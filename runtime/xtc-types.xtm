@@ -169,13 +169,13 @@
                (vector k v)
                (xtc:type:trie-join k (vector k v) (vector-ref t 0) t)))
           (else
-            (let ((prefix (vector-ref t 0)) (bit (vector-ref t 1)))
-              (cond ((not (= (logand k (- bit 1)) prefix))
-                     (xtc:type:trie-join k (vector k v) prefix t))
-                    ((= 0 (logand k bit))
-                     (vector prefix bit (xtc:type:trie-set (vector-ref t 2) k v) (vector-ref t 3)))
-                    (else
-                      (vector prefix bit (vector-ref t 2) (xtc:type:trie-set (vector-ref t 3) k v)))))))))
+           (let ((prefix (vector-ref t 0)) (bit (vector-ref t 1)))
+             (cond ((not (= (logand k (- bit 1)) prefix))
+                    (xtc:type:trie-join k (vector k v) prefix t))
+                   ((= 0 (logand k bit))
+                    (vector prefix bit (xtc:type:trie-set (vector-ref t 2) k v) (vector-ref t 3)))
+                   (else
+                    (vector prefix bit (vector-ref t 2) (xtc:type:trie-set (vector-ref t 3) k v)))))))))
 
 (define xtc:type:empty-subst (vector '() '() 0))
 
@@ -259,55 +259,55 @@
     (let ((rs (xtc:type:resolve s subst))
           (rt (xtc:type:resolve t subst)))
       (cond
-        ((and (xtc:type:var? rs) (xtc:type:var? rt)
-              (= (xtc:type:var-id rs) (xtc:type:var-id rt)))
-         subst)
-        ;; two unbound variables: the younger (higher id) binds to the older.
-        ;; Either way round they resolve alike, but a long-lived variable (a
-        ;; local assigned again and again) then stays the end of its chain;
-        ;; bound to each new result in turn, its chain grew by a link per use
-        ;; and every resolve of it walked the lot
-        ((and (xtc:type:var? rs) (xtc:type:var? rt))
-         (if (> (xtc:type:var-id rs) (xtc:type:var-id rt))
-             (xtc:type:bind (xtc:type:var-id rs) rt subst)
-             (xtc:type:bind (xtc:type:var-id rt) rs subst)))
-        ;; a variable binds to the other side's VARIABLE when it has one (not
-        ;; to that variable's resolution), so binding chains stay connected
-        ;; and a later refinement of the chain's end (refine-named below)
-        ;; reaches every variable that shares the term
-        ((xtc:type:var? rs)
-         (xtc:type:bind (xtc:type:var-id rs) (if (xtc:type:var? t) t rt) subst))
-        ((xtc:type:var? rt)
-         (xtc:type:bind (xtc:type:var-id rt) (if (xtc:type:var? s) s rs) subst))
-        (else
-          (let ((subst2 (xtc:type:unify-ground rs rt subst)))
-            (and subst2
-                 (xtc:type:refine-named t rt rs
-                   (xtc:type:refine-named s rs rt subst2)))))))))
+       ((and (xtc:type:var? rs) (xtc:type:var? rt)
+             (= (xtc:type:var-id rs) (xtc:type:var-id rt)))
+        subst)
+       ;; two unbound variables: the younger (higher id) binds to the older.
+       ;; Either way round they resolve alike, but a long-lived variable (a
+       ;; local assigned again and again) then stays the end of its chain;
+       ;; bound to each new result in turn, its chain grew by a link per use
+       ;; and every resolve of it walked the lot
+       ((and (xtc:type:var? rs) (xtc:type:var? rt))
+        (if (> (xtc:type:var-id rs) (xtc:type:var-id rt))
+            (xtc:type:bind (xtc:type:var-id rs) rt subst)
+            (xtc:type:bind (xtc:type:var-id rt) rs subst)))
+       ;; a variable binds to the other side's VARIABLE when it has one (not
+       ;; to that variable's resolution), so binding chains stay connected
+       ;; and a later refinement of the chain's end (refine-named below)
+       ;; reaches every variable that shares the term
+       ((xtc:type:var? rs)
+        (xtc:type:bind (xtc:type:var-id rs) (if (xtc:type:var? t) t rt) subst))
+       ((xtc:type:var? rt)
+        (xtc:type:bind (xtc:type:var-id rt) (if (xtc:type:var? s) s rs) subst))
+       (else
+        (let ((subst2 (xtc:type:unify-ground rs rt subst)))
+          (and subst2
+               (xtc:type:refine-named t rt rs
+                                      (xtc:type:refine-named s rs rt subst2)))))))))
 
 ;; The non-variable cases of unify: both terms already resolved.
 (define xtc:type:unify-ground
   (lambda (s t subst)
     (cond
-      ;; a BARE generic name (Blob's [Shape*]*) is compatible with any
-      ;; instance of the same name (Shape{double}): under the old structural
-      ;; model the bare form expanded with a free type variable that bound
-      ;; and vanished, so the two were literally one type --- name equality
-      ;; is the nominal rendering of that
-      ((and (xtc:type:named? s) (xtc:type:napp? t)
-            (string=? (xtc:type:named-name s) (xtc:type:napp-name t)))
-       subst)
-      ((and (xtc:type:napp? s) (xtc:type:named? t)
-            (string=? (xtc:type:napp-name s) (xtc:type:named-name t)))
-       subst)
-      ((and (pair? s) (pair? t))
-       (if (and (eq? (car s) (car t))
-                (= (length s) (length t)))
-           (xtc:type:unify-args (cdr s) (cdr t) subst)
-           #f))
-      ((and (atom? s) (atom? t))
-       (if (equal? s t) subst #f))
-      (else #f))))
+     ;; a BARE generic name (Blob's [Shape*]*) is compatible with any
+     ;; instance of the same name (Shape{double}): under the old structural
+     ;; model the bare form expanded with a free type variable that bound
+     ;; and vanished, so the two were literally one type --- name equality
+     ;; is the nominal rendering of that
+     ((and (xtc:type:named? s) (xtc:type:napp? t)
+           (string=? (xtc:type:named-name s) (xtc:type:napp-name t)))
+      subst)
+     ((and (xtc:type:napp? s) (xtc:type:named? t)
+           (string=? (xtc:type:napp-name s) (xtc:type:named-name t)))
+      subst)
+     ((and (pair? s) (pair? t))
+      (if (and (eq? (car s) (car t))
+               (= (length s) (length t)))
+          (xtc:type:unify-args (cdr s) (cdr t) subst)
+          #f))
+     ((and (atom? s) (atom? t))
+      (if (equal? s t) subst #f))
+     (else #f))))
 
 ;; The bare-name compatibility above is a wildcard, and a wildcard bound into a
 ;; variable is a dead end: once the variable holds (ptr (named "Stream")),

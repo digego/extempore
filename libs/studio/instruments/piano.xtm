@@ -67,24 +67,24 @@
 (sys:load "libs/studio/sampler.xtm")
 
 (def-instrument piano
-  "a sampled Yamaha grand piano (the Salamander piano)"
-  ;; the engine reads these seven by position (see *sampler:params*)
-  (params
-    (attack 0.002 "seconds to fade in")
-    (release 0.7 "seconds for a released note to fade by 60 dB (the damper)")
-    (tune 0.0 "transpose, in semitones")
-    (dynamics 30.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
-    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
-    (length 0.0 "seconds after which every note is released (0.0: no limit)")
-    (level 0.3 "output level"))
-  (presets
-    (grand)
-    (soft (dynamics 16.0) (hardness -0.2) (level 0.4))
-    (bright (dynamics 22.0) (hardness 0.4))
-    (felt (hardness -0.7) (release 0.35) (level 0.45))
-    (staccato (release 0.12) (length 0.3))
-    (swell (attack 0.4) (release 2.5) (hardness -0.2))
-    (deep (tune -12.0) (release 1.5) (hardness 0.2))))
+                "a sampled Yamaha grand piano (the Salamander piano)"
+                ;; the engine reads these seven by position (see *sampler:params*)
+                (params
+                 (attack 0.002 "seconds to fade in")
+                 (release 0.7 "seconds for a released note to fade by 60 dB (the damper)")
+                 (tune 0.0 "transpose, in semitones")
+                 (dynamics 30.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+                 (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+                 (length 0.0 "seconds after which every note is released (0.0: no limit)")
+                 (level 0.3 "output level"))
+                (presets
+                 (grand)
+                 (soft (dynamics 16.0) (hardness -0.2) (level 0.4))
+                 (bright (dynamics 22.0) (hardness 0.4))
+                 (felt (hardness -0.7) (release 0.35) (level 0.45))
+                 (staccato (release 0.12) (length 0.3))
+                 (swell (attack 0.4) (release 2.5) (hardness -0.2))
+                 (deep (tune -12.0) (release 1.5) (hardness 0.2))))
 
 (bind-func piano_make
   (lambda ()
@@ -158,29 +158,29 @@
                                  (piano:layer-files dir top)))
                  (count 0))
             (for-each
-              (lambda (range)
-                (let ((files (piano:layer-files dir (car range))))
-                  (for-each
-                    (lambda (kf)
-                      (let* ((key (car kf))
-                             (ab (sampler:buffer (cadr kf) *piano:seconds*))
-                             (match (- (cdr (assv key reference)) (sampler_buffer_rms ab 0.3))))
-                        (if (sampler:add-region
-                              bank (cadr kf)
-                              `((lokey ,(if (= key (car (car files))) 0 (- key 1)))
-                                (hikey ,(if (= key (car (car (reverse files)))) 127 (+ key 1)))
-                                (pitch_keycenter ,key)
-                                (lovel ,(list-ref range 1)) (hivel ,(list-ref range 2))
-                                (xfin_lovel ,(list-ref range 3)) (xfin_hivel ,(list-ref range 4))
-                                (xfout_lovel ,(list-ref range 5)) (xfout_hivel ,(list-ref range 6))
-                                (xf_velcurve 1)
-                                ;; start a few milliseconds before the hammer
-                                ;; strikes, not at the start of the file
-                                (offset ,(sampler_buffer_onset ab 0.02))
-                                (volume ,match)
-                                (loop_mode ,(if (>= (- key 1) *piano:undamped-from*) 1 0)))
-                              *piano:seconds*)
-                            (set! count (+ count 1)))))
-                    files)))
-              ranges)
+             (lambda (range)
+               (let ((files (piano:layer-files dir (car range))))
+                 (for-each
+                  (lambda (kf)
+                    (let* ((key (car kf))
+                           (ab (sampler:buffer (cadr kf) *piano:seconds*))
+                           (match (- (cdr (assv key reference)) (sampler_buffer_rms ab 0.3))))
+                      (if (sampler:add-region
+                           bank (cadr kf)
+                           `((lokey ,(if (= key (car (car files))) 0 (- key 1)))
+                             (hikey ,(if (= key (car (car (reverse files)))) 127 (+ key 1)))
+                             (pitch_keycenter ,key)
+                             (lovel ,(list-ref range 1)) (hivel ,(list-ref range 2))
+                             (xfin_lovel ,(list-ref range 3)) (xfin_hivel ,(list-ref range 4))
+                             (xfout_lovel ,(list-ref range 5)) (xfout_hivel ,(list-ref range 6))
+                             (xf_velcurve 1)
+                             ;; start a few milliseconds before the hammer
+                             ;; strikes, not at the start of the file
+                             (offset ,(sampler_buffer_onset ab 0.02))
+                             (volume ,match)
+                             (loop_mode ,(if (>= (- key 1) *piano:undamped-from*) 1 0)))
+                           *piano:seconds*)
+                          (set! count (+ count 1)))))
+                  files)))
+             ranges)
             (sampler:report 'piano (- (clock:clock) start) count '() '()))))))

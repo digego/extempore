@@ -17,10 +17,10 @@
 (define *xtmlib-portmidi-loaded* #t)
 
 (xtc:aot:suppress-aot-do
-  (sys:load "libs/base/base.xtm"))
+ (sys:load "libs/base/base.xtm"))
 (xtc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 (xtc:aot:suppress-aot-do
-  (sys:load "libs/core/midi.xtm"))
+ (sys:load "libs/core/midi.xtm"))
 (xtc:aot:insert-forms (sys:load "libs/core/midi.xtm" 'quiet))
 
 (xtc:aot:insert-header "xtmportmidi")
@@ -810,22 +810,22 @@ output device(s)
 ;; PmStream as well as one of that library's ports. A PmStream's messages are
 ;; sent by a callback at their time, as they always were.
 (xtc:aot:do-or-emit
-  (define play-midi-note
-    (let ((play-port play-midi-note))
-      (lambda (time device pitch velocity duration channel)
-        (if (midi:port? device)
-            (play-port time device pitch velocity duration channel)
-            (begin
-              (callback time 'pm_send device *midi-note-on* channel pitch velocity)
-              (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity)))))))
+ (define play-midi-note
+   (let ((play-port play-midi-note))
+     (lambda (time device pitch velocity duration channel)
+       (if (midi:port? device)
+           (play-port time device pitch velocity duration channel)
+           (begin
+             (callback time 'pm_send device *midi-note-on* channel pitch velocity)
+             (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity)))))))
 
 (xtc:aot:do-or-emit
-  (define send-midi-cc
-    (let ((send-port send-midi-cc))
-      (lambda (time device cc val channel)
-        (if (midi:port? device)
-            (send-port time device cc val channel)
-            (callback time 'pm_send device *midi-cc* channel (real->integer cc) (real->integer val)))))))
+ (define send-midi-cc
+   (let ((send-port send-midi-cc))
+     (lambda (time device cc val channel)
+       (if (midi:port? device)
+           (send-port time device cc val channel)
+           (callback time 'pm_send device *midi-cc* channel (real->integer cc) (real->integer val)))))))
 
 (xtc:aot:insert-footer "xtmportmidi")
 (define *xtmlib-portmidi-loaded* #t)

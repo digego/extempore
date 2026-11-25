@@ -36,26 +36,26 @@
 (sys:load "libs/studio/sampler.xtm")
 
 (def-instrument drumkit
-  "a sampled acoustic drum kit (the Salamander kit)"
-  ;; the engine reads these seven by position (see *sampler:params*)
-  (params
-    (attack 0.0005 "seconds to fade in")
-    (release 0.08 "seconds to fade by 60 dB once a hit is cut short by length")
-    (tune 0.0 "transpose every drum, in semitones")
-    (dynamics 24.0 "how much quieter a soft hit is: dB between velocity 1.0 and 0.1")
-    (hardness 0.0 "unused: the kit has one recording of each drum")
-    (length 0.0 "seconds after which every hit fades out (0.0: let it ring)")
-    (level 0.28 "output level"))
-  (presets
-    (kit)
-    (tight (tune 1.0) (length 0.35))
-    (deep (tune -3.0) (dynamics 20.0))
-    (high (tune 3.0) (length 0.6))
-    (gated (length 0.12) (release 0.03))
-    (dynamic (dynamics 40.0) (level 0.4)))
-  (sounds
-    (bd 36) (rs 37) (sd 38) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50) (rd 51) (cb 56)
-    (bd2 35) (sd2 40) (ph 44) (cn 52) (rb 53) (sp 55) (cr2 57) (rd2 59)))
+                "a sampled acoustic drum kit (the Salamander kit)"
+                ;; the engine reads these seven by position (see *sampler:params*)
+                (params
+                 (attack 0.0005 "seconds to fade in")
+                 (release 0.08 "seconds to fade by 60 dB once a hit is cut short by length")
+                 (tune 0.0 "transpose every drum, in semitones")
+                 (dynamics 24.0 "how much quieter a soft hit is: dB between velocity 1.0 and 0.1")
+                 (hardness 0.0 "unused: the kit has one recording of each drum")
+                 (length 0.0 "seconds after which every hit fades out (0.0: let it ring)")
+                 (level 0.28 "output level"))
+                (presets
+                 (kit)
+                 (tight (tune 1.0) (length 0.35))
+                 (deep (tune -3.0) (dynamics 20.0))
+                 (high (tune 3.0) (length 0.6))
+                 (gated (length 0.12) (release 0.03))
+                 (dynamic (dynamics 40.0) (level 0.4)))
+                (sounds
+                 (bd 36) (rs 37) (sd 38) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50) (rd 51) (cb 56)
+                 (bd2 35) (sd2 40) (ph 44) (cn 52) (rb 53) (sp 55) (cr2 57) (rd2 59)))
 
 (bind-func drumkit_make
   (lambda ()
@@ -110,19 +110,19 @@
       (if (and dir (sampler:check-params 'drumkit))
           (let ((count 0))
             (for-each
-              (lambda (entry)
-                (let* ((path (string-append dir "/" (cadr entry)))
-                       (ab (sampler:buffer path 0.0)))
-                  (if (and ab (sampler:add-region
-                                bank path
-                                `((lokey ,(car entry)) (hikey ,(car entry))
-                                  (pitch_keycenter ,(car entry))
-                                  (loop_mode 1)
-                                  ;; some recordings (the kicks) have up to
-                                  ;; 15 ms of silence before the hit, which
-                                  ;; would make them late: start just before it
-                                  (offset ,(sampler_buffer_onset ab 0.05))
-                                  ,@(cddr entry))))
-                      (set! count (+ count 1)))))
-              *drumkit:map*)
+             (lambda (entry)
+               (let* ((path (string-append dir "/" (cadr entry)))
+                      (ab (sampler:buffer path 0.0)))
+                 (if (and ab (sampler:add-region
+                              bank path
+                              `((lokey ,(car entry)) (hikey ,(car entry))
+                                (pitch_keycenter ,(car entry))
+                                (loop_mode 1)
+                                ;; some recordings (the kicks) have up to
+                                ;; 15 ms of silence before the hit, which
+                                ;; would make them late: start just before it
+                                (offset ,(sampler_buffer_onset ab 0.05))
+                                ,@(cddr entry))))
+                     (set! count (+ count 1)))))
+             *drumkit:map*)
             (sampler:report 'drumkit (- (clock:clock) start) count '() '()))))))

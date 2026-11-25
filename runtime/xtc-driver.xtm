@@ -229,13 +229,13 @@
                                                    (xtc:cache:get-closure-arg-types symname-string)))
                                         (cdr (assq symname types))))))
           (xtc:diagnostics:print-no-redefinitions-error
-            symname
-            (xtc:codegen:pptype (cons (+ *xtc:codegen:closure*
-                                         *xtc:codegen:pointer*
-                                         *xtc:codegen:pointer*)
-                                      (map (lambda (x) (xtc:codegen:get-type-from-str x))
-                                           (xtc:cache:get-closure-arg-types symname-string))))
-            (xtc:codegen:pptype (cdr (assq symname types)))))
+           symname
+           (xtc:codegen:pptype (cons (+ *xtc:codegen:closure*
+                                        *xtc:codegen:pointer*
+                                        *xtc:codegen:pointer*)
+                                     (map (lambda (x) (xtc:codegen:get-type-from-str x))
+                                          (xtc:cache:get-closure-arg-types symname-string))))
+           (xtc:codegen:pptype (cdr (assq symname types)))))
       ;(log-error "stop")
       (if *xtc:globals:print-ast* (println '---------------------------------))
       (if *xtc:globals:print-ast* (println 'types: types))
@@ -276,10 +276,10 @@
                       (mk-ff (symbol->string symname) (llvm:get-function-pointer (string-append (symbol->string symname) "_scheme"))))))
             ;; (xtc:aot:insert-nativefunc-binding-details library symname type docstring)))
             (xtc:diagnostics:print-bind-func-details-to-log
-              "Compiled:"
-              symname ;(string->symbol (car (regex:split symname-string "_adhoc_")))
-              (xtc:codegen:pretty-print-type closure-type)
-              0 "[static]"))
+             "Compiled:"
+             symname ;(string->symbol (car (regex:split symname-string "_adhoc_")))
+             (xtc:codegen:pretty-print-type closure-type)
+             0 "[static]"))
           (let* ((closure-type (cadr (xtc:codegen:ssa-temp))) ;; normal closure
                  (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str closure-type))))
                  ;; Check if closure has a type. If not, this is first compilation and we need stubs.
@@ -344,13 +344,13 @@
                  (cb-struct-type (if (null? (cdr stub-type))
                                      '()
                                      (string-append ;"{void(i8*)*"
-                                                    "{"
-                                                    (xtc:codegen:get-type-str (cadr stub-type))
-                                                    (apply string-append
-                                                           (map (lambda (a)
-                                                                  (string-append ", " (xtc:codegen:get-type-str a)))
-                                                                (cddr stub-type)))
-                                                    "}*")))
+                                      "{"
+                                      (xtc:codegen:get-type-str (cadr stub-type))
+                                      (apply string-append
+                                             (map (lambda (a)
+                                                    (string-append ", " (xtc:codegen:get-type-str a)))
+                                                  (cddr stub-type)))
+                                      "}*")))
                  (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat, %mzone* %inzone) alwaysinline nounwind {\n"
                                                                                           "entry:\n"
                                                                                           (if (null? cb-struct-type)
@@ -546,9 +546,9 @@
             (if *xtc:globals:print* (print-full-nq scheme-stub-ir))
             (if (and *xtc:globals:compile* compile-stub?)
                 (begin (xtc:codegen:queue-ir-for-compilation stub-ir)
-                  (xtc:codegen:queue-ir-for-compilation native-ir)
-                  (if (and scheme-stub-valid? *xtc:globals:scheme-stubs*)
-                      (xtc:codegen:queue-ir-for-compilation scheme-stub-ir) #t)))
+                       (xtc:codegen:queue-ir-for-compilation native-ir)
+                       (if (and scheme-stub-valid? *xtc:globals:scheme-stubs*)
+                           (xtc:codegen:queue-ir-for-compilation scheme-stub-ir) #t)))
             (if *xtc:globals:print*
                 (println '----------------------------compiling 'callback----------------------------------->))
             (if *xtc:globals:print* (print-full-nq callback-ir))
@@ -599,22 +599,22 @@
                   (cond ((regex:match? symname-string "_poly_")
                          ;; (println 'spec: symname-string)
                          (xtc:diagnostics:print-bind-func-details-to-log
-                           "Spec'zed:"
-                           (string->symbol (car (regex:split symname-string "_poly_")))
-                           (xtc:codegen:pretty-print-type closure-type)
-                           zone-size))
+                          "Spec'zed:"
+                          (string->symbol (car (regex:split symname-string "_poly_")))
+                          (xtc:codegen:pretty-print-type closure-type)
+                          zone-size))
                         ((regex:match? symname-string "_adhoc_")
                          (xtc:diagnostics:print-bind-func-details-to-log
-                           "Compiled:"
-                           (string->symbol (car (regex:split symname-string "_adhoc_")))
-                           (xtc:codegen:pretty-print-type closure-type)
-                           zone-size))
+                          "Compiled:"
+                          (string->symbol (car (regex:split symname-string "_adhoc_")))
+                          (xtc:codegen:pretty-print-type closure-type)
+                          zone-size))
                         (else
-                          (xtc:diagnostics:print-bind-func-details-to-log
-                            "Compiled:"
-                            symname
-                            (xtc:codegen:pretty-print-type closure-type)
-                            zone-size)))))
+                         (xtc:diagnostics:print-bind-func-details-to-log
+                          "Compiled:"
+                          symname
+                          (xtc:codegen:pretty-print-type closure-type)
+                          zone-size)))))
             symname-string)))))
 
 ;; Reentrant wrapper: an instance compile can be triggered MID-PIPELINE --- a
@@ -629,5 +629,5 @@
       (let-temporarily ((*xtc:codegen:sym-name-stack* *xtc:codegen:sym-name-stack*)
                         (*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
                         (*xtc:globals:bound-lambdas* *xtc:globals:bound-lambdas*))
-        ;; whatever the compiler prints is a message
-        (sys:as-message (apply run-fresh args))))))
+                       ;; whatever the compiler prints is a message
+                       (sys:as-message (apply run-fresh args))))))

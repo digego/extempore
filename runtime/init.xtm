@@ -95,8 +95,8 @@
 (define *s7-catch* catch)
 (define-macro (catch error-value . body)
   `(*s7-catch* #t
-    (lambda () ,@body)
-    (lambda (type info) ,error-value)))
+               (lambda () ,@body)
+               (lambda (type info) ,error-value)))
 
 ;; Code sent from an editor for evaluation goes through sys:eval-string. It
 ;; reads and evaluates each form inside s7's native catch so an uncaught error
@@ -130,40 +130,40 @@
 
 (define (sys:error-report-string tag info . location)
   (*s7-catch* #t
-    (lambda ()
-      (if (sys:xtlang-error? tag)
-          (#_format #f ";~A~A~%" tag
-            (if (pair? location) (#_format #f "~%;    ~A" (car location)) ""))
-      (let* ((ow (owlet))
-             (msg (if (and (pair? info) (string? (car info)))
-                      (apply #_format #f info)
-                      (#_format #f "~S ~S" tag info)))
-             (file (let-ref ow 'error-file)))
-        ;; the message, the offending form (truncated to keep one-line error
-        ;; reports readable --- (*s7* 'print-length) is deliberately raised at
-        ;; startup so `write` round-trips, so it can't serve as the limit here),
-        ;; then the source location. A form read from a bare string port has no
-        ;; filename, so coerce #f to "" --- matching what s7's loader prints
-        ;; for editor evals.
-        (#_format #f "~%;~A~%;    ~A~%;    ~A~%"
-          msg
-          (#_object->string (let-ref ow 'error-code) #f 40)
-          (if (pair? location)
-              (car location)
-              (#_format #f "~A, line ~A, position: ~A"
-                (if (string? file) file "")
-                (let-ref ow 'error-line)
-                (let-ref ow 'error-position)))))))
-    ;; the reporter must never itself throw
-    (lambda (t i) (#_format #f "~%;~S ~S~%" tag info))))
+              (lambda ()
+                (if (sys:xtlang-error? tag)
+                    (#_format #f ";~A~A~%" tag
+                              (if (pair? location) (#_format #f "~%;    ~A" (car location)) ""))
+                    (let* ((ow (owlet))
+                           (msg (if (and (pair? info) (string? (car info)))
+                                    (apply #_format #f info)
+                                    (#_format #f "~S ~S" tag info)))
+                           (file (let-ref ow 'error-file)))
+                      ;; the message, the offending form (truncated to keep one-line error
+                      ;; reports readable --- (*s7* 'print-length) is deliberately raised at
+                      ;; startup so `write` round-trips, so it can't serve as the limit here),
+                      ;; then the source location. A form read from a bare string port has no
+                      ;; filename, so coerce #f to "" --- matching what s7's loader prints
+                      ;; for editor evals.
+                      (#_format #f "~%;~A~%;    ~A~%;    ~A~%"
+                                msg
+                                (#_object->string (let-ref ow 'error-code) #f 40)
+                                (if (pair? location)
+                                    (car location)
+                                    (#_format #f "~A, line ~A, position: ~A"
+                                              (if (string? file) file "")
+                                              (let-ref ow 'error-line)
+                                              (let-ref ow 'error-position)))))))
+              ;; the reporter must never itself throw
+              (lambda (t i) (#_format #f "~%;~S ~S~%" tag info))))
 
 (define (sys:report-error tag info)
   (#_display (sys:error-report-string tag info) (current-error-port)))
 
 (define (sys:eval-top-level form)
   (*s7-catch* #t
-    (lambda () (eval form (rootlet)))
-    (lambda (tag info) (sys:report-error tag info) tag)))
+              (lambda () (eval form (rootlet)))
+              (lambda (tag info) (sys:report-error tag info) tag)))
 
 ;; sys:apply-top-level is the same idea for a scheduled callback (temporal
 ;; recursion, OSC handlers): scheme_call applies a closure whose error would
@@ -171,15 +171,15 @@
 ;; unwinds cleanly and reports the error without the accumulating stacktrace.
 (define (sys:apply-top-level func args)
   (*s7-catch* #t
-    (lambda () (apply func args))
-    (lambda (tag info) (sys:report-error tag info) tag)))
+              (lambda () (apply func args))
+              (lambda (tag info) (sys:report-error tag info) tag)))
 
 (define (sys:eval-string str)
   (let ((port (open-input-string str)))
     (let loop ((last (if #f #f)))
       (let ((form (*s7-catch* #t
-                    (lambda () (read port))
-                    (lambda (tag info) (sys:report-error tag info) 'sys:read-error))))
+                              (lambda () (read port))
+                              (lambda (tag info) (sys:report-error tag info) 'sys:read-error))))
         (if (or (eof-object? form) (eq? form 'sys:read-error))
             (begin (close-input-port port) last)
             (loop (sys:eval-top-level form)))))))
@@ -197,10 +197,10 @@
 
 (define (close-port p)
   (cond
-    ((input-output-port? p) (close-input-port (close-output-port p)))
-    ((input-port? p) (close-input-port p))
-    ((output-port? p) (close-output-port p))
-    (else (throw "Not a port" p))))
+   ((input-output-port? p) (close-input-port (close-output-port p)))
+   ((input-port? p) (close-input-port p))
+   ((output-port? p) (close-output-port p))
+   (else (throw "Not a port" p))))
 
 (define (call-with-input-file s p)
   (let ((inport (open-input-file s)))
@@ -299,4 +299,3 @@
                (if (apply proc (list val x)) acc (cons x acc)))
              (list)
              lst))))
-

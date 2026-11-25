@@ -93,9 +93,9 @@
     (let* ((all-gpolys (or (hashtable-ref *xtc:cache:genericfunc-cache* (symbol->string name)) '()))
            (all-gtypes (map (lambda (x) (caddr x)) all-gpolys))
            (all-type-arity (map (lambda (x) (length
-                                              (cl:remove-duplicates
-                                                (regex:match-all (symbol->string x)
-                                                                 "(![A-Za-z0-9_]*)"))))
+                                             (cl:remove-duplicates
+                                              (regex:match-all (symbol->string x)
+                                                               "(![A-Za-z0-9_]*)"))))
                                 all-gtypes))
            (res (cl:remove #f (map (lambda (x y) (if (= x xvararity) y #f)) all-type-arity all-gtypes))))
       (if (<> (length res) 1)
@@ -144,30 +144,30 @@
 (define xtc:desugar:simplify-genericfunc-pretty-type
   (lambda (pretty-type)
     (string-append
-      "["
-      (string-join
-        (map (lambda (x)
-               (if (string-contains? x ":")
-                   (xtc:codegen:add-ptr-depth (car (regex:type-split x ":"))
-                                              (xtc:codegen:get-ptr-depth x))
-                   x))
-             (xtc:codegen:get-pretty-closure-arg-strings pretty-type))
-        ",")
-      "]*")))
+     "["
+     (string-join
+      (map (lambda (x)
+             (if (string-contains? x ":")
+                 (xtc:codegen:add-ptr-depth (car (regex:type-split x ":"))
+                                            (xtc:codegen:get-ptr-depth x))
+                 x))
+           (xtc:codegen:get-pretty-closure-arg-strings pretty-type))
+      ",")
+     "]*")))
 
 (define xtc:desugar:simplify-generictype-pretty-type
   (lambda (pretty-type)
     (string-append
-      "<"
-      (string-join
-        (map (lambda (x)
-               (if (string-contains? x ":")
-                   (xtc:codegen:add-ptr-depth (car (regex:type-split x ":"))
-                                              (xtc:codegen:get-ptr-depth x))
-                   x))
-             (xtc:codegen:get-pretty-tuple-arg-strings pretty-type))
-        ",")
-      ">")))
+     "<"
+     (string-join
+      (map (lambda (x)
+             (if (string-contains? x ":")
+                 (xtc:codegen:add-ptr-depth (car (regex:type-split x ":"))
+                                            (xtc:codegen:get-ptr-depth x))
+                 x))
+           (xtc:codegen:get-pretty-tuple-arg-strings pretty-type))
+      ",")
+     ">")))
 
 ;; this currently doesn't work for multiple "replace" instances
 
@@ -201,34 +201,34 @@
                          (cond ((ast:let? ast)
                                 ;; first find and replace all shadow vars
                                 (let* ((replace-pairs
-                                         (cl:remove
-                                           #f
-                                           (flatten
-                                             (map (lambda (x)
-                                                    (let* ((pair (regex:type-split (symbol->string (ast:binding-var x)) ":"))
-                                                           (sym (string->symbol (car pair))))
-                                                      (if (and (not (equal? sym symname))
-                                                               (or (member sym syms)
-                                                                   (xtc:cache:namedtype-exists? (symbol->string sym))
-                                                                   (xtc:cache:genericfunc-exists? sym)
-                                                                   (xtc:cache:xtmacro-exists? (symbol->string sym))
-                                                                   (xtc:cache:polyfunc-exists? (symbol->string sym))
-                                                                   (and (not (equal? sym fname))
-                                                                        (xtc:cache:closure-exists? (symbol->string sym)))
-                                                                   (xtc:cache:globalvar-exists? (symbol->string sym))))
-                                                          (let ((shadow (xtc:desugar:gen-shadow sym)))
-                                                            (set! syms (cons shadow syms))
-                                                            (if (null? (cdr pair))
-                                                                (cons sym shadow)
-                                                                (list (cons sym shadow)
-                                                                      (cons (ast:binding-var x)
-                                                                            (string->symbol
-                                                                              (string-append
-                                                                                (symbol->string shadow) ":" (cadr pair)))))))
-                                                          (begin
-                                                            (set! syms (cons sym syms))
-                                                            #f))))
-                                                  (ast:let-bindings ast)))))
+                                        (cl:remove
+                                         #f
+                                         (flatten
+                                          (map (lambda (x)
+                                                 (let* ((pair (regex:type-split (symbol->string (ast:binding-var x)) ":"))
+                                                        (sym (string->symbol (car pair))))
+                                                   (if (and (not (equal? sym symname))
+                                                            (or (member sym syms)
+                                                                (xtc:cache:namedtype-exists? (symbol->string sym))
+                                                                (xtc:cache:genericfunc-exists? sym)
+                                                                (xtc:cache:xtmacro-exists? (symbol->string sym))
+                                                                (xtc:cache:polyfunc-exists? (symbol->string sym))
+                                                                (and (not (equal? sym fname))
+                                                                     (xtc:cache:closure-exists? (symbol->string sym)))
+                                                                (xtc:cache:globalvar-exists? (symbol->string sym))))
+                                                       (let ((shadow (xtc:desugar:gen-shadow sym)))
+                                                         (set! syms (cons shadow syms))
+                                                         (if (null? (cdr pair))
+                                                             (cons sym shadow)
+                                                             (list (cons sym shadow)
+                                                                   (cons (ast:binding-var x)
+                                                                         (string->symbol
+                                                                          (string-append
+                                                                           (symbol->string shadow) ":" (cadr pair)))))))
+                                                       (begin
+                                                         (set! syms (cons sym syms))
+                                                         #f))))
+                                               (ast:let-bindings ast)))))
                                        (newast (if (null? replace-pairs) ast (replace-all ast replace-pairs))))
                                   ;; now make sure we have code coverage!
                                   (cons (ast:let-tag newast)
@@ -238,33 +238,33 @@
                                               (f (ast:let-body-forms newast) fname)))))
                                ((ast:lambda? ast)
                                 (let* ((replace-pairs
-                                         (cl:remove
-                                           #f
-                                           (flatten
-                                             (map (lambda (x)
-                                                    (let* ((pair (regex:type-split (symbol->string x) ":"))
-                                                           (sym (string->symbol (car pair))))
-                                                      (if (or (member sym syms)
-                                                              (xtc:cache:namedtype-exists? (symbol->string sym))
-                                                              (xtc:cache:genericfunc-exists? sym)
-                                                              (xtc:cache:xtmacro-exists? (symbol->string sym))
-                                                              (xtc:cache:polyfunc-exists? (symbol->string sym))
-                                                              (and (not (equal? sym fname))
-                                                                   (xtc:cache:closure-exists? (symbol->string sym)))
-                                                              (xtc:cache:globalvar-exists? (symbol->string sym)))
-                                                          (let ((shadow (xtc:desugar:gen-shadow sym)))
-                                                            (set! syms (cons shadow syms))
-                                                            (if (null? (cdr pair))
-                                                                (cons x shadow)
-                                                                (list (cons sym shadow)
-                                                                      (cons x
-                                                                            (string->symbol
-                                                                              (string-append
-                                                                                (symbol->string shadow) ":" (cadr pair)))))))
-                                                          (begin
-                                                            (set! syms (cons sym syms))
-                                                            #f))))
-                                                  (ast:lambda-params ast)))))
+                                        (cl:remove
+                                         #f
+                                         (flatten
+                                          (map (lambda (x)
+                                                 (let* ((pair (regex:type-split (symbol->string x) ":"))
+                                                        (sym (string->symbol (car pair))))
+                                                   (if (or (member sym syms)
+                                                           (xtc:cache:namedtype-exists? (symbol->string sym))
+                                                           (xtc:cache:genericfunc-exists? sym)
+                                                           (xtc:cache:xtmacro-exists? (symbol->string sym))
+                                                           (xtc:cache:polyfunc-exists? (symbol->string sym))
+                                                           (and (not (equal? sym fname))
+                                                                (xtc:cache:closure-exists? (symbol->string sym)))
+                                                           (xtc:cache:globalvar-exists? (symbol->string sym)))
+                                                       (let ((shadow (xtc:desugar:gen-shadow sym)))
+                                                         (set! syms (cons shadow syms))
+                                                         (if (null? (cdr pair))
+                                                             (cons x shadow)
+                                                             (list (cons sym shadow)
+                                                                   (cons x
+                                                                         (string->symbol
+                                                                          (string-append
+                                                                           (symbol->string shadow) ":" (cadr pair)))))))
+                                                       (begin
+                                                         (set! syms (cons sym syms))
+                                                         #f))))
+                                               (ast:lambda-params ast)))))
                                        (newast (if (null? replace-pairs) ast (replace-all ast replace-pairs))))
                                   (cons (ast:lambda-tag ast)
                                         (cons (ast:lambda-params newast)
@@ -346,58 +346,58 @@
     (if (null? ast)
         `(print_return)
         `(begin
-          ,(if (string? (car ast))
-               (list 'printf "%s" (car ast))
-               (list 'print (car ast)))
-          ,@(flatten-1 (map (lambda (x)
-                              (if (string? x)
-                                  (list
+           ,(if (string? (car ast))
+                (list 'printf "%s" (car ast))
+                (list 'print (car ast)))
+           ,@(flatten-1 (map (lambda (x)
+                               (if (string? x)
+                                   (list
                                     (list 'print_space)
                                     (list 'printf "%s" x))
-                                  (list
+                                   (list
                                     (list 'print_space)
                                     (list 'print x))))
-                            (cdr ast)))
-          (print_return)))))
+                             (cdr ast)))
+           (print_return)))))
 
 (define xtc:desugar:println2
   (lambda (ast)
     (if (null? ast)
         `(print_return)
         `(begin
-          ,(if (string? (car ast))
-               (list 'printf "%s" (car ast))
-               (list 'print (car ast)))
-          ,@(flatten-1 (map (lambda (x)
-                              (if (string? x)
-                                  (list
+           ,(if (string? (car ast))
+                (list 'printf "%s" (car ast))
+                (list 'print (car ast)))
+           ,@(flatten-1 (map (lambda (x)
+                               (if (string? x)
+                                   (list
                                     ;; (list 'print_space)
                                     (list 'printf "%s" x))
-                                  (list
+                                   (list
                                     ;; (list 'print_space)
                                     (list 'print x))))
-                            (cdr ast)))
-          void))))
+                             (cdr ast)))
+           void))))
 
 (define xtc:desugar:sprintln
   (lambda (ast)
     (if (null? ast)
         (String "")
         `(memzone 1024
-          (cat
+           (cat
             ,(if (string? (car ast))
                  `(let ((x_t_mst:i8* (salloc 1024)))
-                   (sprintf x_t_mst "%s" ,(car ast))
-                   (String x_t_mst))
+                    (sprintf x_t_mst "%s" ,(car ast))
+                    (String x_t_mst))
                  (list 'toString (car ast)))
             ,@(flatten-1 (map (lambda (x)
                                 (if (string? x)
                                     (list `(let ((x_t_mst:i8* (salloc 1024)))
-                                            (sprintf x_t_mst " %s" ,x)
-                                            (String x_t_mst)))
+                                             (sprintf x_t_mst " %s" ,x)
+                                             (String x_t_mst)))
                                     (list
-                                      (list 'toString_space)
-                                      (list 'toString x))))
+                                     (list 'toString_space)
+                                     (list 'toString x))))
                               (cdr ast))))))))
 
 
@@ -406,12 +406,12 @@
     (if (null? ast)
         (String "")
         `(memzone 1024
-          (cat
+           (cat
             ,@(map (lambda (x)
                      (if (string? x)
                          `(let ((xx_t_mst:i8* (salloc 1024)))
-                           (sprintf xx_t_mst "%s" ,x)
-                           (String xx_t_mst))
+                            (sprintf xx_t_mst "%s" ,x)
+                            (String xx_t_mst))
                          (list 'toString x)))
                    ast))))))
 
@@ -459,7 +459,7 @@
                                   (xtc:desugar:first-transform (ast:lambda-params ast) #t)
                                   (ast:make-begin (xtc:desugar:first-transform (ast:lambda-body-forms ast) #t)))))
       `(let ((,fname ,expr))
-        (begin ,fname)))))
+         (begin ,fname)))))
 
 
 ;; replace (* 2 3 4 5) or (+ 2 3 4 5)
@@ -540,7 +540,7 @@
          (symbol? (car form))
          (or (memq (car form) '(dotimes doloop while))
              (xtc:desugar:type-str-void-return?
-               (xtc:cache:get-builtin-type-str (symbol->string (car form))))))))
+              (xtc:cache:get-builtin-type-str (symbol->string (car form))))))))
 
 (define xtc:desugar:check-memzone-void?
   (lambda (ast)
@@ -563,17 +563,17 @@
     (define zone_returns_void? (xtc:desugar:check-memzone-void? ast))
     (if zone_returns_void?
         `(begin (push_new_zone ,(cadr ast))
-          ,(if (= (length ast) 3) (caddr ast) (cadddr ast))
-          (let ((zonename (pop_zone))
-                (hook:<i64,i8*,i8*>* (cast (tref zonename 4)))
-                (f:[void]* null))
-            (while (not (null? hook))
-              (set! f (cast (tref hook 1) [void]*))
-              (f)
-              (set! hook (cast (tref hook 2) <i64,i8*,i8*>*)))
-            (llvm_zone_destroy zonename)
-            )
-          void)
+                ,(if (= (length ast) 3) (caddr ast) (cadddr ast))
+                (let ((zonename (pop_zone))
+                      (hook:<i64,i8*,i8*>* (cast (tref zonename 4)))
+                      (f:[void]* null))
+                  (while (not (null? hook))
+                    (set! f (cast (tref hook 1) [void]*))
+                    (f)
+                    (set! hook (cast (tref hook 2) <i64,i8*,i8*>*)))
+                  (llvm_zone_destroy zonename)
+                  )
+                void)
         (begin
           (define resname (string->symbol (string-append "res" (number->string (modulo *xtm_mz_num* 100)))))
           (define zonename (string->symbol (string-append "zone" (number->string (modulo *xtm_mz_num* 100)))))
@@ -584,26 +584,26 @@
                   (< (length ast) 3))
               (xtc:diagnostics:print-bad-arity-error ast))
           `(begin (push_new_zone ,(cadr ast))
-            (let ((,resname ,(if (= (length ast) 3) (caddr ast) (cadddr ast)))
-                  (,zonename (pop_zone))
-                  (,newzname (llvm_peek_zone_stack)))
-              ;; this extra let seems reduentant! BUT is needed
-              ;; because rescopyname should go in newzone not zonename
-              ;; i.e. needs to go into a *new* let after pop_zone is called
-              (let ((,rescopyname (zcopy ,resname ,zonename ,newzname))
-                    (hook:<i64,i8*,i8*>* (cast (tref ,zonename 4)))
-                    (f:[void]* null))
-                ,(if (= (length ast) 3)
-                     `(begin
-                       (while (not (null? hook))
-                         (set! f (cast (tref hook 1) [void]*))
-                         (f)
-                         (set! hook (cast (tref hook 2) <i64,i8*,i8*>*))
-                         1)
-                       (llvm_zone_destroy ,zonename)
-                       )
-                     `(llvm_destroy_zone_after_delay ,zonename ,(caddr ast)))
-                ,rescopyname)))))))
+                  (let ((,resname ,(if (= (length ast) 3) (caddr ast) (cadddr ast)))
+                        (,zonename (pop_zone))
+                        (,newzname (llvm_peek_zone_stack)))
+                    ;; this extra let seems reduentant! BUT is needed
+                    ;; because rescopyname should go in newzone not zonename
+                    ;; i.e. needs to go into a *new* let after pop_zone is called
+                    (let ((,rescopyname (zcopy ,resname ,zonename ,newzname))
+                          (hook:<i64,i8*,i8*>* (cast (tref ,zonename 4)))
+                          (f:[void]* null))
+                      ,(if (= (length ast) 3)
+                           `(begin
+                              (while (not (null? hook))
+                                (set! f (cast (tref hook 1) [void]*))
+                                (f)
+                                (set! hook (cast (tref hook 2) <i64,i8*,i8*>*))
+                                1)
+                              (llvm_zone_destroy ,zonename)
+                              )
+                           `(llvm_destroy_zone_after_delay ,zonename ,(caddr ast)))
+                      ,rescopyname)))))))
 
 (define xtc:desugar:beginz
   (lambda (ast)
@@ -616,14 +616,14 @@
     (if (and (list? (cadr ast))
              (list? (caadr ast)))
         (xtc:desugar:memzone `(memzone ,(* 1024 4)
-                               (let ,(cadr ast) ,@(cddr ast))))
+                                (let ,(cadr ast) ,@(cddr ast))))
         (xtc:desugar:memzone `(memzone ,(cadr ast)
-                               (let ,(caddr ast) ,@(cdddr ast)))))))
+                                (let ,(caddr ast) ,@(cdddr ast)))))))
 
 (xtc:cache:register-new-builtin
-  "letz"
-  ""
-  "let-bind temporary variables
+ "letz"
+ ""
+ "let-bind temporary variables
 
 Create a new memzone (with optional zone-size), execute `body' with
 temporary variables bound as described in `bindings', copy the final
@@ -644,7 +644,7 @@ e.g.
   (+ a b (ftoi64 (pref c 0))))
 
 `letz' is the same as `let', with the addition of the new memzone"
-  '(bindings [zone-size] body))
+ '(bindings [zone-size] body))
 
 (define xtc:desugar:zone_cleanup
   (lambda (ast)
@@ -652,55 +652,55 @@ e.g.
            (hooks:<i64,i8*,i8*>* (cast (tref zone 4)))
            (hook:<i64,i8*,i8*>* (alloc))
            (f (lambda () ,@(cdr ast) void)))
-      (tfill! hook 0 (cast f i8*) (cast hooks i8*))
-      (tset! zone 4 (cast hook i8*))
-      void)))
+       (tfill! hook 0 (cast f i8*) (cast hooks i8*))
+       (tset! zone 4 (cast hook i8*))
+       void)))
 
 (define xtc:desugar:callback
   (lambda (ast)
     `(let ((zold (llvm_peek_zone_stack))
            (znew (create_zone (* 1024 4))))
-      (llvm_callback ,(car ast)
-                     ,(cadr ast)
-                     znew
-                     ,@(map (lambda (x)
-                              (xtc:desugar:first-transform `(zcopy ,x zold znew) #t))
-                            (cddr ast)))
-      void)))
+       (llvm_callback ,(car ast)
+                      ,(cadr ast)
+                      znew
+                      ,@(map (lambda (x)
+                               (xtc:desugar:first-transform `(zcopy ,x zold znew) #t))
+                             (cddr ast)))
+       void)))
 
 (define (xtc:desugar:multicref args)
   `(let ,(append (map (lambda (a b n)
                         (list (string->symbol (string-append "f" (number->string n) ":[void]*"))
                               (list (string->symbol
-                                      (string-append
-                                        (if (= n 0)
-                                            (symbol->string a)
-                                            (string-append "f" (number->string (- n 1))))
-                                        "." (symbol->string b))))))
+                                     (string-append
+                                      (if (= n 0)
+                                          (symbol->string a)
+                                          (string-append "f" (number->string (- n 1))))
+                                      "." (symbol->string b))))))
                       (reverse (cdddr (reverse args)))
                       (cdr (reverse (cdr (reverse args))))
                       (range (length (cddr args))))
                  (list (list (string->symbol (string-append "v:" (symbol->string (car (reverse args)))))
                              (list (string->symbol (string-append "f" (number->string (length (cddddr args))) "."
                                                                   (symbol->string (cadr (reverse args)))))))))
-    v))
+     v))
 
 (define (xtc:desugar:multicset args)
   `(let ,(map (lambda (a b n)
                 (list (string->symbol (string-append "f" (number->string n) ":[void]*"))
                       (list (string->symbol
-                              (string-append
-                                (if (= n 0)
-                                    (symbol->string a)
-                                    (string-append "f" (number->string (- n 1))))
-                                "." (symbol->string b))))))
+                             (string-append
+                              (if (= n 0)
+                                  (symbol->string a)
+                                  (string-append "f" (number->string (- n 1))))
+                              "." (symbol->string b))))))
               (reverse (cddddr (reverse args)))
               (cdr (reverse (cdr (reverse args))))
               (range (length (cdddr args))))
-    (,(string->symbol (string-append "f" (number->string (- (length (cddddr args)) 1)) "."
-                                     (symbol->string (caddr (reverse args)))
-                                     ":" (symbol->string (cadr (reverse args)))))
-     ,(car (reverse args)))))
+     (,(string->symbol (string-append "f" (number->string (- (length (cddddr args)) 1)) "."
+                                      (symbol->string (caddr (reverse args)))
+                                      ":" (symbol->string (cadr (reverse args)))))
+      ,(car (reverse args)))))
 
 
 ;; (>= a b) is (or (> a b) (= a b)), which names each operand twice, so an
@@ -731,18 +731,18 @@ e.g.
     (let* ((pair (regex:type-split (symbol->string (caadr ast)) ":"))
            (sym (string->symbol (car pair))))
       `(let ((,(caadr ast) (bitconvert 0)))
-        (begin
-          (dotimes
-              ,(if (null? (cddr (cadr ast)))
-                   `(,sym ,(xtc:desugar:first-transform (cadr (cadr ast)) inbody?))
-                   `(,sym ,(xtc:desugar:first-transform (cadr (cadr ast)) inbody?)
-                     ,(xtc:desugar:first-transform (caddr (cadr ast)) inbody?)))
-            (begin ,@(xtc:desugar:first-transform (cddr ast) inbody?))))))))
+         (begin
+           (dotimes
+               ,(if (null? (cddr (cadr ast)))
+                    `(,sym ,(xtc:desugar:first-transform (cadr (cadr ast)) inbody?))
+                    `(,sym ,(xtc:desugar:first-transform (cadr (cadr ast)) inbody?)
+                           ,(xtc:desugar:first-transform (caddr (cadr ast)) inbody?)))
+             (begin ,@(xtc:desugar:first-transform (cddr ast) inbody?))))))))
 
 (xtc:cache:register-new-builtin
-  "doloop"
-  ""
-  "doloop
+ "doloop"
+ ""
+ "doloop
 
 Execute `body' forms `count' times, with `index-variable' bound to
 successive numerical values (incrementing by 1 each loop). If `start'
@@ -751,7 +751,7 @@ is given, start from there, otherwise start from 0.
 `index-variable' will be automatically bound as a temporary variable
 of type i32, i64, float or double - the type will be inferred from the
 types of `start' and `count'"
-  '(index-variable [start] count body))
+ '(index-variable [start] count body))
 
 (define xtc:desugar:dotimes
   (lambda (ast inbody?)
@@ -761,9 +761,9 @@ types of `start' and `count'"
 
 
 (xtc:cache:register-new-builtin
-  "dotimes"
-  ""
-  "dotimes loop
+ "dotimes"
+ ""
+ "dotimes loop
 
 Execute `body' forms `count' times, with `index-variable' bound to
 successive numerical values (incrementing by 1 each loop). If `start'
@@ -772,7 +772,7 @@ is given, start from there, otherwise start from 0.
 `index-variable' can be either i32, i64, float or double, and must be
 defined outside the loop. For a loop where the index variable is
 automatically bound as a temporary variable, see `doloop'."
-  '(index-variable [start] count body))
+ '(index-variable [start] count body))
 
 (define xtc:desugar:while
   (lambda (ast inbody?)
@@ -781,12 +781,12 @@ automatically bound as a temporary variable, see `doloop'."
           (ast:make-begin (xtc:desugar:first-transform (cdr (ast:call-args ast)) inbody?)))))
 
 (xtc:cache:register-new-builtin
-  "while"
-  ""
-  "while loop
+ "while"
+ ""
+ "while loop
 
 Continue executing `body' forms until `test-expression' returns #f"
-  '(test-expression body))
+ '(test-expression body))
 
 (define *unique-polynum* 0)
 
@@ -799,133 +799,133 @@ Continue executing `body' forms until `test-expression' returns #f"
     (let* ((head-str (symbol->string (car ast)))
            (p (regex:type-split head-str ":")))
       (cond
-        ((xtc:cache:get-polyfunc-candidate
-           (car p) (xtc:codegen:get-type-from-pretty-str (cadr p)))
-         (cons (xtc:cache:get-polyfunc-candidate
-                 (car p) (xtc:codegen:get-type-from-pretty-str (cadr p)))
-               (xtc:desugar:first-transform (cdr ast) inbody?)))
-        ((xtc:cache:genericfunc-exists? (car p))
-         (let ((ptrdepth (xtc:codegen:get-ptr-depth (cadr p))))
-           (xtc:bind:specialize-genericfunc (car p) (cadr p))
-           (cons
-             (string->symbol (xtc:codegen:add-ptr-depth (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
-             (xtc:desugar:first-transform (cdr ast) inbody?))))
-        ((xtc:cache:polyfunc-exists? (car p))
-         (let* ((t (if (xtc:cache:typealias-exists? (cadr p))
-                       (xtc:cache:get-typealias-type (cadr p))
-                       (cadr p)))
-                (cname (cname-encode (xtc:codegen:get-base-type t)))
-                (ptrdepth (xtc:codegen:get-ptr-depth t)))
-           (cons
-             (string->symbol (string-append (car p) "_adhoc_" cname))
-             (xtc:desugar:first-transform (cdr ast) inbody?))))
-        (else #f)))))
+       ((xtc:cache:get-polyfunc-candidate
+         (car p) (xtc:codegen:get-type-from-pretty-str (cadr p)))
+        (cons (xtc:cache:get-polyfunc-candidate
+               (car p) (xtc:codegen:get-type-from-pretty-str (cadr p)))
+              (xtc:desugar:first-transform (cdr ast) inbody?)))
+       ((xtc:cache:genericfunc-exists? (car p))
+        (let ((ptrdepth (xtc:codegen:get-ptr-depth (cadr p))))
+          (xtc:bind:specialize-genericfunc (car p) (cadr p))
+          (cons
+           (string->symbol (xtc:codegen:add-ptr-depth (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
+           (xtc:desugar:first-transform (cdr ast) inbody?))))
+       ((xtc:cache:polyfunc-exists? (car p))
+        (let* ((t (if (xtc:cache:typealias-exists? (cadr p))
+                      (xtc:cache:get-typealias-type (cadr p))
+                      (cadr p)))
+               (cname (cname-encode (xtc:codegen:get-base-type t)))
+               (ptrdepth (xtc:codegen:get-ptr-depth t)))
+          (cons
+           (string->symbol (string-append (car p) "_adhoc_" cname))
+           (xtc:desugar:first-transform (cdr ast) inbody?))))
+       (else #f)))))
 
 (define xtc:desugar:transform-special-form
   (lambda (ast inbody?)
     (let ((head (ast:call-head ast)))
       (cond
-        ((eq? head 'letz) (xtc:desugar:first-transform (xtc:desugar:letz ast) inbody?))
-        ((eq? head 'memzone) (xtc:desugar:first-transform (xtc:desugar:memzone ast) inbody?))
-        ((eq? head 'beginz) (xtc:desugar:first-transform (xtc:desugar:beginz ast) inbody?))
-        ((eq? head 'zone_cleanup) (xtc:desugar:first-transform (xtc:desugar:zone_cleanup ast) inbody?))
-        ((eq? head '>=) (xtc:desugar:first-transform (xtc:desugar:gteq ast) inbody?))
-        ((eq? head '<=) (xtc:desugar:first-transform (xtc:desugar:lteq ast) inbody?))
-        ((eq? head 'and) (xtc:desugar:first-transform (xtc:desugar:and (ast:call-args ast)) inbody?))
-        ((eq? head 'or) (xtc:desugar:first-transform (xtc:desugar:or (ast:call-args ast)) inbody?))
-        ((eq? head 'not) (xtc:desugar:first-transform (xtc:desugar:not (ast:call-arg ast 0)) inbody?))
-        ((eq? head 'quote) (xtc:desugar:first-transform (xtc:desugar:quote (ast:call-arg ast 0)) inbody?))
-        ((eq? head 'list) (xtc:desugar:first-transform (xtc:desugar:list (ast:call-args ast)) inbody?))
-        ((or (eq? head 'strln) (eq? head 'strj))
-         (xtc:desugar:first-transform (xtc:desugar:format (ast:call-args ast)) inbody?))
-        ((eq? head 'sprintln) (xtc:desugar:first-transform (xtc:desugar:sprintln (ast:call-args ast)) inbody?))
-        ((eq? head 'sprintout) (xtc:desugar:first-transform (xtc:desugar:sprintln2 (ast:call-args ast)) inbody?))
-        ((eq? head 'println) (xtc:desugar:first-transform (xtc:desugar:println (ast:call-args ast)) inbody?))
-        ((eq? head 'printout) (xtc:desugar:first-transform (xtc:desugar:println2 (ast:call-args ast)) inbody?))
-        ((eq? head 'afill!) (xtc:desugar:first-transform (xtc:desugar:afill! (ast:call-args ast)) inbody?))
-        ((eq? head 'pfill!) (xtc:desugar:first-transform (xtc:desugar:pfill! (ast:call-args ast)) inbody?))
-        ((eq? head 'tfill!) (xtc:desugar:first-transform (xtc:desugar:tfill! (ast:call-args ast)) inbody?))
-        ((eq? head 'vfill!) (xtc:desugar:first-transform (xtc:desugar:vfill! (ast:call-args ast)) inbody?))
-        ((eq? head 'free)
-         (list 'free (list 'bitcast (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?) 'i8*)))
-        ((eq? head 'vector_ref)
-         (xtc:desugar:first-transform `(let ((v1 (alloc)) (v2 (vector ,@(ast:call-args ast)))) (pset! v1 0 v2) v1) inbody?))
-        ((eq? head 'array_ref)
-         (xtc:desugar:first-transform `(let ((a1 (alloc)) (a2 (array ,@(ast:call-args ast)))) (pset! a1 0 a2) a1) inbody?))
-        ((eq? head 'tuple_ref)
-         (xtc:desugar:first-transform `(let ((t1 (alloc)) (t2 (tuple ,@(ast:call-args ast)))) (pset! t1 0 t2) t1) inbody?))
-        ((eq? head 'vector)
-         `(make-vector ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (ast:call-args ast))))
-        ((eq? head 'array)
-         `(make-array ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (ast:call-args ast))))
-        ((eq? head 'tuple)
-         `(make-tuple ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (ast:call-args ast))))
-        ((member head '(callback schedule))
-         (xtc:desugar:first-transform (xtc:desugar:callback (xtc:desugar:first-transform (ast:call-args ast) inbody?)) inbody?))
-        ((and (member head *xtc:globals:mathbinaryaritylist*) (<> (length ast) 3))
-         (xtc:desugar:first-transform (xtc:desugar:binary-arity ast inbody?) inbody?))
-        ((member head '(bitwise-not ~))
-         (xtc:desugar:bitwise-not-to-eor ast inbody?))
-        (else #f)))))
+       ((eq? head 'letz) (xtc:desugar:first-transform (xtc:desugar:letz ast) inbody?))
+       ((eq? head 'memzone) (xtc:desugar:first-transform (xtc:desugar:memzone ast) inbody?))
+       ((eq? head 'beginz) (xtc:desugar:first-transform (xtc:desugar:beginz ast) inbody?))
+       ((eq? head 'zone_cleanup) (xtc:desugar:first-transform (xtc:desugar:zone_cleanup ast) inbody?))
+       ((eq? head '>=) (xtc:desugar:first-transform (xtc:desugar:gteq ast) inbody?))
+       ((eq? head '<=) (xtc:desugar:first-transform (xtc:desugar:lteq ast) inbody?))
+       ((eq? head 'and) (xtc:desugar:first-transform (xtc:desugar:and (ast:call-args ast)) inbody?))
+       ((eq? head 'or) (xtc:desugar:first-transform (xtc:desugar:or (ast:call-args ast)) inbody?))
+       ((eq? head 'not) (xtc:desugar:first-transform (xtc:desugar:not (ast:call-arg ast 0)) inbody?))
+       ((eq? head 'quote) (xtc:desugar:first-transform (xtc:desugar:quote (ast:call-arg ast 0)) inbody?))
+       ((eq? head 'list) (xtc:desugar:first-transform (xtc:desugar:list (ast:call-args ast)) inbody?))
+       ((or (eq? head 'strln) (eq? head 'strj))
+        (xtc:desugar:first-transform (xtc:desugar:format (ast:call-args ast)) inbody?))
+       ((eq? head 'sprintln) (xtc:desugar:first-transform (xtc:desugar:sprintln (ast:call-args ast)) inbody?))
+       ((eq? head 'sprintout) (xtc:desugar:first-transform (xtc:desugar:sprintln2 (ast:call-args ast)) inbody?))
+       ((eq? head 'println) (xtc:desugar:first-transform (xtc:desugar:println (ast:call-args ast)) inbody?))
+       ((eq? head 'printout) (xtc:desugar:first-transform (xtc:desugar:println2 (ast:call-args ast)) inbody?))
+       ((eq? head 'afill!) (xtc:desugar:first-transform (xtc:desugar:afill! (ast:call-args ast)) inbody?))
+       ((eq? head 'pfill!) (xtc:desugar:first-transform (xtc:desugar:pfill! (ast:call-args ast)) inbody?))
+       ((eq? head 'tfill!) (xtc:desugar:first-transform (xtc:desugar:tfill! (ast:call-args ast)) inbody?))
+       ((eq? head 'vfill!) (xtc:desugar:first-transform (xtc:desugar:vfill! (ast:call-args ast)) inbody?))
+       ((eq? head 'free)
+        (list 'free (list 'bitcast (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?) 'i8*)))
+       ((eq? head 'vector_ref)
+        (xtc:desugar:first-transform `(let ((v1 (alloc)) (v2 (vector ,@(ast:call-args ast)))) (pset! v1 0 v2) v1) inbody?))
+       ((eq? head 'array_ref)
+        (xtc:desugar:first-transform `(let ((a1 (alloc)) (a2 (array ,@(ast:call-args ast)))) (pset! a1 0 a2) a1) inbody?))
+       ((eq? head 'tuple_ref)
+        (xtc:desugar:first-transform `(let ((t1 (alloc)) (t2 (tuple ,@(ast:call-args ast)))) (pset! t1 0 t2) t1) inbody?))
+       ((eq? head 'vector)
+        `(make-vector ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (ast:call-args ast))))
+       ((eq? head 'array)
+        `(make-array ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (ast:call-args ast))))
+       ((eq? head 'tuple)
+        `(make-tuple ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (ast:call-args ast))))
+       ((member head '(callback schedule))
+        (xtc:desugar:first-transform (xtc:desugar:callback (xtc:desugar:first-transform (ast:call-args ast) inbody?)) inbody?))
+       ((and (member head *xtc:globals:mathbinaryaritylist*) (<> (length ast) 3))
+        (xtc:desugar:first-transform (xtc:desugar:binary-arity ast inbody?) inbody?))
+       ((member head '(bitwise-not ~))
+        (xtc:desugar:bitwise-not-to-eor ast inbody?))
+       (else #f)))))
 
 (define xtc:desugar:transform-definition
   (lambda (ast inbody?)
     (let ((head (ast:call-head ast))
           (args (ast:call-args ast)))
       (cond
-        ((ast:lambda? ast)
-         (if inbody?
-             (xtc:desugar:lambda ast)
-             (ast:make-lambda (xtc:desugar:first-transform head inbody?)
-                              (xtc:desugar:first-transform (ast:lambda-params ast) #t)
-                              (ast:make-begin (xtc:desugar:first-transform (ast:lambda-body-forms ast) #t)))))
-        ((eq? head 'cond)
-         (xtc:desugar:first-transform (xtc:desugar:cond args) inbody?))
-        ((eq? head 'cset!) ;; (cset! closure name value [type])
-         (list 'closure-set!
-               (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?)
-               (symbol->string (ast:call-arg ast 1))
-               (xtc:desugar:first-transform (ast:call-arg ast 2) inbody?)
-               (if (> (length args) 3)
-                   (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (ast:call-arg ast 3))))))
-        ((eq? head 'cref) ;; (cref closure name [type])
-         (list 'closure-ref
-               (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?)
-               (symbol->string (ast:call-arg ast 1))
-               (if (> (length args) 2)
-                   (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (ast:call-arg ast 2))))))
-        ((eq? head 'refcheck)
-         (list 'closure-refcheck
-               (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?)
-               (symbol->string (ast:call-arg ast 1))))
-        ((member head '(cast convert))
-         (if (= (length args) 1)
-             (xtc:desugar:first-transform (list (if (eq? head 'cast) 'bitcast 'bitconvert)
-                                                (ast:call-arg ast 0)) inbody?)
-             (let* ((p (regex:type-split (symbol->string (ast:call-arg ast 1)) ":"))
-                    (ptrdepth (xtc:codegen:get-ptr-depth (ast:call-arg ast 1)))
-                    (basetype (if (null? (cdr p)) #f (xtc:codegen:get-base-type (cadr p))))
-                    (etype (if (null? (cdr p)) #f (cname-encode basetype))))
-               (xtc:desugar:first-transform
-                 (list (if (eq? head 'cast) 'bitcast 'bitconvert)
-                       (ast:call-arg ast 0)
-                       (if etype
-                           (string->symbol
-                             (xtc:codegen:add-ptr-depth (string-append "%" (car p) "_poly_" etype)
-                                                        ptrdepth))
-                           (string->symbol (car p))))
-                 inbody?))))
-        ((eq? head 'doloop) (xtc:desugar:doloop ast inbody?))
-        ((eq? head 'dotimes) (xtc:desugar:dotimes ast inbody?))
-        ((eq? head 'while) (xtc:desugar:while ast inbody?))
-        ((ast:let? ast)
-         (ast:make-let (xtc:desugar:first-transform head inbody?)
-                       (map (lambda (p)
-                              (ast:make-binding (xtc:desugar:first-transform (ast:binding-var p) #f)
-                                                (xtc:desugar:first-transform (ast:binding-expr p) #f)))
-                            (ast:let-bindings ast))
-                       (ast:make-begin (xtc:desugar:first-transform (ast:let-body-forms ast) #t))))
-        (else #f)))))
+       ((ast:lambda? ast)
+        (if inbody?
+            (xtc:desugar:lambda ast)
+            (ast:make-lambda (xtc:desugar:first-transform head inbody?)
+                             (xtc:desugar:first-transform (ast:lambda-params ast) #t)
+                             (ast:make-begin (xtc:desugar:first-transform (ast:lambda-body-forms ast) #t)))))
+       ((eq? head 'cond)
+        (xtc:desugar:first-transform (xtc:desugar:cond args) inbody?))
+       ((eq? head 'cset!) ;; (cset! closure name value [type])
+        (list 'closure-set!
+              (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?)
+              (symbol->string (ast:call-arg ast 1))
+              (xtc:desugar:first-transform (ast:call-arg ast 2) inbody?)
+              (if (> (length args) 3)
+                  (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (ast:call-arg ast 3))))))
+       ((eq? head 'cref) ;; (cref closure name [type])
+        (list 'closure-ref
+              (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?)
+              (symbol->string (ast:call-arg ast 1))
+              (if (> (length args) 2)
+                  (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (ast:call-arg ast 2))))))
+       ((eq? head 'refcheck)
+        (list 'closure-refcheck
+              (xtc:desugar:first-transform (ast:call-arg ast 0) inbody?)
+              (symbol->string (ast:call-arg ast 1))))
+       ((member head '(cast convert))
+        (if (= (length args) 1)
+            (xtc:desugar:first-transform (list (if (eq? head 'cast) 'bitcast 'bitconvert)
+                                               (ast:call-arg ast 0)) inbody?)
+            (let* ((p (regex:type-split (symbol->string (ast:call-arg ast 1)) ":"))
+                   (ptrdepth (xtc:codegen:get-ptr-depth (ast:call-arg ast 1)))
+                   (basetype (if (null? (cdr p)) #f (xtc:codegen:get-base-type (cadr p))))
+                   (etype (if (null? (cdr p)) #f (cname-encode basetype))))
+              (xtc:desugar:first-transform
+               (list (if (eq? head 'cast) 'bitcast 'bitconvert)
+                     (ast:call-arg ast 0)
+                     (if etype
+                         (string->symbol
+                          (xtc:codegen:add-ptr-depth (string-append "%" (car p) "_poly_" etype)
+                                                     ptrdepth))
+                         (string->symbol (car p))))
+               inbody?))))
+       ((eq? head 'doloop) (xtc:desugar:doloop ast inbody?))
+       ((eq? head 'dotimes) (xtc:desugar:dotimes ast inbody?))
+       ((eq? head 'while) (xtc:desugar:while ast inbody?))
+       ((ast:let? ast)
+        (ast:make-let (xtc:desugar:first-transform head inbody?)
+                      (map (lambda (p)
+                             (ast:make-binding (xtc:desugar:first-transform (ast:binding-var p) #f)
+                                               (xtc:desugar:first-transform (ast:binding-expr p) #f)))
+                           (ast:let-bindings ast))
+                      (ast:make-begin (xtc:desugar:first-transform (ast:let-body-forms ast) #t))))
+       (else #f)))))
 
 (define xtc:desugar:transform-dot-syntax
   (lambda (ast inbody?)
@@ -945,19 +945,19 @@ Continue executing `body' forms until `test-expression' returns #f"
                        (xtc:desugar:first-transform (list 'cset! a b (ast:call-arg ast 0) c) inbody?))
                       ((and (> (length subs) 2) (= (length ast) 2))
                        (xtc:desugar:first-transform
-                         (xtc:desugar:multicset
-                           (append (map (lambda (x) (string->symbol x))
-                                        (append (reverse (cdr (reverse subs))) subs2))
-                                   (ast:call-args ast)))
-                         inbody?))
+                        (xtc:desugar:multicset
+                         (append (map (lambda (x) (string->symbol x))
+                                      (append (reverse (cdr (reverse subs))) subs2))
+                                 (ast:call-args ast)))
+                        inbody?))
                       ((and (> (length subs) 2) (= (length ast) 1))
                        (xtc:desugar:first-transform
-                         (xtc:desugar:multicref
-                           (map (lambda (x) (string->symbol x))
-                                (append (reverse (cdr (reverse subs))) subs2)))
-                         inbody?))
+                        (xtc:desugar:multicref
+                         (map (lambda (x) (string->symbol x))
+                              (append (reverse (cdr (reverse subs))) subs2)))
+                        inbody?))
                       (else
-                        (xtc:diagnostics:print-compiler-error "Bad form!" ast))))
+                       (xtc:diagnostics:print-compiler-error "Bad form!" ast))))
               (let* ((subs (regex:split head-str "\\."))
                      (a (string->symbol (car subs)))
                      (b (string->symbol (cadr subs))))
@@ -1041,7 +1041,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                        ((string=? (cadr p) "f64")
                         (list 'bitconvert (string->atom (car p)) 'double))
                        (else
-                         (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
+                        (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
           (else ast))))
 
 (define xtc:desugar:first-transform
@@ -1054,32 +1054,32 @@ Continue executing `body' forms until `test-expression' returns #f"
                                 h))
                       (ast (if (syntax? h) (cons head (ast:call-args ast)) ast)))
                  (cond
-                   ((and (symbol? head)
-                         (or (xtc:cache:get-polyfunc-candidate-types (symbol->string head))
-                             (xtc:cache:genericfunc-exists? head)))
-                    (set! *unique-polynum* (+ 1 *unique-polynum*))
-                    (cons (string->symbol (string-append (symbol->string head)
-                                                         "##"
-                                                         (number->string *unique-polynum*)))
-                          (xtc:desugar:first-transform (ast:call-args ast) inbody?)))
-                   ((and (symbol? head)
-                         (string-contains? (symbol->string head) ":[")
+                  ((and (symbol? head)
+                        (or (xtc:cache:get-polyfunc-candidate-types (symbol->string head))
+                            (xtc:cache:genericfunc-exists? head)))
+                   (set! *unique-polynum* (+ 1 *unique-polynum*))
+                   (cons (string->symbol (string-append (symbol->string head)
+                                                        "##"
+                                                        (number->string *unique-polynum*)))
+                         (xtc:desugar:first-transform (ast:call-args ast) inbody?)))
+                  ((and (symbol? head)
+                        (string-contains? (symbol->string head) ":[")
 
-                         (xtc:desugar:transform-typed-poly ast inbody?)))
-                   ((xtc:desugar:transform-special-form ast inbody?))
-                   ((xtc:desugar:transform-definition ast inbody?))
-                   ((and (symbol? head) (xtc:desugar:transform-dot-syntax ast inbody?)))
-                   ((and (symbol? head)
-                         (xtc:cache:xtmacro-exists? (symbol->string head)))
-                    (xtc:desugar:first-transform
-                      (macro-expand (cons (string->symbol
-                                            (string-append "xtmacro_"
-                                                           (symbol->string head)))
-                                          (ast:call-args ast)))
-                      'inbody?))
-                   (else
-                     (cons (xtc:desugar:first-transform head #t)
-                           (xtc:desugar:first-transform (ast:call-args ast) #t))))))
+                        (xtc:desugar:transform-typed-poly ast inbody?)))
+                  ((xtc:desugar:transform-special-form ast inbody?))
+                  ((xtc:desugar:transform-definition ast inbody?))
+                  ((and (symbol? head) (xtc:desugar:transform-dot-syntax ast inbody?)))
+                  ((and (symbol? head)
+                        (xtc:cache:xtmacro-exists? (symbol->string head)))
+                   (xtc:desugar:first-transform
+                    (macro-expand (cons (string->symbol
+                                         (string-append "xtmacro_"
+                                                        (symbol->string head)))
+                                        (ast:call-args ast)))
+                    'inbody?))
+                  (else
+                   (cons (xtc:desugar:first-transform head #t)
+                         (xtc:desugar:first-transform (ast:call-args ast) #t))))))
               (else (xtc:desugar:transform-atom ast inbody?))))))
 (define xtc:desugar:bang-type?
   (lambda (type)
@@ -1123,21 +1123,21 @@ Continue executing `body' forms until `test-expression' returns #f"
               (let* ((name (car p))
                      (argstr (cadr p))
                      (ags
-                       (cl:remove #f
-                                  (map (lambda (x)
-                                         (if (string-contains? x "{")
-                                             (xtc:desugar:maximize-generic-type x)
-                                             (if (regex:match? x (string-append "^" name "[^A-Za-z0-9_]"))
-                                                 #f
-                                                 x)))
-                                       (xtc:codegen:get-pretty-tuple-arg-strings argstr)))) ;)
+                      (cl:remove #f
+                                 (map (lambda (x)
+                                        (if (string-contains? x "{")
+                                            (xtc:desugar:maximize-generic-type x)
+                                            (if (regex:match? x (string-append "^" name "[^A-Za-z0-9_]"))
+                                                #f
+                                                x)))
+                                      (xtc:codegen:get-pretty-tuple-arg-strings argstr)))) ;)
                      (named_ags (cl:remove
-                                  #f
-                                  (map (lambda (x)
-                                         (if (string-contains? x "{")
-                                             (xtc:desugar:maximize-generic-type x)
-                                             #f))
-                                       (xtc:codegen:get-pretty-tuple-arg-strings argstr))))
+                                 #f
+                                 (map (lambda (x)
+                                        (if (string-contains? x "{")
+                                            (xtc:desugar:maximize-generic-type x)
+                                            #f))
+                                      (xtc:codegen:get-pretty-tuple-arg-strings argstr))))
                      (ags_a (cl:remove-duplicates (regex:match-all argstr "![A-Za-z_0-9]*")))
                      (gtype (symbol->string (xtc:cache:get-generictype-candidate-types (car p))))
                      ;; (plst (xtc:codegen:get-pretty-tuple-arg-strings gtype))
@@ -1147,13 +1147,13 @@ Continue executing `body' forms until `test-expression' returns #f"
                      ;;                  x))
                      ;;            (xtc:codegen:get-pretty-tuple-arg-strings gtype)))
                      (named_gags (cl:remove
-                                   #f
-                                   (map (lambda (x)
-                                          (if (or (string-contains? x "{")
-                                                  (string-contains? x ":<"))
-                                              (string-append "\\Q" x "\\E")
-                                              #f))
-                                        (xtc:codegen:get-pretty-tuple-arg-strings gtype))))
+                                  #f
+                                  (map (lambda (x)
+                                         (if (or (string-contains? x "{")
+                                                 (string-contains? x ":<"))
+                                             (string-append "\\Q" x "\\E")
+                                             #f))
+                                       (xtc:codegen:get-pretty-tuple-arg-strings gtype))))
                      (gags (cl:remove-duplicates (regex:match-all gtype "![A-Za-z_0-9]*"))))
                 ;; (println 'maximize: string-type 'gtype gtype 'ags ags 'gags gags 'named: named_ags named_gags)
                 (let* ((gt2 (if (<> (length named_gags)
@@ -1207,12 +1207,12 @@ Continue executing `body' forms until `test-expression' returns #f"
            (ret (cl:remove-if (lambda (x) (not x)) res))
            (chk1 (if (> (length typevars) (length ret))
                      (begin (set! typevars (cl:remove-duplicates typevars))
-                       #f)
+                            #f)
                      #t))
            (errchk (if (<> (length ret) (length typevars))
                        (begin (xtc:diagnostics:print-compiler-error "Type Vars and Ret should be same length in Minimize Finalize X"
                                                                     (list ret typevars))
-                         #f)
+                              #f)
                        #t))
            (pairs (map (lambda (x y) (cons x y)) ret typevars))
            (ps (cl:remove-duplicates pairs))
@@ -1232,8 +1232,8 @@ Continue executing `body' forms until `test-expression' returns #f"
         (if (list? (car l1))
             (let ((res (xtc:desugar:minimize-gen-type-x (car l1) '() (car l2) '())))
               (xtc:desugar:minimize-gen-type-x
-                (cdr l1) (append (car res) newl1)
-                (cdr l2) (append (cdr res) newl2)))
+               (cdr l1) (append (car res) newl1)
+               (cdr l2) (append (cdr res) newl2)))
             (if (and (symbol? (car l1))
                      (char=? (string-ref (symbol->string (car l1)) 0) #\!))
                 (xtc:desugar:minimize-gen-type-x (cdr l1) (cons (car l1) newl1)
@@ -1245,9 +1245,9 @@ Continue executing `body' forms until `test-expression' returns #f"
 (define xtc:desugar:minimized-gen-type
   (lambda (type gtype)
     (xtc:desugar:minimize-gen-type-finalize-x
-      (map (lambda (x) (string->symbol x)) (regex:match-all gtype "\\![a-zA-Z0-9_]*"))
-      (xtc:desugar:minimize-gen-type-x (xtc:codegen:get-type-from-pretty-str gtype) '()
-                                       (xtc:codegen:get-type-from-pretty-str type) '()))))
+     (map (lambda (x) (string->symbol x)) (regex:match-all gtype "\\![a-zA-Z0-9_]*"))
+     (xtc:desugar:minimize-gen-type-x (xtc:codegen:get-type-from-pretty-str gtype) '()
+                                      (xtc:codegen:get-type-from-pretty-str type) '()))))
 (define xtc:desugar:generate-generic-type-cname
   (lambda (t gtype)
     ;; (println 'gentypecname: t gtype)

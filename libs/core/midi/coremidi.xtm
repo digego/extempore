@@ -129,11 +129,11 @@
                (set! i (+ i 1))
                void)
               (else
-                (set! len (midi_msg_length status))
-                (if (<= (+ i len) n)
-                    (midi_port_deliver port (pref-ptr data i) len time))
-                (set! i (+ i len))
-                void)))
+               (set! len (midi_msg_length status))
+               (if (<= (+ i len) n)
+                   (midi_port_deliver port (pref-ptr data i) len time))
+               (set! i (+ i len))
+               void)))
       void)))
 
 ;; CoreMIDI calls this on its own thread. For a source connected to our input
@@ -149,7 +149,7 @@
       (if (not (null? port))
           (dotimes (k packets)
             (set! len (+ (& (convert (pref pktlist (+ offset 8)) i64) #xFF)
-                            (* 256 (& (convert (pref pktlist (+ offset 9)) i64) #xFF))))
+                         (* 256 (& (convert (pref pktlist (+ offset 9)) i64) #xFF))))
             (midi_cm_deliver port (pref-ptr pktlist (+ offset 10)) len
                              (midi_cm_clock_time (pref (cast (pref-ptr pktlist offset) i64*) 0)))
             (set! offset (+ offset 10 len))
@@ -286,16 +286,16 @@ now; a virtual source's listeners are told the time, so it has to be a real one.
                  (= (MIDIPortConnectSource midi_cm_in (convert a i32) (cast port i8*)) 0)
                  #t))
             (else
-              (set! cfname (midi_cm_string name))
-              (set! res (if input
-                            (MIDIDestinationCreate midi_cm_client cfname
-                                                   (cast (get_native_fptr midi_cm_read) i8*)
-                                                   (cast port i8*) endpoint)
-                            (MIDISourceCreate midi_cm_client cfname endpoint)))
-              (CFRelease cfname)
-              (tset! port 1 (convert (pref endpoint 0) i64))
-              (tset! port 2 1)
-              (= res 0))))))
+             (set! cfname (midi_cm_string name))
+             (set! res (if input
+                           (MIDIDestinationCreate midi_cm_client cfname
+                                                  (cast (get_native_fptr midi_cm_read) i8*)
+                                                  (cast port i8*) endpoint)
+                           (MIDISourceCreate midi_cm_client cfname endpoint)))
+             (CFRelease cfname)
+             (tset! port 1 (convert (pref endpoint 0) i64))
+             (tset! port 2 1)
+             (= res 0))))))
 
 (bind-func midi_be_close
   (lambda (port:MidiPort*)

@@ -58,14 +58,14 @@
       (if (not alist)
           'conflict
           (cl:remove
-            #f
-            (map (lambda (sym)
-                   (let ((e (assq sym alist)))
-                     (if (or (eq? sym symname)
-                             (and e (xtc:codegen:type? (inferfn:norm (cdr e)))))
-                         #f
-                         sym)))
-                 (hashtable-keys (car p))))))))
+           #f
+           (map (lambda (sym)
+                  (let ((e (assq sym alist)))
+                    (if (or (eq? sym symname)
+                            (and e (xtc:codegen:type? (inferfn:norm (cdr e)))))
+                        #f
+                        sym)))
+                (hashtable-keys (car p))))))))
 
 ;; A couple of monomorphic globals so a function body can call out.
 (bind-func inferfn_add_i32 (lambda (a:i32 b:i32) (+ a b)))
@@ -102,12 +102,12 @@
 (xtmtest-result (inferfn:residuals 'tf_tup
                                    '(lambda (x:i64 y:double)
                                      (let ((t:<i64,double>* (salloc)))
-                                       (tset! t 0 x) (tset! t 1 y) (tref t 0))))
+                                      (tset! t 0 x) (tset! t 1 y) (tref t 0))))
                 '() "fn-tuple-build-read")
 (xtmtest-result (inferfn:residuals 'tf_tup1
                                    '(lambda (x:i64 y:double)
                                      (let ((t:<i64,double>* (salloc)))
-                                       (tset! t 0 x) (tset! t 1 y) (tref t 1))))
+                                      (tset! t 0 x) (tset! t 1 y) (tref t 1))))
                 '() "fn-tuple-field1")
 (xtmtest-result (inferfn:residuals 'tf_named '(lambda (p:ifn_pair*) (tref p 0)))
                 '() "fn-named-tuple-field0")

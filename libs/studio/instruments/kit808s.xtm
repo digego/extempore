@@ -36,26 +36,26 @@
 (sys:load "libs/studio/sampler.xtm")
 
 (def-instrument kit808s
-  "a sampled Roland TR-808 drum machine"
-  ;; the engine reads these seven by position (see *sampler:params*)
-  (params
-    (attack 0.0005 "seconds to fade in")
-    (release 0.04 "seconds to fade by 60 dB once a hit is cut short by length")
-    (tune 0.0 "transpose every sound, in semitones")
-    (dynamics 20.0 "how much quieter a soft hit is: dB between velocity 1.0 and 0.1")
-    (hardness 0.0 "unused: there is one recording of each sound")
-    (length 0.0 "seconds after which every hit fades out (0.0: let it ring)")
-    (level 0.3 "output level"))
-  (presets
-    (classic)
-    (tight (length 0.12))
-    (low (tune -4.0))
-    (high (tune 4.0) (length 0.3))
-    (boom (tune -2.0) (release 0.3) (dynamics 12.0))
-    (dynamic (dynamics 36.0) (level 0.35)))
-  (sounds
-    (bd 36) (rs 37) (sd 38) (cp 39) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50) (cb 56)
-    (sd2 40) (boom 53) (cg 48) (ma 51) (cl 63)))
+                "a sampled Roland TR-808 drum machine"
+                ;; the engine reads these seven by position (see *sampler:params*)
+                (params
+                 (attack 0.0005 "seconds to fade in")
+                 (release 0.04 "seconds to fade by 60 dB once a hit is cut short by length")
+                 (tune 0.0 "transpose every sound, in semitones")
+                 (dynamics 20.0 "how much quieter a soft hit is: dB between velocity 1.0 and 0.1")
+                 (hardness 0.0 "unused: there is one recording of each sound")
+                 (length 0.0 "seconds after which every hit fades out (0.0: let it ring)")
+                 (level 0.3 "output level"))
+                (presets
+                 (classic)
+                 (tight (length 0.12))
+                 (low (tune -4.0))
+                 (high (tune 4.0) (length 0.3))
+                 (boom (tune -2.0) (release 0.3) (dynamics 12.0))
+                 (dynamic (dynamics 36.0) (level 0.35)))
+                (sounds
+                 (bd 36) (rs 37) (sd 38) (cp 39) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50) (cb 56)
+                 (sd2 40) (boom 53) (cg 48) (ma 51) (cl 63)))
 
 (bind-func kit808s_make
   (lambda ()
@@ -94,17 +94,17 @@
       (if (and dir (sampler:check-params 'kit808s))
           (let ((count 0))
             (for-each
-              (lambda (kf)
-                (let* ((key (car kf))
-                       (moved (assv key *kit808s:moved*))
-                       (path (if moved (string-append dir "/" (cadr moved)) (cadr kf)))
-                       (extra (assv key *kit808s:extra*))
-                       (volume (assv key *kit808s:volumes*)))
-                  (if (sampler:add-region bank path
-                                          `((lokey ,key) (hikey ,key) (pitch_keycenter ,key)
-                                            (loop_mode 1)
-                                            (volume ,(if volume (cdr volume) -3))
-                                            ,@(if extra (cdr extra) '())))
-                      (set! count (+ count 1)))))
-              (sampler:numbered-files dir))
+             (lambda (kf)
+               (let* ((key (car kf))
+                      (moved (assv key *kit808s:moved*))
+                      (path (if moved (string-append dir "/" (cadr moved)) (cadr kf)))
+                      (extra (assv key *kit808s:extra*))
+                      (volume (assv key *kit808s:volumes*)))
+                 (if (sampler:add-region bank path
+                                         `((lokey ,key) (hikey ,key) (pitch_keycenter ,key)
+                                           (loop_mode 1)
+                                           (volume ,(if volume (cdr volume) -3))
+                                           ,@(if extra (cdr extra) '())))
+                     (set! count (+ count 1)))))
+             (sampler:numbered-files dir))
             (sampler:report 'kit808s (- (clock:clock) start) count '() '()))))))

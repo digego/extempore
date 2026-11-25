@@ -350,14 +350,14 @@ file can't be read."
   (let ((xt-name (lambda (opcode)
                    (string->symbol (string-append "SFZ_" (string-upcase (symbol->string opcode)))))))
     `(begin
-      ,@(map (lambda (op) `(bind-val ,(xt-name (car op)) i64 ,(sampler:opcode-index (car op))))
-             *sampler:opcodes*)
-      (bind-val SAMPLER_NOPCODES i64 ,(length *sampler:opcodes*))
-      (bind-func sampler_region_defaults
-        (lambda (row:double*)
-          ,@(map (lambda (op) `(pset! row ,(sampler:opcode-index (car op)) ,(* 1.0 (cadr op))))
-                 *sampler:opcodes*)
-          void)))))
+       ,@(map (lambda (op) `(bind-val ,(xt-name (car op)) i64 ,(sampler:opcode-index (car op))))
+              *sampler:opcodes*)
+       (bind-val SAMPLER_NOPCODES i64 ,(length *sampler:opcodes*))
+       (bind-func sampler_region_defaults
+         (lambda (row:double*)
+           ,@(map (lambda (op) `(pset! row ,(sampler:opcode-index (car op)) ,(* 1.0 (cadr op))))
+                  *sampler:opcodes*)
+           void)))))
 
 (sampler:define-opcodes)
 
@@ -1340,17 +1340,17 @@ parameters (the first seven are *sampler:params*)"
 (define sampler:numbered-files
   (lambda (dir)
     (cl:sort
-      (let loop ((names (sys:directory-list dir)) (acc '()))
-        (if (null? names)
-            acc
-            (let* ((name (car names))
-                   (dot (char-position #\. name))
-                   (n (and dot (string->number (substring name 0 dot)))))
-              (loop (cdr names)
-                    (if (and (integer? n) (<= 0 n 127) (sampler:playable-file? name))
-                        (cons (list n (string-append dir "/" name)) acc)
-                        acc)))))
-      (lambda (a b) (< (car a) (car b))))))
+     (let loop ((names (sys:directory-list dir)) (acc '()))
+       (if (null? names)
+           acc
+           (let* ((name (car names))
+                  (dot (char-position #\. name))
+                  (n (and dot (string->number (substring name 0 dot)))))
+             (loop (cdr names)
+                   (if (and (integer? n) (<= 0 n 127) (sampler:playable-file? name))
+                       (cons (list n (string-append dir "/" name)) acc)
+                       acc)))))
+     (lambda (a b) (< (car a) (car b))))))
 
 ;; Regions for a folder of numbered files. With mode 'drums each file plays
 ;; on its own key, at its own pitch, to the end; with mode 'pitched each
@@ -1396,8 +1396,8 @@ parameters (the first seven are *sampler:params*)"
                (let ((end (string-position "*/" text (+ i 2))))
                  (loop (if end (+ end 2) n))))
               (else
-                (write-char (string-ref text i) out)
-                (loop (+ i 1))))))))
+               (write-char (string-ref text i) out)
+               (loop (+ i 1))))))))
 
 ;; The text of an SFZ file with its comments removed, its #include files
 ;; spliced in and its #define names replaced. defines is a list of
@@ -1409,28 +1409,28 @@ parameters (the first seven are *sampler:params*)"
           (begin (if (> depth 0) (studio:error "can't read the SFZ include" path)) "")
           (let ((out (open-output-string)))
             (for-each
-              (lambda (line)
-                (let ((trimmed (sampler:trim line)))
-                  (cond ((and (> (string-length trimmed) 7) (string=? (substring trimmed 0 7) "#define"))
-                         (let ((parts (regex:split (sampler:trim (substring trimmed 7)) "\\s+")))
-                           (if (>= (length parts) 2)
-                               (set-car! defines-box (cons (cons (car parts) (cadr parts)) (car defines-box))))))
-                        ((and (> (string-length trimmed) 8) (string=? (substring trimmed 0 8) "#include"))
-                         (let ((name (sampler:string-replace (sampler:trim (substring trimmed 8)) "\"" "")))
-                           (write-string (sampler:sfz-text (sampler:join-path root name) root defines-box (+ depth 1)) out)
-                           (newline out)))
-                        (else
-                          ;; longest names first, so $NOTE doesn't eat part of $NOTE_LO
-                          (write-string
-                            (let loop ((s line)
-                                       (ds (cl:sort (car defines-box)
-                                                    (lambda (a b) (> (string-length (car a)) (string-length (car b)))))))
-                              (if (or (null? ds) (not (char-position #\$ s)))
-                                  s
-                                  (loop (sampler:string-replace s (caar ds) (cdar ds)) (cdr ds))))
-                            out)
-                          (newline out)))))
-              (regex:split (sampler:strip-comments text) "\r?\n"))
+             (lambda (line)
+               (let ((trimmed (sampler:trim line)))
+                 (cond ((and (> (string-length trimmed) 7) (string=? (substring trimmed 0 7) "#define"))
+                        (let ((parts (regex:split (sampler:trim (substring trimmed 7)) "\\s+")))
+                          (if (>= (length parts) 2)
+                              (set-car! defines-box (cons (cons (car parts) (cadr parts)) (car defines-box))))))
+                       ((and (> (string-length trimmed) 8) (string=? (substring trimmed 0 8) "#include"))
+                        (let ((name (sampler:string-replace (sampler:trim (substring trimmed 8)) "\"" "")))
+                          (write-string (sampler:sfz-text (sampler:join-path root name) root defines-box (+ depth 1)) out)
+                          (newline out)))
+                       (else
+                        ;; longest names first, so $NOTE doesn't eat part of $NOTE_LO
+                        (write-string
+                         (let loop ((s line)
+                                    (ds (cl:sort (car defines-box)
+                                                 (lambda (a b) (> (string-length (car a)) (string-length (car b)))))))
+                           (if (or (null? ds) (not (char-position #\$ s)))
+                               s
+                               (loop (sampler:string-replace s (caar ds) (cdar ds)) (cdr ds))))
+                         out)
+                        (newline out)))))
+             (regex:split (sampler:strip-comments text) "\r?\n"))
             (get-output-string out))))))
 
 (define sampler:trim
@@ -1461,35 +1461,35 @@ parameters (the first seven are *sampler:params*)"
     (let ((n (string-length text)))
       (let loop ((i 0) (acc '()))
         (cond
-          ((>= i n) (reverse acc))
-          ((char-whitespace? (string-ref text i)) (loop (+ i 1) acc))
-          ((char=? (string-ref text i) #\<)
-           (let ((end (or (char-position #\> text i) n)))
-             (loop (+ end 1) (cons (list 'header (substring text (+ i 1) (min end n))) acc))))
-          ((sampler:opcode-at? text i)
-           (let* ((eq (char-position #\= text i))
-                  (name (substring text i eq))
-                  (spaces? (member name '("sample" "default_path")))
-                  (end (let scan ((j (+ eq 1)))
-                         (cond ((>= j n) n)
-                               ((char=? (string-ref text j) #\newline) j)
-                               ((char=? (string-ref text j) #\<) j)
-                               ((and (char-whitespace? (string-ref text j))
-                                     (or (not spaces?)
-                                         (let skip ((k j))
-                                           (cond ((>= k n) #t)
-                                                 ((char-whitespace? (string-ref text k))
-                                                  (if (char=? (string-ref text k) #\newline) #t (skip (+ k 1))))
-                                                 (else (sampler:opcode-at? text k))))))
-                                j)
-                               (else (scan (+ j 1)))))))
-             (loop end (cons (list 'opcode name (sampler:trim (substring text (+ eq 1) end))) acc))))
-          (else
-            ;; a stray word: skip it
-            (let skip ((j i))
-              (if (and (< j n) (not (char-whitespace? (string-ref text j))))
-                  (skip (+ j 1))
-                  (loop j acc)))))))))
+         ((>= i n) (reverse acc))
+         ((char-whitespace? (string-ref text i)) (loop (+ i 1) acc))
+         ((char=? (string-ref text i) #\<)
+          (let ((end (or (char-position #\> text i) n)))
+            (loop (+ end 1) (cons (list 'header (substring text (+ i 1) (min end n))) acc))))
+         ((sampler:opcode-at? text i)
+          (let* ((eq (char-position #\= text i))
+                 (name (substring text i eq))
+                 (spaces? (member name '("sample" "default_path")))
+                 (end (let scan ((j (+ eq 1)))
+                        (cond ((>= j n) n)
+                              ((char=? (string-ref text j) #\newline) j)
+                              ((char=? (string-ref text j) #\<) j)
+                              ((and (char-whitespace? (string-ref text j))
+                                    (or (not spaces?)
+                                        (let skip ((k j))
+                                          (cond ((>= k n) #t)
+                                                ((char-whitespace? (string-ref text k))
+                                                 (if (char=? (string-ref text k) #\newline) #t (skip (+ k 1))))
+                                                (else (sampler:opcode-at? text k))))))
+                               j)
+                              (else (scan (+ j 1)))))))
+            (loop end (cons (list 'opcode name (sampler:trim (substring text (+ eq 1) end))) acc))))
+         (else
+          ;; a stray word: skip it
+          (let skip ((j i))
+            (if (and (< j n) (not (char-whitespace? (string-ref text j))))
+                (skip (+ j 1))
+                (loop j acc)))))))))
 
 (define *sampler:loop-modes*
   '(("no_loop" . 0) ("one_shot" . 1) ("loop_continuous" . 2) ("loop_sustain" . 3)))
@@ -1515,30 +1515,30 @@ parameters (the first seven are *sampler:params*)"
                  (op (string->symbol name))
                  (note (lambda () (sampler:note-number value))))
             (cond
-              ((memq op ignore) (loop (cdr pairs) acc sample skip))
-              ((string=? name "sample") (loop (cdr pairs) acc value skip))
-              ((string=? name "key")
-               (let ((k (note)))
-                 (loop (cdr pairs)
-                       (if k (append `((pitch_keycenter ,k) (hikey ,k) (lokey ,k)) acc) acc)
-                       sample skip)))
-              ((member name '("lokey" "hikey" "pitch_keycenter"))
-               (let ((k (note))) (loop (cdr pairs) (if k (cons (list op k) acc) acc) sample skip)))
-              ((string=? name "loop_mode")
-               (let ((m (assoc value *sampler:loop-modes*)))
-                 (loop (cdr pairs) (if m (cons (list op (cdr m)) acc) acc) sample skip)))
-              ((string=? name "xf_velcurve")
-               (loop (cdr pairs) (cons (list op (if (string=? value "gain") 1 0)) acc) sample skip))
-              ((string=? name "trigger")
-               ;; release triggers (a damper's thump, say) are left out
-               (loop (cdr pairs) acc sample
-                     (if (member value '("attack" "first" "legato")) skip "it plays on note-off")))
-              ((sampler:opcode-index op)
-               (let ((x (string->number value)))
-                 (loop (cdr pairs) (if x (cons (list op x) acc) acc) sample skip)))
-              (else
-                (hash-table-set! unknown name (+ 1 (or (hash-table-ref unknown name) 0)))
-                (loop (cdr pairs) acc sample skip))))))))
+             ((memq op ignore) (loop (cdr pairs) acc sample skip))
+             ((string=? name "sample") (loop (cdr pairs) acc value skip))
+             ((string=? name "key")
+              (let ((k (note)))
+                (loop (cdr pairs)
+                      (if k (append `((pitch_keycenter ,k) (hikey ,k) (lokey ,k)) acc) acc)
+                      sample skip)))
+             ((member name '("lokey" "hikey" "pitch_keycenter"))
+              (let ((k (note))) (loop (cdr pairs) (if k (cons (list op k) acc) acc) sample skip)))
+             ((string=? name "loop_mode")
+              (let ((m (assoc value *sampler:loop-modes*)))
+                (loop (cdr pairs) (if m (cons (list op (cdr m)) acc) acc) sample skip)))
+             ((string=? name "xf_velcurve")
+              (loop (cdr pairs) (cons (list op (if (string=? value "gain") 1 0)) acc) sample skip))
+             ((string=? name "trigger")
+              ;; release triggers (a damper's thump, say) are left out
+              (loop (cdr pairs) acc sample
+                    (if (member value '("attack" "first" "legato")) skip "it plays on note-off")))
+             ((sampler:opcode-index op)
+              (let ((x (string->number value)))
+                (loop (cdr pairs) (if x (cons (list op x) acc) acc) sample skip)))
+             (else
+              (hash-table-set! unknown name (+ 1 (or (hash-table-ref unknown name) 0)))
+              (loop (cdr pairs) acc sample skip))))))))
 
 ;; Load an SFZ file into bank, leaving out the opcodes (symbols) in the
 ;; optional list ignore. Returns (regions-loaded regions-skipped
@@ -1559,9 +1559,9 @@ parameters (the first seven are *sampler:params*)"
             (if region
                 (let* ((default-path (let ((d (assoc "default_path" control))) (if d (cdr d) "")))
                        (ops (sampler:sfz-region-opcodes
-                              (append (reverse global) (reverse master) (reverse group) (reverse region))
-                              unknown
-                              (if (null? ignore) '() (car ignore)))))
+                             (append (reverse global) (reverse master) (reverse group) (reverse region))
+                             unknown
+                             (if (null? ignore) '() (car ignore)))))
                   (if (string? ops)
                       (set! skipped (cons ops skipped))
                       (let ((file (sampler:join-path root (string-append (sampler:string-replace default-path "\\" "/")
@@ -1573,7 +1573,7 @@ parameters (the first seven are *sampler:params*)"
                               ((sampler:add-region bank file (cdr ops))
                                (set! loaded (+ loaded 1)))
                               (else
-                                (set! skipped (cons (string-append "can't read " file) skipped))))))))))
+                               (set! skipped (cons (string-append "can't read " file) skipped))))))))))
         (if (null? tokens)
             (emit)
             (let ((tok (car tokens)))
@@ -1626,10 +1626,10 @@ parameters (the first seven are *sampler:params*)"
       (cond ((not bank) #f)
             ((not path) (studio:error "there is no file called" sfz-path))
             (else
-              (sampler_clear bank)
-              (let ((result (sampler:load-sfz bank path)))
-                (sampler:report sfz-path (- (clock:clock) start) (car result) (cadr result) (caddr result))
-                (car result)))))))
+             (sampler_clear bank)
+             (let ((result (sampler:load-sfz bank path)))
+               (sampler:report sfz-path (- (clock:clock) start) (car result) (cadr result) (caddr result))
+               (car result)))))))
 
 ;; (sampler-load-folder 'track "path/to/folder")           ; pitched: spread across the keys
 ;; (sampler-load-folder 'track "path/to/folder" 'drums)    ; one sound per key
@@ -1644,11 +1644,11 @@ parameters (the first seven are *sampler:params*)"
             ((or (not path) (null? (sampler:numbered-files path)))
              (studio:error "there are no files named by note number (36.wav ...) in" dir))
             (else
-              (sampler_clear bank)
-              (let ((loaded (length (cl:remove-if not (map (lambda (fr) (sampler:add-region bank (car fr) (cadr fr)))
-                                                           (sampler:folder-regions (sampler:numbered-files path) mode))))))
-                (sampler:report dir (- (clock:clock) start) loaded '() '())
-                loaded))))))
+             (sampler_clear bank)
+             (let ((loaded (length (cl:remove-if not (map (lambda (fr) (sampler:add-region bank (car fr) (cadr fr)))
+                                                          (sampler:folder-regions (sampler:numbered-files path) mode))))))
+               (sampler:report dir (- (clock:clock) start) loaded '() '())
+               loaded))))))
 
 ;; Fitting a library's samples to the engine. These work on the regions an
 ;; SFZ file has loaded into a bank, and setup-sfz applies the ones its caller
@@ -1678,24 +1678,24 @@ parameters (the first seven are *sampler:params*)"
   (lambda (bank)
     (let ((found 0) (scores '()))
       (sampler:each-region
-        bank
-        (lambda (r)
-          (if (< (sampler:ref bank r 'loop_mode) 2)
-              (let* ((id (sampler_region_buffer_id bank r))
-                     (known (hash-table-ref *sampler:loops* id)))
-                (if known
-                    (begin
-                      (for-each (lambda (op v) (sampler:set bank r op v))
-                                '(loop_start loop_end loop_crossfade loop_mode) known)
-                      (set! found (+ found 1)))
-                    (let ((score (sampler_region_autoloop bank r)))
-                      (if (> score 0.0)
-                          (begin
-                            (hash-table-set! *sampler:loops* id
-                                             (map (lambda (op) (sampler:ref bank r op))
-                                                  '(loop_start loop_end loop_crossfade loop_mode)))
-                            (set! scores (cons score scores))
-                            (set! found (+ found 1))))))))))
+       bank
+       (lambda (r)
+         (if (< (sampler:ref bank r 'loop_mode) 2)
+             (let* ((id (sampler_region_buffer_id bank r))
+                    (known (hash-table-ref *sampler:loops* id)))
+               (if known
+                   (begin
+                     (for-each (lambda (op v) (sampler:set bank r op v))
+                               '(loop_start loop_end loop_crossfade loop_mode) known)
+                     (set! found (+ found 1)))
+                   (let ((score (sampler_region_autoloop bank r)))
+                     (if (> score 0.0)
+                         (begin
+                           (hash-table-set! *sampler:loops* id
+                                            (map (lambda (op) (sampler:ref bank r op))
+                                                 '(loop_start loop_end loop_crossfade loop_mode)))
+                           (set! scores (cons score scores))
+                           (set! found (+ found 1))))))))))
       (list found (if (null? scores) 0.0 (apply min scores))))))
 
 ;; Move every region's level to one RMS level, in dB: the volume which the
@@ -1725,12 +1725,12 @@ parameters (the first seven are *sampler:params*)"
                               ((< (car ks) low) (loop (cdr ks) (max m (+ (car ks) 1))))
                               (else (loop (cdr ks) m))))))
       (for-each
-        (lambda (r)
-          (if (= (sampler:ref bank r 'lokey) low)
-              (sampler:set bank r 'lokey (max floor-key (- low semitones))))
-          (if (= (sampler:ref bank r 'hikey) high)
-              (sampler:set bank r 'hikey (min 127 (+ high semitones)))))
-        all))))
+       (lambda (r)
+         (if (= (sampler:ref bank r 'lokey) low)
+             (sampler:set bank r 'lokey (max floor-key (- low semitones))))
+         (if (= (sampler:ref bank r 'hikey) high)
+             (sampler:set bank r 'hikey (min 127 (+ high semitones)))))
+       all))))
 
 ;; the option named `name` in a setup-sfz option list: (name value ...)
 (define sampler:option

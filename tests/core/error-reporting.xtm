@@ -40,15 +40,15 @@
 ;; s7-style report apart from one with a stacktrace stapled on.
 (define (test-all-comment-lines? s)
   (call-with-exit
-    (lambda (return)
-      (let ((at-line-start #t))
-        (do ((i 0 (+ i 1)))
-            ((= i (string-length s)) #t)
-          (let ((c (string-ref s i)))
-            (cond ((char=? c #\newline) (set! at-line-start #t))
-                  (at-line-start
-                   (set! at-line-start #f)
-                   (if (not (char=? c #\;)) (return #f))))))))))
+   (lambda (return)
+     (let ((at-line-start #t))
+       (do ((i 0 (+ i 1)))
+           ((= i (string-length s)) #t)
+         (let ((c (string-ref s i)))
+           (cond ((char=? c #\newline) (set! at-line-start #t))
+                 (at-line-start
+                  (set! at-line-start #f)
+                  (if (not (char=? c #\;)) (return #f))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; stack hygiene -- the core of the fix
@@ -57,13 +57,13 @@
 ;; accumulate). One warm-up settles any pre-existing frames, then the depth
 ;; before and after a burst of errors must match exactly.
 (xtmtest-result
-  (begin
-    (sys:eval-string "(car 5)")
-    (let ((before (*s7* 'stack-top)))
-      (do ((i 0 (+ i 1))) ((= i 30)) (sys:eval-string "(car 5)"))
-      (= (*s7* 'stack-top) before)))
-  #t
-  "no-stack-leak-across-errors")
+ (begin
+   (sys:eval-string "(car 5)")
+   (let ((before (*s7* 'stack-top)))
+     (do ((i 0 (+ i 1))) ((= i 30)) (sys:eval-string "(car 5)"))
+     (= (*s7* 'stack-top) before)))
+ #t
+ "no-stack-leak-across-errors")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; error isolation and preserved semantics
@@ -139,20 +139,20 @@
 
 ;; and repeated erroring callbacks don't grow the stack
 (xtmtest-result
-  (begin
-    (sys:apply-top-level car '(5))
-    (let ((before (*s7* 'stack-top)))
-      (do ((i 0 (+ i 1))) ((= i 30)) (sys:apply-top-level car '(5)))
-      (= (*s7* 'stack-top) before)))
-  #t
-  "apply-no-stack-leak")
+ (begin
+   (sys:apply-top-level car '(5))
+   (let ((before (*s7* 'stack-top)))
+     (do ((i 0 (+ i 1))) ((= i 30)) (sys:apply-top-level car '(5)))
+     (= (*s7* 'stack-top) before)))
+ #t
+ "apply-no-stack-leak")
 
 ;; the callback error report is the same terse form, with no stacktrace
 (xtmtest-result
-  (let* ((sp (open-output-string))
-         (old (set-current-error-port sp)))
-    (sys:apply-top-level car '(5))
-    (set-current-error-port old)
-    (test-all-comment-lines? (get-output-string sp)))
-  #t
-  "apply-report-has-no-stacktrace")
+ (let* ((sp (open-output-string))
+        (old (set-current-error-port sp)))
+   (sys:apply-top-level car '(5))
+   (set-current-error-port old)
+   (test-all-comment-lines? (get-output-string sp)))
+ #t
+ "apply-report-has-no-stacktrace")

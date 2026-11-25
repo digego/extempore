@@ -58,22 +58,22 @@
 ;; coloured text is always a message
 (define-macro (print-with-colors fg bg bold . body)
   `(sys:as-message
-     (let ((colors '((black . 0)
-                     (red . 1)
-                     (green . 2)
-                     (yellow . 3)
-                     (blue . 4)
-                     (magenta . 5)
-                     (cyan . 6)
-                     (white . 7)
-                     (default . 9)
-                     (none . 9))))
-       (ascii-print-color (if ,bold 1 0)
-                          (cdr (assoc ,fg colors))
-                          (cdr (assoc ,bg colors)))
-       ,@body
-       ;; return colors to normal
-       (ascii-print-color 0 7 9))))
+    (let ((colors '((black . 0)
+                    (red . 1)
+                    (green . 2)
+                    (yellow . 3)
+                    (blue . 4)
+                    (magenta . 5)
+                    (cyan . 6)
+                    (white . 7)
+                    (default . 9)
+                    (none . 9))))
+      (ascii-print-color (if ,bold 1 0)
+                         (cdr (assoc ,fg colors))
+                         (cdr (assoc ,bg colors)))
+      ,@body
+      ;; return colors to normal
+      (ascii-print-color 0 7 9))))
 
 (define log-info
   (lambda args
@@ -108,11 +108,11 @@
 (define (tree-member mem tree)
   (if (member #t
               (flatten
-                (let loop ((tree tree))
-                  (if (pair? tree)
-                      (cons (loop (car tree)) (loop (cdr tree)))
-                      (if (null? tree) '()
-                          (if (equal? tree mem) #t #f))))))
+               (let loop ((tree tree))
+                 (if (pair? tree)
+                     (cons (loop (car tree)) (loop (cdr tree)))
+                     (if (null? tree) '()
+                         (if (equal? tree mem) #t #f))))))
       #t #f))
 
 (define remove-first
@@ -146,11 +146,11 @@
 
 (define-macro (dotimes init . body)
   `(if (<= ,(cadr init) 0)
-    '()
-    (let uri1834ck ((,(car init) 0))
-      ,@body
-      (if (< ,(car init) (- ,(cadr init) 1))
-          (uri1834ck (+ ,(car init) 1))))))
+       '()
+       (let uri1834ck ((,(car init) 0))
+         ,@body
+         (if (< ,(car init) (- ,(cadr init) 1))
+             (uri1834ck (+ ,(car init) 1))))))
 
 ;; Deprectateded because of symbol leak.  see above.
 ;;(define-macro (dotimes init . body)
@@ -161,20 +161,20 @@
 (define-macro (dotill predicate expression . args)
   (let ((max-iterations (if (null? args) 100000000 (car args))))
     `(let impsym38479k ((cnt 0))
-      (let ((value ,expression))
-        (if ,predicate
-            value
-            (if (> cnt ,max-iterations)
-                (begin (log-info "Dropping out after max-iterations")
-                  'failed)
-                (impsym38479k (+ cnt 1))))))))
+       (let ((value ,expression))
+         (if ,predicate
+             value
+             (if (> cnt ,max-iterations)
+                 (begin (log-info "Dropping out after max-iterations")
+                        'failed)
+                 (impsym38479k (+ cnt 1))))))))
 
 (define make-vector-with-proc
   (lambda (num func)
     (let ((new-vector (make-vector num)))
       (do ((i 0 (+ i 1)))
           ((= i num) new-vector)
-          (vector-set! new-vector i (func i))))))
+        (vector-set! new-vector i (func i))))))
 
 (define (make-list lth obj)
   (let loop ((i lth)
@@ -286,9 +286,9 @@
             (if (> (math:std-deviation l2)
                    (if (null? args) 0.0005 (car args)))
                 (begin (log-info "clock sync outside tolerance - making no time adjustment: " (math:std-deviation l2))
-                  (log-info "clock times: " lst))
+                       (log-info "clock times: " lst))
                 (begin (log-info 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
-                  (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
+                       (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
 
 
 (define clock:update-metro
@@ -394,7 +394,7 @@
 (define-macro (ramp x)
   `(let* ((xx (+ ,x 0.000000001))
           (xmod2pi (- xx (* TWOPI (floor (/ xx TWOPI))))))
-    (* (/ 1.0 TWOPI) xmod2pi)))
+     (* (/ 1.0 TWOPI) xmod2pi)))
 
 
 (define-macro (rampr . __rampr-rest)
@@ -417,7 +417,7 @@
 
 (define-macro (rect x)
   `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
-    (if (< xmod2pi PI) 1.0 0.0)))
+     (if (< xmod2pi PI) 1.0 0.0)))
 
 (define-macro (rectr . __rectr-rest)
   (let ((args (cons 'rectr __rectr-rest)))
@@ -430,8 +430,8 @@
 (define-macro (tri-wave x)
   `(let* ((xx (+ ,x 0.000000001))
           (xmod2pi (- xx (* TWOPI (floor (/ xx TWOPI))))))
-    (* (/ 1.0 PI)
-       (if (< xmod2pi PI) xmod2pi (- TWOPI xmod2pi)))))
+     (* (/ 1.0 PI)
+        (if (< xmod2pi PI) xmod2pi (- TWOPI xmod2pi)))))
 
 (define-macro (trir . __trir-rest)
   (let ((args (cons 'trir __trir-rest)))
@@ -615,19 +615,19 @@
              (closure? (eval value)))
         `(let l1929 ((t (now))
                      (count (/ ,seconds ,r)))
-          (if (equal? ,variable 'stop-signal)
-              'done
-              (begin (set! ,variable (apply ,value (list ,variable)))
-                (if (> count 1)
-                    (callback (+ t (* *samplerate* ,r)) l1929 (+ t (* *samplerate* ,r)) (- count 1))))))
+           (if (equal? ,variable 'stop-signal)
+               'done
+               (begin (set! ,variable (apply ,value (list ,variable)))
+                      (if (> count 1)
+                          (callback (+ t (* *samplerate* ,r)) l1929 (+ t (* *samplerate* ,r)) (- count 1))))))
         `(let l1929 ((t (now))
                      (inc (/ (- ,value ,variable) (real->integer (/ ,seconds ,r))))
                      (count (real->integer (/ ,seconds ,r))))
-          (if (equal? ,variable 'stop-signal)
-              'done
-              (begin (set! ,variable (+ ,variable inc))
-                (if (> count 1)
-                    (callback (+ t (* *samplerate* ,r)) l1929 (+ t (* *samplerate* ,r)) inc (- count 1)))))))))
+           (if (equal? ,variable 'stop-signal)
+               'done
+               (begin (set! ,variable (+ ,variable inc))
+                      (if (> count 1)
+                          (callback (+ t (* *samplerate* ,r)) l1929 (+ t (* *samplerate* ,r)) inc (- count 1)))))))))
 
 
 
@@ -700,8 +700,8 @@
     (let* ((callback-proc (ipc:get-process-name))
            (func (if (string? (car args))
                      (begin (set! callback-proc (car args))
-                       (set! args (cdr args))
-                       (car args))
+                            (set! args (cdr args))
+                            (car args))
                      (car args))))
       (let loop ((i *ipc:active-label-cnt*))
         (if (not (null? (vector-ref *ipc:active-labels* i)))
@@ -1014,7 +1014,7 @@
                       (write-char #\~ buffer)
                       (loop (cddr format-list) objects))
                      (else
-                       (error 'format "Unrecognized escape sequence")))))
+                      (error 'format "Unrecognized escape sequence")))))
               (else (write-char (car format-list) buffer)
                     (loop (cdr format-list) objects)))))))
 
@@ -1045,8 +1045,8 @@
                           (if (>= i n1) r
                               (loop (+ i 1)
                                     (cons `(vector-set! st ,i
-                                            ,
-                                            (vector-ref vv i))
+                                                        ,
+                                                        (vector-ref vv i))
                                           r))))
                       (let loop ((fvfv fvfv))
                         (if (not (null? fvfv))
@@ -1054,22 +1054,22 @@
                                                  (+ (list-position (car fvfv) ff)
                                                     1)
                                                  (cadr fvfv))
-                              (loop (cddr fvfv)))))
+                                    (loop (cddr fvfv)))))
                       st)))
-          ,@(let loop ((i 1) (procs '()))
-              (if (>= i n1) procs
-                  (loop (+ i 1)
-                        (let ((f (symbol->string (list-ref ff (- i 1)))))
-                          (cons `(define ,(string->symbol (string-append ss "." f))
-                                  (lambda (x) (vector-ref x ,i)))
-                                (cons `(define ,(string->symbol (string-append "set!" ss "." f))
-                                        (lambda (x v)
-                                          (vector-set! x ,i v)))
-                                      procs))))))
-          (define ,(string->symbol (string-append ss "?"))
-            (lambda (x)
-              (and (vector? x)
-                   (eqv? (vector-ref x 0) ',s)))))))))
+                ,@(let loop ((i 1) (procs '()))
+                    (if (>= i n1) procs
+                        (loop (+ i 1)
+                              (let ((f (symbol->string (list-ref ff (- i 1)))))
+                                (cons `(define ,(string->symbol (string-append ss "." f))
+                                         (lambda (x) (vector-ref x ,i)))
+                                      (cons `(define ,(string->symbol (string-append "set!" ss "." f))
+                                               (lambda (x v)
+                                                 (vector-set! x ,i v)))
+                                            procs))))))
+                (define ,(string->symbol (string-append ss "?"))
+                  (lambda (x)
+                    (and (vector? x)
+                         (eqv? (vector-ref x 0) ',s)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1082,7 +1082,7 @@
 (define-macro (benchmark expr)
   `(let* ((t (clock:clock))
           (res ,expr))
-    (- (clock:clock) t)))
+     (- (clock:clock) t)))
 
 ;; this for buffered version
 (define _dsp:set!
@@ -1211,10 +1211,10 @@
 ;@
 (define cl:union
   (letrec ((onion
-             (lambda (lst1 lst2)
-               (if (null? lst1)
-                   lst2
-                   (onion (cdr lst1) (cl:adjoin (car lst1) lst2))))))
+            (lambda (lst1 lst2)
+              (if (null? lst1)
+                  lst2
+                  (onion (cdr lst1) (cl:adjoin (car lst1) lst2))))))
     (lambda (lst1 lst2)
       (cond ((null? lst1) lst2)
             ((null? lst2) lst1)
@@ -1311,8 +1311,8 @@
     (cond ((null? lst))
           ((eqv? obj (car lst)) (remove (cdr lst) tail))
           (else
-            (set-cdr! tail (list (car lst)))
-            (remove (cdr lst) (cdr tail)))))
+           (set-cdr! tail (list (car lst)))
+           (remove (cdr lst) (cdr tail)))))
   (cdr head))
 ;@
 (define (cl:remove-if pred? lst)
@@ -1335,9 +1335,9 @@
           ((null? (cdr args)) (car args))
           ((null? (car args)) (apply cl:nconc (cdr args)))
           (else
-            (set-cdr! (last-pair (car args))
-                      (apply cl:nconc (cdr args)))
-            (car args)))))
+           (set-cdr! (last-pair (car args))
+                     (apply cl:nconc (cdr args)))
+           (car args)))))
 
 ;;;@ From: hugh@ear.mit.edu (Hugh Secker-Walker)
 (define (cl:nreverse rev-it)
@@ -1368,7 +1368,7 @@
                      (tail ans (cdr tail))
                      (k (+ -2 k) (+ -1 k)))
                     ((or (negative? k) (null? lst)) ans)
-                    (set-cdr! tail (list (car lst))))))))
+                  (set-cdr! tail (list (car lst))))))))
 
 ;;;; CONDITIONALS
 ;@
@@ -1429,24 +1429,24 @@
     (cond ((null? lst) '())
           ((equal? obj (car lst)) (delete (cdr lst)))
           (else
-            (set-cdr! lst (delete (cdr lst)))
-            lst))))
+           (set-cdr! lst (delete (cdr lst)))
+           lst))))
 ;@
 (define (cl:delete-if pred lst)
   (let delete-if ((lst lst))
     (cond ((null? lst) '())
           ((pred (car lst)) (delete-if (cdr lst)))
           (else
-            (set-cdr! lst (delete-if (cdr lst)))
-            lst))))
+           (set-cdr! lst (delete-if (cdr lst)))
+           lst))))
 ;@
 (define (cl:delete-if-not pred lst)
   (let delete-if ((lst lst))
     (cond ((null? lst) '())
           ((not (pred (car lst))) (delete-if (cdr lst)))
           (else
-            (set-cdr! lst (delete-if (cdr lst)))
-            lst))))
+           (set-cdr! lst (delete-if (cdr lst)))
+           lst))))
 
 ;;;;;;;;;;;;;;
 ;; sort.xtm ;;
@@ -1506,14 +1506,14 @@
   (define (loop r a b)
     (if (less? (car b) (car a))
         (begin (set-cdr! r b)
-          (if (null? (cdr b))
-              (set-cdr! b a)
-              (loop b a (cdr b))))
+               (if (null? (cdr b))
+                   (set-cdr! b a)
+                   (loop b a (cdr b))))
         ;; (car a) <= (car b)
         (begin (set-cdr! r a)
-          (if (null? (cdr a))
-              (set-cdr! a b)
-              (loop a (cdr a) b)))))
+               (if (null? (cdr a))
+                   (set-cdr! a b)
+                   (loop a (cdr a) b)))))
   (cond ((null? a) b)
         ((null? b) a)
         ((less? (car b) (car a))
@@ -1620,16 +1620,16 @@
       (if (not file-string)
           (if (or (null? quiet?) (not (car quiet?)))
               (begin (sys:as-message
-                       (print-with-colors 'red 'default #t (print "File Error"))
-                       (print " couldn't find file ")
-                       (print-with-colors 'blue 'default #f (print path "\n")))
-                #f)
+                      (print-with-colors 'red 'default #t (print "File Error"))
+                      (print " couldn't find file ")
+                      (print-with-colors 'blue 'default #f (print path "\n")))
+                     #f)
               #f)
           (let ((input (open-input-string file-string))
                 (msg (call/cc
-                       (lambda (k)
-                         (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
-                         ""))))
+                      (lambda (k)
+                        (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
+                        ""))))
             (if (string=? msg "")
                 ;; Each top-level form is evaluated inside its own catch: an
                 ;; error is reported (with the file's path, which the string
@@ -1652,30 +1652,30 @@
                         (set! *global-sysload-evals* (cons sexpr *global-sysload-evals*))
                         (set! *global-sysload-evals* (list-head *global-sysload-evals* 10))
                         (let ((form-ok
-                                (*s7-catch* #t
-                                  (lambda ()
-                                    (eval (car *global-sysload-evals*) (interaction-environment))
-                                    #t)
-                                  (lambda (tag info)
-                                    (sys:as-message
-                                      (#_display (sys:error-report-string
-                                                   tag info
-                                                   (string-append path ", line " (number->string line)))
-                                                 (current-output-port)))
-                                    (if (and (defined? 'xtc:aot:currently-compiling?)
-                                             (xtc:aot:currently-compiling?))
-                                        (begin
-                                          (print-with-colors 'red 'default #t (print "AOT compilation failed"))
-                                          (print " while loading " path "\n")
-                                          (xtc:aot:abort-compilation)))
-                                    #f))))
+                               (*s7-catch* #t
+                                           (lambda ()
+                                             (eval (car *global-sysload-evals*) (interaction-environment))
+                                             #t)
+                                           (lambda (tag info)
+                                             (sys:as-message
+                                              (#_display (sys:error-report-string
+                                                          tag info
+                                                          (string-append path ", line " (number->string line)))
+                                                         (current-output-port)))
+                                             (if (and (defined? 'xtc:aot:currently-compiling?)
+                                                      (xtc:aot:currently-compiling?))
+                                                 (begin
+                                                   (print-with-colors 'red 'default #t (print "AOT compilation failed"))
+                                                   (print " while loading " path "\n")
+                                                   (xtc:aot:abort-compilation)))
+                                             #f))))
                           (loop (read input) (and form-ok ok))))))
                 (let ((words (regex:split msg " ")))
                   (if (or (null? quiet?) (not (car quiet?)))
                       (sys:as-message
-                        (print-with-colors 'yellow 'default #t (print "sys:load notification "))
-                        (for-each (lambda (w) (print w "")) words)
-                        (println)))
+                       (print-with-colors 'yellow 'default #t (print "sys:load notification "))
+                       (for-each (lambda (w) (print w "")) words)
+                       (println)))
                   (close-port input)
                   #f)))))))
 
@@ -1710,8 +1710,8 @@
 
 (define-macro (clamp x minval maxval)
   `(if (> ,x ,maxval) ,maxval
-    (if (< ,x ,minval) ,minval
-        ,x)))
+       (if (< ,x ,minval) ,minval
+           ,x)))
 
 
 

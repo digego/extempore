@@ -107,18 +107,18 @@
 (define studio:cycle-pattern
   (lambda (f)
     (studio:make-pattern
-      (lambda (from end)
-        (apply append
-               (map (lambda (span) (f (car span) (cadr span) (caddr span)))
-                    (studio:cycle-spans from end)))))))
+     (lambda (from end)
+       (apply append
+              (map (lambda (span) (f (car span) (cadr span) (caddr span)))
+                   (studio:cycle-spans from end)))))))
 
 (define silence (studio:make-pattern (lambda (from end) '())))
 
 (define pure
   (lambda (value)
     (studio:cycle-pattern
-      (lambda (b e cycle)
-        (list (studio:hap cycle (+ cycle 1) b e value))))))
+     (lambda (b e cycle)
+       (list (studio:hap cycle (+ cycle 1) b e value))))))
 
 ;; the value a pattern has at one instant, or #f
 (define studio:sample-at
@@ -135,9 +135,9 @@
   (lambda (f pat)
     (let ((p (->pattern pat)))
       (studio:make-pattern
-        (lambda (from end)
-          (map (lambda (h) (studio:hap-with-value h (f (studio:hap-value h))))
-               (query p from end)))))))
+       (lambda (from end)
+         (map (lambda (h) (studio:hap-with-value h (f (studio:hap-value h))))
+              (query p from end)))))))
 
 ;; A function which transforms a pattern can be called without the pattern,
 ;; and then returns a function waiting for it: (fast 2) is "play it twice as
@@ -146,11 +146,11 @@
   (let ((name (car name-and-args))
         (args (cdr name-and-args)))
     `(define ,name
-      (lambda (,@args . maybe-pattern)
-        (if (null? maybe-pattern)
-            (lambda (pat) (,name ,@args pat))
-            (let ((pat (->pattern (car maybe-pattern))))
-              ,@body))))))
+       (lambda (,@args . maybe-pattern)
+         (if (null? maybe-pattern)
+             (lambda (pat) (,name ,@args pat))
+             (let ((pat (->pattern (car maybe-pattern))))
+               ,@body))))))
 
 ;; A number which a transformation takes can be a pattern of numbers instead.
 ;; (make n) builds the transformed pattern for the number n. Given a pattern,
@@ -165,25 +165,25 @@
                  ;; the patterns made so far, by number
                  (made '()))
              (studio:make-pattern
-               (lambda (from end)
-                 (apply append
-                        (map (lambda (h)
-                               (let ((n (studio:hap-value h)))
-                                 (if (not (number? n))
-                                     '()
-                                     (let ((known (assv n made)))
-                                       (if (not known)
-                                           (begin
-                                             ;; a signal has a new number at every
-                                             ;; moment: don't keep them all
-                                             (if (> (length made) 64) (set! made '()))
-                                             (set! known (cons n (->pattern (make n))))
-                                             (set! made (cons known made))))
-                                       (query (cdr known) (studio:hap-part-begin h) (studio:hap-part-end h))))))
-                             (query numbers from end)))))))
+              (lambda (from end)
+                (apply append
+                       (map (lambda (h)
+                              (let ((n (studio:hap-value h)))
+                                (if (not (number? n))
+                                    '()
+                                    (let ((known (assv n made)))
+                                      (if (not known)
+                                          (begin
+                                            ;; a signal has a new number at every
+                                            ;; moment: don't keep them all
+                                            (if (> (length made) 64) (set! made '()))
+                                            (set! known (cons n (->pattern (make n))))
+                                            (set! made (cons known made))))
+                                      (query (cdr known) (studio:hap-part-begin h) (studio:hap-part-end h))))))
+                            (query numbers from end)))))))
           (else
-            (studio:error who "takes a number or a pattern of numbers, not" arg)
-            (error 'wrong-type-arg "see the studio's message above")))))
+           (studio:error who "takes a number or a pattern of numbers, not" arg)
+           (error 'wrong-type-arg "see the studio's message above")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; combining patterns  ;;
@@ -193,8 +193,8 @@
   (lambda pats
     (let ((ps (map ->pattern pats)))
       (studio:make-pattern
-        (lambda (from end)
-          (apply append (map (lambda (p) (query p from end)) ps)))))))
+       (lambda (from end)
+         (apply append (map (lambda (p) (query p from end)) ps)))))))
 
 ;; one pattern per cycle, in turn
 (define slowcat
@@ -204,29 +204,29 @@
       (if (= n 0)
           silence
           (studio:cycle-pattern
-            (lambda (b e cycle)
-              ;; each pattern sees its own cycles count up one at a time
-              (let* ((p (vector-ref ps (modulo cycle n)))
-                     (offset (- cycle (floor (/ cycle n)))))
-                (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t offset))))
-                     (query p (- b offset) (- e offset))))))))))
+           (lambda (b e cycle)
+             ;; each pattern sees its own cycles count up one at a time
+             (let* ((p (vector-ref ps (modulo cycle n)))
+                    (offset (- cycle (floor (/ cycle n)))))
+               (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t offset))))
+                    (query p (- b offset) (- e offset))))))))))
 
 (define-transform (fast factor)
   (studio:with-number
-    'fast factor
-    (lambda (factor)
-      (if (<= factor 0)
-          silence
-          (studio:make-pattern
-            (lambda (from end)
-              (map (lambda (h) (studio:hap-with-time h (lambda (t) (/ t factor))))
-                   (query pat (* from factor) (* end factor)))))))))
+   'fast factor
+   (lambda (factor)
+     (if (<= factor 0)
+         silence
+         (studio:make-pattern
+          (lambda (from end)
+            (map (lambda (h) (studio:hap-with-time h (lambda (t) (/ t factor))))
+                 (query pat (* from factor) (* end factor)))))))))
 
 (define-transform (slow factor)
   (studio:with-number
-    'slow factor
-    (lambda (factor)
-      (if (<= factor 0) silence (fast (/ 1 factor) pat)))))
+   'slow factor
+   (lambda (factor)
+     (if (<= factor 0) silence (fast (/ 1 factor) pat)))))
 
 ;; all of the patterns in one cycle, one after the other
 (define fastcat
@@ -240,12 +240,12 @@
 
 (define-transform (late amount)
   (studio:with-number
-    'late amount
-    (lambda (amount)
-      (studio:make-pattern
-        (lambda (from end)
-          (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t amount))))
-               (query pat (- from amount) (- end amount))))))))
+   'late amount
+   (lambda (amount)
+     (studio:make-pattern
+      (lambda (from end)
+        (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t amount))))
+             (query pat (- from amount) (- end amount))))))))
 
 (define-transform (early amount)
   (studio:with-number 'early amount (lambda (amount) (late (- amount) pat))))
@@ -257,18 +257,18 @@
       (if (<= width 0)
           silence
           (studio:cycle-pattern
-            (lambda (b e cycle)
-              (let* ((lo (+ cycle start))
-                     (hi (+ cycle end))
-                     (qb (max b lo))
-                     (qe (min e hi)))
-                (if (>= qb qe)
-                    '()
-                    (map (lambda (h)
-                           (studio:hap-with-time h (lambda (t) (+ lo (* (- t cycle) width)))))
-                         (query pat
-                                (+ cycle (/ (- qb lo) width))
-                                (+ cycle (/ (- qe lo) width))))))))))))
+           (lambda (b e cycle)
+             (let* ((lo (+ cycle start))
+                    (hi (+ cycle end))
+                    (qb (max b lo))
+                    (qe (min e hi)))
+               (if (>= qb qe)
+                   '()
+                   (map (lambda (h)
+                          (studio:hap-with-time h (lambda (t) (+ lo (* (- t cycle) width)))))
+                        (query pat
+                               (+ cycle (/ (- qb lo) width))
+                               (+ cycle (/ (- qe lo) width))))))))))))
 
 ;; like fastcat, but each pattern has a weight which says how much of the
 ;; cycle it gets: (timecat '(3 . a) '(1 . b))
@@ -296,7 +296,7 @@
             ((and (procedure? (car others)) (not (pattern? (car others))))
              (loop (->pattern ((car others) p)) (cdr others)))
             (else
-              (loop (studio:merge p (->pattern (car others))) (cdr others)))))))
+             (loop (studio:merge p (->pattern (car others))) (cdr others)))))))
 
 (define studio:merge-values
   (lambda (a b)
@@ -307,20 +307,20 @@
 (define studio:merge
   (lambda (structure values)
     (studio:make-pattern
-      (lambda (from end)
-        (let loop ((haps (query structure from end)) (acc '()))
-          (if (null? haps)
-              (reverse acc)
-              (let* ((h (car haps))
-                     (other (studio:sample-at values (or (studio:hap-whole-begin h)
-                                                         (studio:hap-part-begin h)))))
-                (loop (cdr haps)
-                      (if other
-                          (cons (studio:hap-with-value
-                                  h
-                                  (studio:merge-values (studio:hap-value h) (studio:hap-value other)))
-                                acc)
-                          acc)))))))))
+     (lambda (from end)
+       (let loop ((haps (query structure from end)) (acc '()))
+         (if (null? haps)
+             (reverse acc)
+             (let* ((h (car haps))
+                    (other (studio:sample-at values (or (studio:hap-whole-begin h)
+                                                        (studio:hap-part-begin h)))))
+               (loop (cdr haps)
+                     (if other
+                         (cons (studio:hap-with-value
+                                h
+                                (studio:merge-values (studio:hap-value h) (studio:hap-value other)))
+                               acc)
+                         acc)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; transforming patterns ;;
@@ -337,27 +337,27 @@
 
 (define-transform (rev)
   (studio:cycle-pattern
-    (lambda (b e cycle)
-      (let ((mirror (lambda (t) (- (+ cycle cycle 1) t))))
-        (map (lambda (h)
-               (studio:hap (and (studio:hap-whole-end h) (mirror (studio:hap-whole-end h)))
-                           (and (studio:hap-whole-begin h) (mirror (studio:hap-whole-begin h)))
-                           (mirror (studio:hap-part-end h))
-                           (mirror (studio:hap-part-begin h))
-                           (studio:hap-value h)))
-             (query pat (mirror e) (mirror b)))))))
+   (lambda (b e cycle)
+     (let ((mirror (lambda (t) (- (+ cycle cycle 1) t))))
+       (map (lambda (h)
+              (studio:hap (and (studio:hap-whole-end h) (mirror (studio:hap-whole-end h)))
+                          (and (studio:hap-whole-begin h) (mirror (studio:hap-whole-begin h)))
+                          (mirror (studio:hap-part-end h))
+                          (mirror (studio:hap-part-begin h))
+                          (studio:hap-value h)))
+            (query pat (mirror e) (mirror b)))))))
 
 ;; use (f pat) in the cycles where (test cycle) is true
 (define-transform (when-cycle test f)
   (let ((transformed (studio:transform f pat)))
     (studio:cycle-pattern
-      (lambda (b e cycle)
-        (query (if (test cycle) transformed pat) b e)))))
+     (lambda (b e cycle)
+       (query (if (test cycle) transformed pat) b e)))))
 
 (define-transform (every n f)
   (studio:with-number
-    'every n
-    (lambda (n) (when-cycle (lambda (cycle) (= 0 (modulo cycle n))) f pat))))
+   'every n
+   (lambda (n) (when-cycle (lambda (cycle) (= 0 (modulo cycle n))) f pat))))
 
 ;; like every, but from the cycle numbered `offset` in each group of n
 (define-transform (every-from n offset f)
@@ -368,36 +368,36 @@
 
 (define-transform (off amount f)
   (studio:with-number
-    'off amount
-    (lambda (amount) (stack pat (studio:transform f (late amount pat))))))
+   'off amount
+   (lambda (amount) (stack pat (studio:transform f (late amount pat))))))
 
 ;; repeat each event n times in its own span
 (define-transform (ply n)
   (studio:with-number
-    'ply n
-    (lambda (n)
-      (studio:make-pattern
-        (lambda (from end)
-          (apply append
-                 (map (lambda (h)
-                        (if (not (studio:hap-whole-begin h))
-                            (list h)
-                            ;; A long event may arrive as several fragments,
-                            ;; over several queries. Each repeat is played by
-                            ;; the fragment which contains its start.
-                            (let* ((wb (studio:hap-whole-begin h))
-                                   (step (/ (- (studio:hap-whole-end h) wb) n)))
-                              (let loop ((i 0) (acc '()))
-                                (if (>= i n)
-                                    (reverse acc)
-                                    (let* ((b (+ wb (* i step)))
-                                           (e (+ b step)))
-                                      (loop (+ i 1)
-                                            (if (and (>= b (studio:hap-part-begin h))
-                                                     (< b (studio:hap-part-end h)))
-                                                (cons (studio:hap b e b (min e end) (studio:hap-value h)) acc)
-                                                acc))))))))
-                      (query pat from end))))))))
+   'ply n
+   (lambda (n)
+     (studio:make-pattern
+      (lambda (from end)
+        (apply append
+               (map (lambda (h)
+                      (if (not (studio:hap-whole-begin h))
+                          (list h)
+                          ;; A long event may arrive as several fragments,
+                          ;; over several queries. Each repeat is played by
+                          ;; the fragment which contains its start.
+                          (let* ((wb (studio:hap-whole-begin h))
+                                 (step (/ (- (studio:hap-whole-end h) wb) n)))
+                            (let loop ((i 0) (acc '()))
+                              (if (>= i n)
+                                  (reverse acc)
+                                  (let* ((b (+ wb (* i step)))
+                                         (e (+ b step)))
+                                    (loop (+ i 1)
+                                          (if (and (>= b (studio:hap-part-begin h))
+                                                   (< b (studio:hap-part-end h)))
+                                              (cons (studio:hap b e b (min e end) (studio:hap-value h)) acc)
+                                              acc))))))))
+                    (query pat from end))))))))
 
 ;; `count` copies of the pattern, each `time` later and `feedback` times as loud
 (define-transform (echo count time feedback)
@@ -417,13 +417,13 @@
 ;; start one step later each cycle, for a pattern of n steps
 (define-transform (iter n)
   (studio:with-number
-    'iter n
-    (lambda (n)
-      (apply slowcat
-             (let loop ((i 0) (acc '()))
-               (if (>= i n)
-                   (reverse acc)
-                   (loop (+ i 1) (cons (early (/ i n) pat) acc))))))))
+   'iter n
+   (lambda (n)
+     (apply slowcat
+            (let loop ((i 0) (acc '()))
+              (if (>= i n)
+                  (reverse acc)
+                  (loop (+ i 1) (cons (early (/ i n) pat) acc))))))))
 
 ;; apply f only to the part of each cycle from start to end (0 to 1)
 (define-transform (within start end f)
@@ -433,9 +433,9 @@
                       (pos (- t (floor t))))
                  (and (>= pos start) (< pos end))))))
     (studio:make-pattern
-      (lambda (b e)
-        (append (cl:remove-if in? (query pat b e))
-                (cl:remove-if-not in? (query transformed b e)))))))
+     (lambda (b e)
+       (append (cl:remove-if in? (query pat b e))
+               (cl:remove-if-not in? (query transformed b e)))))))
 
 ;; apply f as if the pattern were n times slower: (inside 2 rev) reverses each half
 (define-transform (inside n f)
@@ -444,32 +444,32 @@
 ;; delay every second step of n per cycle by `amount` of a step
 (define-transform (swing amount n)
   (studio:with-number
-    'swing amount
-    (lambda (amount) (inside n (within 1/2 1 (late (* 1/2 amount))) pat))))
+   'swing amount
+   (lambda (amount) (inside n (within 1/2 1 (late (* 1/2 amount))) pat))))
 
 ;; repeat the first `fraction` of each cycle
 (define-transform (linger fraction)
   (if (<= fraction 0)
       pat
       (studio:cycle-pattern
-        (lambda (b e cycle)
-          (apply append
-                 (map (lambda (span)
-                        (let* ((rep (floor (/ (- (car span) cycle) fraction)))
-                               (shift (* rep fraction)))
-                          (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t shift))))
-                               (cl:remove-if-not
-                                 (lambda (h) (< (- (or (studio:hap-whole-begin h)
-                                                       (studio:hap-part-begin h))
-                                                   cycle)
-                                                fraction))
-                                 (query pat (- (car span) shift) (- (cadr span) shift))))))
-                      ;; cut the cycle into pieces of length `fraction`
-                      (let loop ((t b) (acc '()))
-                        (if (>= t e)
-                            (reverse acc)
-                            (let ((next (min e (+ cycle (* fraction (+ 1 (floor (/ (- t cycle) fraction))))))))
-                              (loop next (cons (list t next) acc)))))))))))
+       (lambda (b e cycle)
+         (apply append
+                (map (lambda (span)
+                       (let* ((rep (floor (/ (- (car span) cycle) fraction)))
+                              (shift (* rep fraction)))
+                         (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t shift))))
+                              (cl:remove-if-not
+                               (lambda (h) (< (- (or (studio:hap-whole-begin h)
+                                                     (studio:hap-part-begin h))
+                                                 cycle)
+                                              fraction))
+                               (query pat (- (car span) shift) (- (cadr span) shift))))))
+                     ;; cut the cycle into pieces of length `fraction`
+                     (let loop ((t b) (acc '()))
+                       (if (>= t e)
+                           (reverse acc)
+                           (let ((next (min e (+ cycle (* fraction (+ 1 (floor (/ (- t cycle) fraction))))))))
+                             (loop next (cons (list t next) acc)))))))))))
 
 ;; split each cycle into n parts and apply f to one part per cycle, in turn
 (define-transform (chunk n f)
@@ -494,15 +494,15 @@
           ((<= hits 0) (make-list steps #f))
           ((>= hits steps) (make-list steps #t))
           (else
-            (let loop ((a (make-list hits '(#t)))
-                       (b (make-list (- steps hits) '(#f))))
-              (if (<= (length b) 1)
-                  (apply append (append a b))
-                  (let* ((n (min (length a) (length b)))
-                         (paired (map append (list-head a n) (list-head b n)))
-                         (rest-a (list-tail a n))
-                         (rest-b (list-tail b n)))
-                    (loop paired (if (null? rest-a) rest-b rest-a)))))))))
+           (let loop ((a (make-list hits '(#t)))
+                      (b (make-list (- steps hits) '(#f))))
+             (if (<= (length b) 1)
+                 (apply append (append a b))
+                 (let* ((n (min (length a) (length b)))
+                        (paired (map append (list-head a n) (list-head b n)))
+                        (rest-a (list-tail a n))
+                        (rest-b (list-tail b n)))
+                   (loop paired (if (null? rest-a) rest-b rest-a)))))))))
 
 (define studio:rotate
   (lambda (lst n)
@@ -522,20 +522,20 @@
           ((and (number? (car more)) (null? (cdr more)))
            (lambda (pat) (euclid hits steps (car more) pat)))
           (else
-            (let ((rotation (if (pair? (cdr more)) (car more) 0))
-                  (pat (->pattern (if (pair? (cdr more)) (cadr more) (car more)))))
-              (studio:with-number
-                'euclid hits
-                (lambda (hits)
-                  (studio:with-number
-                    'euclid steps
-                    (lambda (steps)
-                      (studio:with-number
-                        'euclid rotation
-                        (lambda (rotation)
-                          (apply fastcat
-                                 (map (lambda (hit) (if hit pat silence))
-                                      (studio:rotate (studio:bjorklund hits steps) rotation))))))))))))))
+           (let ((rotation (if (pair? (cdr more)) (car more) 0))
+                 (pat (->pattern (if (pair? (cdr more)) (cadr more) (car more)))))
+             (studio:with-number
+              'euclid hits
+              (lambda (hits)
+                (studio:with-number
+                 'euclid steps
+                 (lambda (steps)
+                   (studio:with-number
+                    'euclid rotation
+                    (lambda (rotation)
+                      (apply fastcat
+                             (map (lambda (hit) (if hit pat silence))
+                                  (studio:rotate (studio:bjorklund hits steps) rotation))))))))))))))
 
 ;; keep the timing of the true events in `bools`, with values from pat
 (define-transform (struct bools)
@@ -547,37 +547,37 @@
 (define-transform (mask bools)
   (let ((b (->pattern bools)))
     (studio:make-pattern
-      (lambda (from end)
-        (cl:remove-if-not
-          (lambda (h)
-            (let ((m (studio:sample-at b (or (studio:hap-whole-begin h) (studio:hap-part-begin h)))))
-              (and m
-                   (studio:hap-value m)
-                   (not (eq? (studio:hap-value m) 'f))
-                   (not (eqv? (studio:hap-value m) 0)))))
-          (query pat from end))))))
+     (lambda (from end)
+       (cl:remove-if-not
+        (lambda (h)
+          (let ((m (studio:sample-at b (or (studio:hap-whole-begin h) (studio:hap-part-begin h)))))
+            (and m
+                 (studio:hap-value m)
+                 (not (eq? (studio:hap-value m) 'f))
+                 (not (eqv? (studio:hap-value m) 0)))))
+        (query pat from end))))))
 
 (define studio:filter-values
   (lambda (keep? pat)
     (studio:make-pattern
-      (lambda (from end)
-        (cl:remove-if-not (lambda (h) (keep? (studio:hap-value h))) (query pat from end))))))
+     (lambda (from end)
+       (cl:remove-if-not (lambda (h) (keep? (studio:hap-value h))) (query pat from end))))))
 
 ;; structure from the first pattern, values (only) from the second
 (define studio:merge-right
   (lambda (structure values)
     (studio:make-pattern
-      (lambda (from end)
-        (let loop ((haps (query structure from end)) (acc '()))
-          (if (null? haps)
-              (reverse acc)
-              (let* ((h (car haps))
-                     (other (studio:sample-at values (or (studio:hap-whole-begin h)
-                                                         (studio:hap-part-begin h)))))
-                (loop (cdr haps)
-                      (if other
-                          (cons (studio:hap-with-value h (studio:hap-value other)) acc)
-                          acc)))))))))
+     (lambda (from end)
+       (let loop ((haps (query structure from end)) (acc '()))
+         (if (null? haps)
+             (reverse acc)
+             (let* ((h (car haps))
+                    (other (studio:sample-at values (or (studio:hap-whole-begin h)
+                                                        (studio:hap-part-begin h)))))
+               (loop (cdr haps)
+                     (if other
+                         (cons (studio:hap-with-value h (studio:hap-value other)) acc)
+                         acc)))))))))
 
 ;; a repeatable random number from 0 to 1 for a moment in time: the same
 ;; pattern makes the same choices every time it is played
@@ -597,15 +597,15 @@
 (define-transform (degrade-by probability)
   (let ((seed (studio:next-seed)))
     (studio:with-number
-      'degrade-by probability
-      (lambda (probability)
-        (studio:make-pattern
-          (lambda (from end)
-            (cl:remove-if
-              (lambda (h)
-                (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
-                   probability))
-              (query pat from end))))))))
+     'degrade-by probability
+     (lambda (probability)
+       (studio:make-pattern
+        (lambda (from end)
+          (cl:remove-if
+           (lambda (h)
+             (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
+                probability))
+           (query pat from end))))))))
 
 (define-transform (degrade)
   (degrade-by 0.5 pat))
@@ -614,17 +614,17 @@
 (define-transform (sometimes-by probability f)
   (let ((seed (studio:next-seed)))
     (studio:with-number
-      'sometimes-by probability
-      (lambda (probability)
-        (let ((chosen? (lambda (h)
-                         (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
-                            probability))))
-          (stack (studio:make-pattern
-                   (lambda (from end) (cl:remove-if chosen? (query pat from end))))
-                 (studio:transform
-                   f
-                   (studio:make-pattern
-                     (lambda (from end) (cl:remove-if-not chosen? (query pat from end)))))))))))
+     'sometimes-by probability
+     (lambda (probability)
+       (let ((chosen? (lambda (h)
+                        (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
+                           probability))))
+         (stack (studio:make-pattern
+                 (lambda (from end) (cl:remove-if chosen? (query pat from end))))
+                (studio:transform
+                 f
+                 (studio:make-pattern
+                  (lambda (from end) (cl:remove-if-not chosen? (query pat from end)))))))))))
 
 (define-transform (sometimes f) (sometimes-by 0.5 f pat))
 (define-transform (often f) (sometimes-by 0.75 f pat))
@@ -645,8 +645,8 @@
 (define studio:signal
   (lambda (f)
     (studio:make-pattern
-      (lambda (from end)
-        (list (studio:hap #f #f from end (f (* 1.0 from))))))))
+     (lambda (from end)
+       (list (studio:hap #f #f from end (f (* 1.0 from))))))))
 
 (define sine (studio:signal (lambda (t) (+ 0.5 (* 0.5 (sin (* 6.283185307179586 t)))))))
 (define cosine (studio:signal (lambda (t) (+ 0.5 (* 0.5 (cos (* 6.283185307179586 t)))))))
@@ -658,13 +658,13 @@
 ;; smooth random movement: a new random value each cycle, with a glide between
 (define perlin
   (studio:signal
-    (lambda (t)
-      (let* ((c (floor t))
-             (x (- t c))
-             (smooth (* x x (- 3 (* 2 x))))
-             (a (studio:random-at c 7))
-             (b (studio:random-at (+ c 1) 7)))
-        (+ a (* smooth (- b a)))))))
+   (lambda (t)
+     (let* ((c (floor t))
+            (x (- t c))
+            (smooth (* x x (- 3 (* 2 x))))
+            (a (studio:random-at c 7))
+            (b (studio:random-at (+ c 1) 7)))
+       (+ a (* smooth (- b a)))))))
 
 ;; a random whole number from 0 up to (but not including) n
 (define irand
@@ -784,7 +784,7 @@
           ((vector? x)
            (apply stack
                   (map cdr (studio:steps (car (studio:group-brackets
-                                                (studio:tokenise (vector->list x))))))))
+                                               (studio:tokenise (vector->list x))))))))
           ((and (pair? x) (eq? (car x) '*alt*))
            (apply slowcat (map cdr (studio:steps (cdr x)))))
           ((and (pair? x) (eq? (car x) 'euclid) (>= (length x) 4))
@@ -819,7 +819,7 @@
                                  steps
                                  (apply-all (cdr mods) (studio:apply-modifier steps (car mods))))))))
                   (else
-                    (loop (cdr tokens) (cons (cons 1 (studio:element->pattern x)) steps)))))))))
+                   (loop (cdr tokens) (cons (cons 1 (studio:element->pattern x)) steps)))))))))
 
 (define studio:sequence
   (lambda (lst)
@@ -871,10 +871,10 @@
                       ((or (char=? (string-ref str i) #\b) (char=? (string-ref str i) #\f))
                        (loop (+ i 1) (- semitones 1)))
                       (else
-                        (let ((octave (string->number (substring str i n))))
-                          (if octave
-                              (+ semitones (* 12 (+ octave 1)))
-                              x))))))))))
+                       (let ((octave (string->number (substring str i n))))
+                         (if octave
+                             (+ semitones (* 12 (+ octave 1)))
+                             x))))))))))
 
 (define sound (studio:control 'sound studio:identity))
 (define note (studio:control 'note studio:note-number))
@@ -916,15 +916,15 @@
           (let ((amounts (->pattern amount))
                 (pat (->pattern (car maybe-pattern))))
             (studio:make-pattern
-              (lambda (from end)
-                (map (lambda (h)
-                       (let ((other (studio:sample-at amounts (or (studio:hap-whole-begin h)
-                                                                  (studio:hap-part-begin h)))))
-                         (if other
-                             (studio:hap-with-value
-                               h (studio:combine-values op (studio:hap-value h) (studio:hap-value other)))
-                             h)))
-                     (query pat from end)))))))))
+             (lambda (from end)
+               (map (lambda (h)
+                      (let ((other (studio:sample-at amounts (or (studio:hap-whole-begin h)
+                                                                 (studio:hap-part-begin h)))))
+                        (if other
+                            (studio:hap-with-value
+                             h (studio:combine-values op (studio:hap-value h) (studio:hap-value other)))
+                            h)))
+                    (query pat from end)))))))))
 
 (define studio:combine-values
   (lambda (op a b)
@@ -991,16 +991,16 @@
       (cond ((not steps) (studio:error "there is no scale called" name) silence)
             ((null? rest) (lambda (pat) (if rooted? (scale first name pat) (scale name pat))))
             (else
-              (let* ((degrees (list->vector (cdr steps)))
-                     (size (vector-length degrees)))
-                (fmap (lambda (d)
-                        (if (number? d)
-                            (let ((whole (floor d)))
-                              (+ root
-                                 (* 12 (floor (/ whole size)))
-                                 (vector-ref degrees (modulo whole size))))
-                            d))
-                      (car rest))))))))
+             (let* ((degrees (list->vector (cdr steps)))
+                    (size (vector-length degrees)))
+               (fmap (lambda (d)
+                       (if (number? d)
+                           (let ((whole (floor d)))
+                             (+ root
+                                (* 12 (floor (/ whole size)))
+                                (vector-ref degrees (modulo whole size))))
+                           d))
+                     (car rest))))))))
 
 ;; turn each root note into a chord: (chord 'minor7 '(c3 f3))
 (define chord
@@ -1009,81 +1009,81 @@
       (cond ((not intervals) (studio:error "there is no chord called" name) silence)
             ((null? maybe-pattern) (lambda (pat) (chord name pat)))
             (else
-              (let ((roots (fmap studio:note-number (car maybe-pattern))))
-                (apply stack
-                       (map (lambda (interval)
-                              (fmap (lambda (root) (if (number? root) (+ root interval) root)) roots))
-                            (cdr intervals)))))))))
+             (let ((roots (fmap studio:note-number (car maybe-pattern))))
+               (apply stack
+                      (map (lambda (interval)
+                             (fmap (lambda (root) (if (number? root) (+ root interval) root)) roots))
+                           (cdr intervals)))))))))
 
 ;; play the notes which sound together one after another, n to each chord
 ;; (going back to the bottom when they run out)
 (define-transform (arp n)
   (studio:make-pattern
-    (lambda (from end)
-      (let* ((haps (cl:remove-if-not studio:hap-whole-begin (query pat from end)))
-             (starts (let loop ((hs haps) (acc '()))
-                       (cond ((null? hs) (reverse acc))
-                             ((member (studio:hap-whole-begin (car hs)) acc) (loop (cdr hs) acc))
-                             (else (loop (cdr hs) (cons (studio:hap-whole-begin (car hs)) acc)))))))
-        (apply append
-               (map (lambda (start)
-                      ;; the chord: every note which started at this moment
-                      ;; (they may have started before this query's span)
-                      (let* ((group (list->vector
-                                      (cl:remove-if-not
-                                        (lambda (h) (= (studio:hap-whole-begin h) start))
-                                        haps)))
-                             (size (vector-length group))
-                             (whole-end (studio:hap-whole-end (vector-ref group 0)))
-                             (step (/ (- whole-end start) n)))
-                        (let loop ((i 0) (acc '()))
-                          (if (>= i n)
-                              (reverse acc)
-                              (let* ((b (+ start (* i step)))
-                                     (e (+ b step)))
-                                (loop (+ i 1)
-                                      (if (and (>= b from) (< b end))
-                                          (cons (studio:hap b e b (min e end)
-                                                            (studio:hap-value (vector-ref group (modulo i size))))
-                                                acc)
-                                          acc)))))))
-                    starts))))))
+   (lambda (from end)
+     (let* ((haps (cl:remove-if-not studio:hap-whole-begin (query pat from end)))
+            (starts (let loop ((hs haps) (acc '()))
+                      (cond ((null? hs) (reverse acc))
+                            ((member (studio:hap-whole-begin (car hs)) acc) (loop (cdr hs) acc))
+                            (else (loop (cdr hs) (cons (studio:hap-whole-begin (car hs)) acc)))))))
+       (apply append
+              (map (lambda (start)
+                     ;; the chord: every note which started at this moment
+                     ;; (they may have started before this query's span)
+                     (let* ((group (list->vector
+                                    (cl:remove-if-not
+                                     (lambda (h) (= (studio:hap-whole-begin h) start))
+                                     haps)))
+                            (size (vector-length group))
+                            (whole-end (studio:hap-whole-end (vector-ref group 0)))
+                            (step (/ (- whole-end start) n)))
+                       (let loop ((i 0) (acc '()))
+                         (if (>= i n)
+                             (reverse acc)
+                             (let* ((b (+ start (* i step)))
+                                    (e (+ b step)))
+                               (loop (+ i 1)
+                                     (if (and (>= b from) (< b end))
+                                         (cons (studio:hap b e b (min e end)
+                                                           (studio:hap-value (vector-ref group (modulo i size))))
+                                               acc)
+                                         acc)))))))
+                   starts))))))
 
 ;; Spread the notes of each chord out in time, as a strummed guitar does:
 ;; each note starts `seconds` after the one below it. A negative time strums
 ;; downwards in pitch, from the top note.
 (define-transform (strum seconds)
   (studio:make-pattern
-    (lambda (from end)
-      (let ((haps (query pat from end)))
-        (map (lambda (h)
-               (let ((v (studio:hap-value h)))
-                 (if (and (studio:hap-whole-begin h) (list? v) (assoc 'note v))
-                     ;; how many notes of the same chord are lower (or, strumming
-                     ;; down, higher) than this one?
-                     (let* ((pitch (cdr (assoc 'note v)))
-                            (before (length
-                                      (cl:remove-if-not
-                                        (lambda (other)
-                                          (let ((ov (studio:hap-value other)))
-                                            (and (studio:hap-whole-begin other)
-                                                 (= (studio:hap-whole-begin other) (studio:hap-whole-begin h))
-                                                 (list? ov)
-                                                 (assoc 'note ov)
-                                                 (number? (cdr (assoc 'note ov)))
-                                                 (number? pitch)
-                                                 (if (> seconds 0)
-                                                     (< (cdr (assoc 'note ov)) pitch)
-                                                     (> (cdr (assoc 'note ov)) pitch)))))
-                                        haps))))
-                       (studio:hap-with-value
-                         h
-                         (studio:merge-values
-                           v
-                           (list (cons 'nudge (+ (studio:control-value v 'nudge 0)
-                                                 (* before (abs seconds))))))))
-                     h)))
-             haps)))))
+   (lambda (from end)
+     (let ((haps (query pat from end)))
+       (map (lambda (h)
+              (let ((v (studio:hap-value h)))
+                (if (and (studio:hap-whole-begin h) (list? v) (assoc 'note v))
+                    ;; how many notes of the same chord are lower (or, strumming
+                    ;; down, higher) than this one?
+                    (let* ((pitch (cdr (assoc 'note v)))
+                           (before (length
+                                    (cl:remove-if-not
+                                     (lambda (other)
+                                       (let ((ov (studio:hap-value other)))
+                                         (and (studio:hap-whole-begin other)
+                                              (= (studio:hap-whole-begin other) (studio:hap-whole-begin h))
+                                              (list? ov)
+                                              (assoc 'note ov)
+                                              (number? (cdr (assoc 'note ov)))
+                                              (number? pitch)
+                                              (if (> seconds 0)
+                                                  (< (cdr (assoc 'note ov)) pitch)
+                                                  (> (cdr (assoc 'note ov)) pitch)))))
+                                     haps))))
+                      (studio:hap-with-value
+                       h
+                       (studio:merge-values
+                        v
+                        (list (cons 'nudge (+ (studio:control-value v 'nudge 0)
+                                              (* before (abs seconds))))))))
+                    h)))
+            haps)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; playing events on the studio ;;
@@ -1114,16 +1114,16 @@
                  (s (and slot (assoc (string->symbol (cadr parts))
                                      (studio:instrument-sounds (cadr slot))))))
             (if s (cons i (cadr s)) #f))
-      (if i
-          (cons i #f)
-          (let loop ((i (- *studio:num-tracks* 1)))
-            (if (< i 0)
-                #f
-                (let* ((slot (vector-ref *studio:tracks* i))
-                       (s (and slot (assoc name (studio:instrument-sounds (cadr slot))))))
-                  (if s
-                      (cons i (cadr s))
-                      (loop (- i 1)))))))))))
+          (if i
+              (cons i #f)
+              (let loop ((i (- *studio:num-tracks* 1)))
+                (if (< i 0)
+                    #f
+                    (let* ((slot (vector-ref *studio:tracks* i))
+                           (s (and slot (assoc name (studio:instrument-sounds (cadr slot))))))
+                      (if s
+                          (cons i (cadr s))
+                          (loop (- i 1)))))))))))
 
 (define *studio:special-controls* '(sound note vel legato dur nudge))
 
@@ -1143,46 +1143,46 @@
                 ((not where)
                  (studio:warn-once sound-name "there is no track or sound called" sound-name))
                 (else
-                  (let* ((i (car where))
-                         (track-name (car (vector-ref *studio:tracks* i)))
-                         (when (+ time (* *studio:samplerate* (studio:control-value value 'nudge 0))))
-                         (pitch (or (cdr where) (studio:control-value value 'note 60)))
-                         (length (or (studio:control-value value 'dur #f)
-                                     (* seconds (studio:control-value value 'legato 0.9)))))
-                    (if (number? pitch)
-                        (begin
-                          ;; anything which isn't about the note itself is
-                          ;; a parameter, sent just before the note: the
-                          ;; note's own if it can be (see
-                          ;; studio:find-note-param), the track's if not
-                          (for-each
-                            (lambda (pair)
-                              (if (and (not (memq (car pair) *studio:special-controls*))
-                                       (number? (cdr pair)))
-                                  (let ((p (studio:find-note-param track-name (car pair))))
-                                    (if p
-                                        (studio:send when (car p) i (cadr p) (cdr pair) 0.0)
-                                        (studio:warn-once (list track-name (car pair))
-                                                          track-name "has no parameter called" (car pair))))))
-                            value)
-                          (studio:send when studio:event-note-on i
-                                       (max 1 (real->integer (* length *studio:samplerate*)))
-                                       pitch
-                                       (studio:control-value value 'vel 0.75)))))))))))
+                 (let* ((i (car where))
+                        (track-name (car (vector-ref *studio:tracks* i)))
+                        (when (+ time (* *studio:samplerate* (studio:control-value value 'nudge 0))))
+                        (pitch (or (cdr where) (studio:control-value value 'note 60)))
+                        (length (or (studio:control-value value 'dur #f)
+                                    (* seconds (studio:control-value value 'legato 0.9)))))
+                   (if (number? pitch)
+                       (begin
+                         ;; anything which isn't about the note itself is
+                         ;; a parameter, sent just before the note: the
+                         ;; note's own if it can be (see
+                         ;; studio:find-note-param), the track's if not
+                         (for-each
+                          (lambda (pair)
+                            (if (and (not (memq (car pair) *studio:special-controls*))
+                                     (number? (cdr pair)))
+                                (let ((p (studio:find-note-param track-name (car pair))))
+                                  (if p
+                                      (studio:send when (car p) i (cadr p) (cdr pair) 0.0)
+                                      (studio:warn-once (list track-name (car pair))
+                                                        track-name "has no parameter called" (car pair))))))
+                          value)
+                         (studio:send when studio:event-note-on i
+                                      (max 1 (real->integer (* length *studio:samplerate*)))
+                                      pitch
+                                      (studio:control-value value 'vel 0.75)))))))))))
 
 ;; play the events of a pattern which start between two cycles, given a
 ;; function which turns a cycle into a time in frames
 (define studio:play-span
   (lambda (pat from end cycle->time)
     (for-each
-      (lambda (h)
-        (if (studio:hap-onset? h)
-            (let ((start (cycle->time (studio:hap-whole-begin h)))
-                  (finish (cycle->time (studio:hap-whole-end h))))
-              (studio:play-value (studio:hap-value h)
-                                 start
-                                 (/ (- finish start) *studio:samplerate*)))))
-      (query pat from end))))
+     (lambda (h)
+       (if (studio:hap-onset? h)
+           (let ((start (cycle->time (studio:hap-whole-begin h)))
+                 (finish (cycle->time (studio:hap-whole-end h))))
+             (studio:play-value (studio:hap-value h)
+                                start
+                                (/ (- finish start) *studio:samplerate*)))))
+     (query pat from end))))
 
 ;;;;;;;;;;;;;;;
 ;; the clock ;;
@@ -1267,7 +1267,7 @@
     (if *studio:clock-running*
         (let* ((now (studio_now))
                (end (studio:cycle-at
-                      (+ now (studio:exact (round (* *studio:lookahead* *studio:samplerate*))))))
+                     (+ now (studio:exact (round (* *studio:lookahead* *studio:samplerate*))))))
                (current (studio:cycle-at now))
                ;; if Scheme was busy and the clock got ahead of us, skip what was missed
                (from (max *studio:scheduled-to* current)))
@@ -1280,13 +1280,13 @@
           (if (> end from)
               (begin
                 (for-each
-                  (lambda (entry)
-                    (*s7-catch* #t
-                                (lambda () (studio:play-span (cdr entry) from end studio:time-at))
-                                (lambda args
-                                  (studio:warn-once (list 'broken (car entry))
-                                                    "the pattern" (car entry) "failed:" args))))
-                  *studio:patterns*)
+                 (lambda (entry)
+                   (*s7-catch* #t
+                               (lambda () (studio:play-span (cdr entry) from end studio:time-at))
+                               (lambda args
+                                 (studio:warn-once (list 'broken (car entry))
+                                                   "the pattern" (car entry) "failed:" args))))
+                 *studio:patterns*)
                 (set! *studio:scheduled-to* end)))
           (callback (+ (now) (* *studio:tick* *studio:samplerate*)) 'studio:tick)))))
 
@@ -1300,16 +1300,16 @@
     (if (and *studio:clock-running* (pair? *studio:patterns*))
         (let* ((now (studio_now))
                (end (studio:cycle-at
-                      (+ now (studio:exact (round (* seconds *studio:samplerate*))))))
+                     (+ now (studio:exact (round (* seconds *studio:samplerate*))))))
                (from (max *studio:scheduled-to* (studio:cycle-at now))))
           (if (> end from)
               (begin
                 (for-each
-                  (lambda (entry)
-                    (*s7-catch* #t
-                                (lambda () (studio:play-span (cdr entry) from end studio:time-at))
-                                (lambda args #f)))
-                  *studio:patterns*)
+                 (lambda (entry)
+                   (*s7-catch* #t
+                               (lambda () (studio:play-span (cdr entry) from end studio:time-at))
+                               (lambda args #f)))
+                 *studio:patterns*)
                 (set! *studio:scheduled-to* end)))))
     #t))
 
@@ -1400,9 +1400,9 @@
     (let ((from (if (pair? span) (car span) 0))
           (end (if (and (pair? span) (pair? (cdr span))) (cadr span) 1)))
       (for-each
-        (lambda (h)
-          (if (studio:hap-onset? h)
-              (studio:say (studio:hap-whole-begin h) "->" (studio:hap-whole-end h) (studio:hap-value h))))
-        (cl:sort (query pat from end)
-              (lambda (a b) (< (studio:hap-part-begin a) (studio:hap-part-begin b)))))
+       (lambda (h)
+         (if (studio:hap-onset? h)
+             (studio:say (studio:hap-whole-begin h) "->" (studio:hap-whole-end h) (studio:hap-value h))))
+       (cl:sort (query pat from end)
+                (lambda (a b) (< (studio:hap-part-begin a) (studio:hap-part-begin b)))))
       #t)))

@@ -68,33 +68,33 @@
 (bind-val PIf float 3.1415926535897932384626433832795028841971693993751058209749 "pi of float type")
 (bind-val TWOPIf float 6.2831853071795864769252867665590057683943387987502116419498 "2pi of float type")
 (bind-val Ef float 2.7182818284590452353602874713526624977572470936999595749669
-          "e (base of natural log) of float type")
+  "e (base of natural log) of float type")
 
 (bind-val PI double 3.1415926535897932384626433832795028841971693993751058209749
-          "pi of double type")
+  "pi of double type")
 (bind-val TWOPI double 6.2831853071795864769252867665590057683943387987502116419498
-          "pi of double type")
+  "pi of double type")
 (bind-val E double 2.7182818284590452353602874713526624977572470936999595749669
-          "e (base of natural log) of double type")
+  "e (base of natural log) of double type")
 
 ;; audio
 
 ;; if you change one of these, make sure you change them all!
 
 (bind-alias SAMPLE float
-            "audio I/O sample type in the dsp processing chain")
+  "audio I/O sample type in the dsp processing chain")
 (bind-alias DSP [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*
-            "audio output callback type")
+  "audio output callback type")
 (bind-alias DSPMT [SAMPLE,SAMPLE*,i64,i64,SAMPLE*]*
-            "(multithreaded) audio output callback type")
+  "(multithreaded) audio output callback type")
 (bind-func audio_64bit "audiostuff" (lambda () 0:i1))
 
 (bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749
-          "pi of type SAMPLE")
+  "pi of type SAMPLE")
 (bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498
-          "2pi of type SAMPLE")
+  "2pi of type SAMPLE")
 (bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669
-          "e (base of natural log) of type SAMPLE")
+  "e (base of natural log) of type SAMPLE")
 
 (bind-ext-val SAMPLE_RATE i32 "audio sample rate")
 (bind-val SAMPLERATE SAMPLE SAMPLE_RATE "audio sample rate")
@@ -252,11 +252,11 @@
 ;;;;;;;;;;;;;;;;;;;
 
 (bind-macro
- "return size of type"
- (size_of type)
- (begin
-   (if (symbol? type) (set! type (symbol->string type)))
-   (xtc:codegen:get-type-size (xtc:codegen:get-type-from-pretty-str type))))
+  "return size of type"
+  (size_of type)
+  (begin
+    (if (symbol? type) (set! type (symbol->string type)))
+    (xtc:codegen:get-type-size (xtc:codegen:get-type-from-pretty-str type))))
 
 (bind-macro
   "increment variable by y"
@@ -328,42 +328,42 @@
 
 
 (bind-macro
- "return native function name for closure"
- (get_native_name closure-name . type)
- (let* ((pair (regex:type-split (symbol->string closure-name) ":"))
-        (base (if (null? (cdr pair)) "" (xtc:codegen:get-base-type (cadr pair)))))
-   ;; apply any aliases
-   (if (and (not (null? (cdr pair)))
-            (xtc:cache:typealias-exists? base))
-       (set! base (xtc:codegen:get-base-type (xtc:codegen:pretty-print-type (xtc:cache:get-typealias-type base)))))
-   (set! closure-name (symbol->string closure-name))
-   (if (not (null? (cdr pair)))
-       (string-append (car pair) "_adhoc_" (cname-encode base) "_native")
-       (if (null? type)
-           (if (and (xtc:cache:polyfunc-exists? closure-name)
-                    (= (length (xtc:cache:get-polyfunc-candidate-types closure-name)) 1))
-               (let* ((t (xtc:codegen:pretty-print-type (car (xtc:cache:get-polyfunc-candidate-types closure-name))))
-                      (bt (xtc:codegen:get-base-type t))
-                      (fullname (string-append closure-name
-                                               "_adhoc_"
-                                               (cname-encode bt)
-                                               "_native")))
-                 fullname)
-               (xtc:diagnostics:print-compiler-error "Try forcing a type? Ambiguous call to get_native_fptr" (string->symbol closure-name)))
-           (let* ((bt (xtc:codegen:get-base-type (symbol->string (car type))))
-                  (fullname (string-append closure-name
-                                           "_adhoc_"
-                                           (cname-encode bt)
-                                           "_native")))
-             fullname)))))
+  "return native function name for closure"
+  (get_native_name closure-name . type)
+  (let* ((pair (regex:type-split (symbol->string closure-name) ":"))
+         (base (if (null? (cdr pair)) "" (xtc:codegen:get-base-type (cadr pair)))))
+    ;; apply any aliases
+    (if (and (not (null? (cdr pair)))
+             (xtc:cache:typealias-exists? base))
+        (set! base (xtc:codegen:get-base-type (xtc:codegen:pretty-print-type (xtc:cache:get-typealias-type base)))))
+    (set! closure-name (symbol->string closure-name))
+    (if (not (null? (cdr pair)))
+        (string-append (car pair) "_adhoc_" (cname-encode base) "_native")
+        (if (null? type)
+            (if (and (xtc:cache:polyfunc-exists? closure-name)
+                     (= (length (xtc:cache:get-polyfunc-candidate-types closure-name)) 1))
+                (let* ((t (xtc:codegen:pretty-print-type (car (xtc:cache:get-polyfunc-candidate-types closure-name))))
+                       (bt (xtc:codegen:get-base-type t))
+                       (fullname (string-append closure-name
+                                                "_adhoc_"
+                                                (cname-encode bt)
+                                                "_native")))
+                  fullname)
+                (xtc:diagnostics:print-compiler-error "Try forcing a type? Ambiguous call to get_native_fptr" (string->symbol closure-name)))
+            (let* ((bt (xtc:codegen:get-base-type (symbol->string (car type))))
+                   (fullname (string-append closure-name
+                                            "_adhoc_"
+                                            (cname-encode bt)
+                                            "_native")))
+              fullname)))))
 
 ;; the same functionality, but for use in xtlang code
 (bind-macro
- "return native function pointer for closure"
- (get_native_fptr closure-name . type)
- (if (null? type)
-     `(llvm_get_function_ptr (get_native_name ,closure-name))
-     `(llvm_get_function_ptr (get_native_name ,closure-name ,(car type)))))
+  "return native function pointer for closure"
+  (get_native_fptr closure-name . type)
+  (if (null? type)
+      `(llvm_get_function_ptr (get_native_name ,closure-name))
+      `(llvm_get_function_ptr (get_native_name ,closure-name ,(car type)))))
 
 
 (bind-macro
@@ -524,7 +524,7 @@ Second item in tuple is a char* c-style string ")
 ;; easy String dataconstructors from c strings
 
 ;; zone alloc'ed versions
-            
+
 (bind-func String
   "Create an xtlang String type from a c string (char array)
 
@@ -546,22 +546,22 @@ Allocation size will be (+ (strlen cstr) 1)
   (lambda (cstr:i8*)
     (String cstr)))
 
-;; strings need dedicated zcopy 
+;; strings need dedicated zcopy
 ;; so need to override default
 (bind-func zcopy:[String*,String*,mzone*,mzone*]*
   (lambda (x fromz toz)
     (if (llvm_ptr_in_zone fromz (cast x i8*))
         (begin (push_zone toz)
-          (let ((obj (zalloc)))
-            (begin 
-              (tset! obj 0 (tref x 0)))
-            (if (llvm_ptr_in_zone fromz (cast (tref x 1) i8*)) 
-                (let ((newptr:i8* (zalloc (+ 1 (tref x 0)))))
-                  (strcpy newptr (cast (tref x 1) i8*)) ; (+ (tref x 0) 1)) 
-                  (tset! obj 1 newptr))
-                (tset! obj 1 (tref x 1)))
-            (pop_zone)
-            obj))
+               (let ((obj (zalloc)))
+                 (begin
+                   (tset! obj 0 (tref x 0)))
+                 (if (llvm_ptr_in_zone fromz (cast (tref x 1) i8*))
+                     (let ((newptr:i8* (zalloc (+ 1 (tref x 0)))))
+                       (strcpy newptr (cast (tref x 1) i8*)) ; (+ (tref x 0) 1))
+                       (tset! obj 1 newptr))
+                     (tset! obj 1 (tref x 1)))
+                 (pop_zone)
+                 obj))
         x)))
 
 (bind-func hcopy:[String*,String*]*
@@ -577,7 +577,7 @@ Allocation size will be (+ (strlen cstr) 1)
   (lambda (x)
     (free (tref x 1))
     (free x)
-    void))    
+    void))
 
 (bind-func String_h
   "Create an xtlang String type from a c string (char array)
@@ -1153,22 +1153,22 @@ Use via the polymorphic Str function
           (new_str (Symbol_z len (cstring str))))
       new_str)))
 
-;; symbols need dedicated zcopy 
+;; symbols need dedicated zcopy
 ;; so need to override default
 (bind-func zcopy:[Symbol*,Symbol*,mzone*,mzone*]*
   (lambda (x fromz toz)
     (if (llvm_ptr_in_zone fromz (cast x i8*))
         (begin (push_zone toz)
-          (let ((obj (zalloc)))
-            (begin 
-              (tset! obj 0 (tref x 0)))
-            (if (llvm_ptr_in_zone fromz (cast (tref x 1) i8*)) 
-                (let ((newptr:i8* (zalloc (+ 1 (tref x 0)))))
-                  (strcpy newptr (cast (tref x 1) i8*)) ; (+ (tref x 0) 1)) 
-                  (tset! obj 1 newptr))
-                (tset! obj 1 (tref x 1)))
-            (pop_zone)
-            obj))
+               (let ((obj (zalloc)))
+                 (begin
+                   (tset! obj 0 (tref x 0)))
+                 (if (llvm_ptr_in_zone fromz (cast (tref x 1) i8*))
+                     (let ((newptr:i8* (zalloc (+ 1 (tref x 0)))))
+                       (strcpy newptr (cast (tref x 1) i8*)) ; (+ (tref x 0) 1))
+                       (tset! obj 1 newptr))
+                     (tset! obj 1 (tref x 1)))
+                 (pop_zone)
+                 obj))
         x)))
 
 (bind-func hcopy:[Symbol*,Symbol*]*
@@ -1184,7 +1184,7 @@ Use via the polymorphic Str function
   (lambda (x)
     (free (tref x 1))
     (free x)
-    void))    
+    void))
 
 (bind-func equal
   "Equality test for Symbol

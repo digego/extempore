@@ -45,11 +45,11 @@
 
 (define (nrepl:error-message tag info)
   (*s7-catch* #t
-    (lambda ()
-      (if (and (pair? info) (string? (car info)))
-          (apply #_format #f info)
-          (#_format #f "~A" (if (null? info) tag info))))
-    (lambda (t i) (#_format #f "~S" info))))
+              (lambda ()
+                (if (and (pair? info) (string? (car info)))
+                    (apply #_format #f info)
+                    (#_format #f "~A" (if (null? info) tag info))))
+              (lambda (t i) (#_format #f "~S" info))))
 
 ;; An error ends the request: its report on the console, as any eval's error
 ;; would be, then err and eval-error to the client. An xtlang diagnostic has
@@ -89,24 +89,24 @@
             (if (and last-only last) (nrepl:send "value" last)))
           (let* ((start (port-line-number port))
                  (form (*s7-catch* #t
-                         (lambda () (read port))
-                         (lambda (tag info)
-                           (nrepl:report-error tag (copy info) #f file start)
-                           nrepl:failed))))
+                                   (lambda () (read port))
+                                   (lambda (tag info)
+                                     (nrepl:report-error tag (copy info) #f file start)
+                                     nrepl:failed))))
             (cond
-              ((eq? form nrepl:failed) (close-input-port port))
-              ((eof-object? form) (loop last))
-              (else
-                (let ((result (*s7-catch* #t
-                                (lambda () (list (eval form (rootlet))))
-                                (lambda (tag info)
-                                  (nrepl:report-error tag (copy info) form file start)
-                                  nrepl:failed))))
-                  (if (eq? result nrepl:failed)
-                      (close-input-port port)
-                      (let ((printed (#_object->string (if (pair? result) (car result) result))))
-                        (if (not last-only) (nrepl:send "value" printed))
-                        (loop printed)))))))))))
+             ((eq? form nrepl:failed) (close-input-port port))
+             ((eof-object? form) (loop last))
+             (else
+              (let ((result (*s7-catch* #t
+                                        (lambda () (list (eval form (rootlet))))
+                                        (lambda (tag info)
+                                          (nrepl:report-error tag (copy info) form file start)
+                                          nrepl:failed))))
+                (if (eq? result nrepl:failed)
+                    (close-input-port port)
+                    (let ((printed (#_object->string (if (pair? result) (car result) result))))
+                      (if (not last-only) (nrepl:send "value" printed))
+                      (loop printed)))))))))))
 
 (define (nrepl:line msg)
   (let ((line (nrepl:get msg "line")))
@@ -151,24 +151,24 @@
     (if (> n 0)
         (begin
           (for-each
-            (lambda (sym)
-              (let ((name (symbol->string sym)))
-                (if (and (match? name) (defined? sym (rootlet)))
-                    (let ((value (symbol->value sym (rootlet))))
-                      (hash-table-set! found name
-                                       (cond ((macro? value) "macro")
-                                             ((procedure? value) "function")
-                                             (else "var")))))))
-            (symbol-table))
+           (lambda (sym)
+             (let ((name (symbol->string sym)))
+               (if (and (match? name) (defined? sym (rootlet)))
+                   (let ((value (symbol->value sym (rootlet))))
+                     (hash-table-set! found name
+                                      (cond ((macro? value) "macro")
+                                            ((procedure? value) "function")
+                                            (else "var")))))))
+           (symbol-table))
           ;; after Scheme's, so that a function with a Scheme stub keeps the
           ;; kind the compiler gives it
           (for-each
-            (lambda (cache)
-              (for-each (lambda (entry)
-                          (if (and (string? (car entry)) (match? (car entry)))
-                              (hash-table-set! found (car entry) (cdr cache))))
-                        (car cache)))
-            (nrepl:xtlang-caches))))
+           (lambda (cache)
+             (for-each (lambda (entry)
+                         (if (and (string? (car entry)) (match? (car entry)))
+                             (hash-table-set! found (car entry) (cdr cache))))
+                       (car cache)))
+           (nrepl:xtlang-caches))))
     (let* ((names (sort! (map car found) string<?))
            (names (if (> (length names) *nrepl:max-completions*)
                       (list-head names *nrepl:max-completions*)
@@ -182,8 +182,8 @@
 ;; What xtmdoc knows of NAME, as an association list, or #f.
 (define (nrepl:documentation name)
   (let ((doc (*s7-catch* #t
-               (lambda () (xtmdoc-documentation-function name))
-               (lambda (tag info) #f))))
+                         (lambda () (xtmdoc-documentation-function name))
+                         (lambda (tag info) #f))))
     (and (pair? doc) (eq? (car doc) 'xtmdoc-docstring) (cdr doc))))
 
 ;; the argument names of the first lambda in FORM, or #f
@@ -253,13 +253,13 @@
 (define (nrepl:handle msg)
   (let ((op (nrepl:get msg "op")))
     (cond
-      ((equal? op "eval")
-       (nrepl:eval-code (nrepl:get msg "code") (nrepl:get msg "file") (nrepl:line msg) #f))
-      ((equal? op "load-file")
-       (nrepl:eval-code (nrepl:get msg "file")
-                        (or (nrepl:get msg "file-path") (nrepl:get msg "file-name"))
-                        1 #t))
-      ((equal? op "completions")
-       (nrepl:completions (nrepl:->string (nrepl:get msg "prefix" ""))))
-      ((equal? op "lookup")
-       (nrepl:lookup (nrepl:->string (nrepl:get msg "sym" "")))))))
+     ((equal? op "eval")
+      (nrepl:eval-code (nrepl:get msg "code") (nrepl:get msg "file") (nrepl:line msg) #f))
+     ((equal? op "load-file")
+      (nrepl:eval-code (nrepl:get msg "file")
+                       (or (nrepl:get msg "file-path") (nrepl:get msg "file-name"))
+                       1 #t))
+     ((equal? op "completions")
+      (nrepl:completions (nrepl:->string (nrepl:get msg "prefix" ""))))
+     ((equal? op "lookup")
+      (nrepl:lookup (nrepl:->string (nrepl:get msg "sym" "")))))))
