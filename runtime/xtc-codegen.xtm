@@ -64,10 +64,11 @@
                 (let* ((lines (regex:split ir-to-compile "\n"))
                        (limit 40)
                        (shown (if (> (length lines) limit) (list-head lines limit) lines)))
-                  (print "FLUSH FAILED. IR was:\n")
-                  (print-full-nq (string-join shown "\n"))
-                  (if (> (length lines) limit)
-                      (print (string-append "\n... " (number->string (- (length lines) limit)) " more lines\n")))))
+                  (log:emit 'error 'compiler "failed to JIT-compile the queued IR, which was:\n"
+                            (string-join shown "\n")
+                            (if (> (length lines) limit)
+                                (string-append "\n... " (number->string (- (length lines) limit)) " more lines")
+                                ""))))
             res)
           #t))))
 
@@ -84,22 +85,13 @@
 ;; startups)
 (define sys:compile-ll
   (lambda (name)
-    (let ((print? #f))
-      (if (string=? (ipc:get-process-name) *xtc:globals:process*)
-          (let ((init-ll-string (sys:slurp-file (string-append (sys:share-dir) "/runtime/" name))))
-            (if (and init-ll-string (llvm:compile-ir init-ll-string))
-                (if print?
-                    (begin
-                      (print "\nCompiling ")
-                      (print-with-colors 'blue 'default #t (print name))
-                      (print "... ")
-                      (print-with-colors 'green 'default #t (print "done"))
-                      (print "\n\n"))
-                    #t)
-                (begin
-                  (print-with-colors 'red 'default #t (print "\n\nError compiling " name " IR\n\n"))
-                  (print "This is pretty bad.  Exiting...\n")
-                  (quit 1))))))))
+    (if (string=? (ipc:get-process-name) *xtc:globals:process*)
+        (let ((init-ll-string (sys:slurp-file (string-append (sys:share-dir) "/runtime/" name))))
+          (if (and init-ll-string (llvm:compile-ir init-ll-string))
+              #t
+              (begin
+                (log:emit 'error 'compiler "could not compile the IR in runtime/" name ", exiting")
+                (quit 1)))))))
 
 (define sys:compile-init-ll
   (lambda ()

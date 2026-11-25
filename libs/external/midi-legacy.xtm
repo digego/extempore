@@ -102,8 +102,10 @@
     (lambda ()
       (set! tail (enqueue_midi_event.tail:i64))
       (if (< (+ head XTM_MIDI_EVENT_QUEUE_SIZE) tail)
-          (begin (println "Warning: MIDI overrun (head:" head "tail:" tail ") events dropped")
-                 (set! head tail)))
+          (let ((buf:i8* (salloc 128)))
+            (sprintf buf "MIDI overrun (head: %lld tail: %lld), events dropped" head tail)
+            (log_warn buf)
+            (set! head tail)))
       (if (< head tail)
           (let ((res (aref-ptr XTM_MIDI_EVENT_QUEUE (% head XTM_MIDI_EVENT_QUEUE_SIZE))))
             (set! head (+ head 1))
@@ -115,7 +117,7 @@
     (let ((head (dequeue_midi_event.head:i64))
           (tail (enqueue_midi_event.tail:i64)))
       (if (< (+ head XTM_MIDI_EVENT_QUEUE_SIZE) tail)
-          (begin (println "Warning: MIDI overrun - dropping old events")
+          (begin (log_warn "MIDI overrun, dropping old events")
                  (dequeue_midi_event.head:i64 tail)
                  0)
           (- tail head)))))
@@ -140,7 +142,9 @@
                    (else
                     (loop (+ i (i64toi32 1)))))))
                (else
-                (printf "No MIDI input port found with name %s\n" port_name)
+                (let ((msg:i8* (salloc 512)))
+                  (sprintf msg "no MIDI input port found with name %s" port_name)
+                  (log_error msg))
                 (i64toi32 -1))))))
       (loop (i64toi32 0)))))
 
@@ -161,7 +165,9 @@
                    (else
                     (loop (+ i (i64toi32 1)))))))
                (else
-                (printf "No MIDI output port found with name %s\n" port_name)
+                (let ((msg:i8* (salloc 512)))
+                  (sprintf msg "no MIDI output port found with name %s" port_name)
+                  (log_error msg))
                 (i64toi32 -1))))))
       (loop (i64toi32 0)))))
 

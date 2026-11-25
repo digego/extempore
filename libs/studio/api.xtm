@@ -154,10 +154,10 @@
             (loop (cdr args)))))
     (newline)))
 
+;; log an error and return #f
 (define studio:error
   (lambda args
-    (print-with-colors 'red 'default #t (display "studio: "))
-    (apply studio:say args)
+    (apply log:emit 'error 'studio args)
     #f))
 
 (define studio:make-instance
@@ -500,8 +500,7 @@
 (define studio:start
   (lambda ()
     (dsp:set! studio_dsp)
-    (print-with-colors 'green 'default #t (display "studio: "))
-    (studio:say "ready. (instruments) lists what you can put on a track.")
+    (log:emit 'info 'studio "Ready. (instruments) lists what you can put on a track.")
     #t))
 
 ;; how is the mix going? Prints each track's level since the last time this

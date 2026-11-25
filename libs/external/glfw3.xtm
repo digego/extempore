@@ -566,7 +566,9 @@
 
 (bind-func glfw_error_callback:GLFWerrorfun
   (lambda (err description)
-    (printf "GLFW error %d: %s\n" err description)
+    (let ((msg:i8* (salloc 512)))
+      (sprintf msg "GLFW error %d: %s" err description)
+      (log_error msg))
     void))
 
 (bind-func glfw_init
@@ -658,7 +660,7 @@
   (lambda (window:GLFWwindow*)
     (if (not (null? window))
         (glfwDestroyWindow window)
-        (begin (printf "Error: Window pointer is NULL.\n")
+        (begin (log_error "glfw_destroy_window: window pointer is NULL")
                void))
     void))
 
@@ -685,7 +687,7 @@
     (let ((monitor (glfwGetPrimaryMonitor)))
       (if (not (null? monitor))
           (glfw_print_video_mode_details (glfwGetVideoMode monitor))
-          (printf "Error: Monitor pointer is NULL.\n")))))
+          (log_error "glfw_print_primary_monitor_details: monitor pointer is NULL")))))
 
 (bind-func glfw_set_core_profile
   (lambda ()

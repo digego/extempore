@@ -191,7 +191,10 @@
           (out:i8* (base64_decode (cstring b64) (length b64) (ref size))))
       (if (<= size (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) (AudioBuffer_sample_bytes)))
           (begin (memcpy (cast (AudioBuffer_data ab)) out size) void)
-          (begin (println "error: AudioBuffer must be at least " size " bytes." ) void)))))
+          (let ((buf:i8* (salloc 128)))
+            (sprintf buf "AudioBuffer_set_data_b64: the AudioBuffer must be at least %lld bytes" size)
+            (log_error buf)
+            void)))))
 
 (bind-func static AudioBuffer_samplerate
   (lambda (ab:AudioBuffer*)
@@ -575,7 +578,7 @@ can't be read"
   (lambda (ab1:AudioBuffer* ab2:AudioBuffer*)
     (if (or (<> (AudioBuffer_samplerate ab1) (AudioBuffer_samplerate ab2))
             (<> (AudioBuffer_channels ab1) (AudioBuffer_channels ab2)))
-        (begin (println "Error: cannot concat incompatible audiobuffers") null) ;; return null on error!
+        (begin (log_error "AudioBuffer_concat: cannot concat incompatible audiobuffers") null) ;; return null on error!
         (let ((new (AudioBuffer (+ (AudioBuffer_frames ab1) (AudioBuffer_frames ab2))
                                 (AudioBuffer_channels ab1)
                                 (AudioBuffer_samplerate ab1)))

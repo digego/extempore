@@ -97,7 +97,9 @@
   "a config for forward complex FFTs of n points (a power of two), or null"
   (lambda (n)
     (if (not (fft_power_of_two n))
-        (begin (printf "fft_config: length %lld is not a power of two\n" n)
+        (begin (let ((msg:i8* (salloc 512)))
+                 (sprintf msg "fft_config: length %lld is not a power of two" n)
+                 (log_error msg))
                null)
         (FFT_Config n (fft_make_twiddles n -1.0) (fft_make_bitrev n)))))
 
@@ -105,7 +107,9 @@
   "a config for inverse complex FFTs of n points (a power of two), or null"
   (lambda (n)
     (if (not (fft_power_of_two n))
-        (begin (printf "ifft_config: length %lld is not a power of two\n" n)
+        (begin (let ((msg:i8* (salloc 512)))
+                 (sprintf msg "ifft_config: length %lld is not a power of two" n)
+                 (log_error msg))
                null)
         (IFFT_Config n (fft_make_twiddles n 1.0) (fft_make_bitrev n)))))
 
@@ -127,7 +131,9 @@ spectrum of m complex points into that of 2m reals"
   "a config for forward FFTs of n reals (n a power of two, at least 2), or null"
   (lambda (n)
     (if (or (< n 2) (not (fft_power_of_two n)))
-        (begin (printf "fftr_config: length %lld is not a power of two of at least 2\n" n)
+        (begin (let ((msg:i8* (salloc 512)))
+                 (sprintf msg "fftr_config: length %lld is not a power of two of at least 2" n)
+                 (log_error msg))
                null)
         (let ((m (/ n 2)))
           (FFTR_Config n (fft_make_twiddles m -1.0) (fft_make_bitrev m)
@@ -137,7 +143,9 @@ spectrum of m complex points into that of 2m reals"
   "a config for inverse FFTs to n reals (n a power of two, at least 2), or null"
   (lambda (n)
     (if (or (< n 2) (not (fft_power_of_two n)))
-        (begin (printf "ifftr_config: length %lld is not a power of two of at least 2\n" n)
+        (begin (let ((msg:i8* (salloc 512)))
+                 (sprintf msg "ifftr_config: length %lld is not a power of two of at least 2" n)
+                 (log_error msg))
                null)
         (let ((m (/ n 2)))
           (IFFTR_Config n (fft_make_twiddles m 1.0) (fft_make_bitrev m)

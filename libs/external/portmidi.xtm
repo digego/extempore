@@ -662,8 +662,8 @@ Scheme)"
 (bind-func pm_initialize
   (lambda ()
     (if (<> (Pm_Initialize) pmNoError)
-        (println "Error initialising Portmidi")
-        (println "Portmidi successfully initialised."))))
+        (log_error "failed to initialise Portmidi")
+        (log_info "Portmidi initialised"))))
 
 (bind-func pm_print_devices
   (lambda ()
@@ -731,7 +731,9 @@ input device(s)
                              (convert (get_native_fptr pm_current_time_in_ms)) null)))
       (if (<> res pmNoError)
           (begin
-            (println "PortMIDI error opening input port:" (String (Pm_GetErrorText res)))
+            (let ((msg:i8* (salloc 512)))
+              (sprintf msg "PortMIDI error opening input port: %s" (Pm_GetErrorText res))
+              (log_error msg))
             (cast null PmStream*))
           (pref stream_ptr 0)))))
 
@@ -749,7 +751,9 @@ output device(s)
                               (convert (get_native_fptr pm_current_time_in_ms)) null 0)))
       (if (<> res pmNoError)
           (begin
-            (println "PortMIDI error opening output port:" (String (Pm_GetErrorText res)))
+            (let ((msg:i8* (salloc 512)))
+              (sprintf msg "PortMIDI error opening output port: %s" (Pm_GetErrorText res))
+              (log_error msg))
             (cast null PmStream*))
           (pref stream_ptr 0)))))
 

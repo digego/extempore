@@ -812,12 +812,12 @@ failure."
          (let ((i (midi:find-port name input?)))
            (if (not i)
                (begin
-                 (println "midi: no" (if input? "input" "output") "port has a name containing" name
-                          (if (midi:true? (midi_available)) "--- see (midi-ports)" "--- there is no MIDI on this machine"))
+                 (log:emit 'error 'midi "no" (if input? "input" "output") "port has a name containing" name
+                           (if (midi:true? (midi_available)) "(see (midi-ports))" "(there is no MIDI on this machine)"))
                  #f)
                (let ((port (midi_scheme_open i (if input? 1 0))))
                  (if (midi:true? (midi_port_null port))
-                     (begin (println "midi: couldn't open" (cptr->string (midi_port_name i))) #f)
+                     (begin (log:emit 'error 'midi "couldn't open" (cptr->string (midi_port_name i))) #f)
                      (begin
                        (set! *midi:named-ports*
                              (cons (cons name (cons input? port)) *midi:named-ports*))
@@ -834,7 +834,7 @@ failure."
    (lambda (name input?)
      (let ((port (midi_scheme_open_virtual name (if input? 1 0))))
        (if (midi:true? (midi_port_null port))
-           (begin (println "midi: couldn't make a virtual port") #f)
+           (begin (log:emit 'error 'midi "couldn't make a virtual port") #f)
            (midi:remember port))))))
 
 (xtc:aot:do-or-emit
@@ -1097,7 +1097,7 @@ failure."
                 (*s7-catch* #t
                             (lambda () ((if (symbol? (cdr entry)) (eval (cdr entry)) (cdr entry))
                                         (midi:message status)))
-                            (lambda args (println "midi: a listener failed:" args)))
+                            (lambda args (log:emit 'error 'midi "a listener failed:" args)))
                 (loop (midi_scheme_receive (car entry)))))))
       *midi:listeners*)
      (if (pair? *midi:listeners*)

@@ -169,7 +169,7 @@
          (if ,predicate
              value
              (if (> cnt ,max-iterations)
-                 (begin (log-info "Dropping out after max-iterations")
+                 (begin (log:warn "dotill dropping out after max-iterations")
                         'failed)
                  (impsym38479k (+ cnt 1))))))))
 
@@ -289,9 +289,9 @@
             ;; check tolerance of return
             (if (> (math:std-deviation l2)
                    (if (null? args) 0.0005 (car args)))
-                (begin (log-info "clock sync outside tolerance - making no time adjustment: " (math:std-deviation l2))
-                       (log-info "clock times: " lst))
-                (begin (log-info 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
+                (begin (log:emit 'warning 'clock "clock sync outside tolerance, making no time adjustment:" (math:std-deviation l2))
+                       (log:emit 'debug 'clock "clock times:" lst))
+                (begin (log:emit 'info 'clock "Clock adjusted by" (/ (apply + l2) (length l2)) "seconds")
                        (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
 
 
@@ -307,7 +307,7 @@
 (define -clock:metro-from-host-
   (lambda ()
     (let ((mark (*metro* 'get-mark)))
-      (println 'mark-remote: mark 'time: (samples->clock (car mark)))
+      (log:emit 'debug 'clock "mark-remote:" mark "time:" (samples->clock (car mark)))
       (list (*metro* 'get-tempo)
             (samples->clock (car mark))
             (cdr mark)))))
@@ -459,7 +459,7 @@
     (if (not (= 0 (modulo beats tactus)))
         (begin (log-error "Tactus must be a subdivision of beats") '())
         (if #f ;(not (beats-divisible-by-rlst beats))
-            (begin (println "Impossible rhythm-list selection") '())
+            (begin (log:warn "impossible rhythm-list selection") '())
             (let loop ((rl '())
                        (cnt 0))
               (if (null? rl) (list (random rhythm-list)))
@@ -674,7 +674,7 @@
   (lambda (id . args)
     (let ((k (vector-ref *ipc:active-labels* id)))
       (if (null? k)
-          (println "Error: bad process? Have you given your local process a name on the remote host?"))
+          (log:error "bad process? have you given your local process a name on the remote host?"))
       (vector-set! *ipc:active-labels* id '())
       (apply k args))))
 
@@ -775,8 +775,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (io:osc:receive time address . args)
-  (log-info 'override 'io:osc:receive 'to 'handle 'osc 'events:)
-  (println time address args))
+  (log:emit 'info 'osc "Override io:osc:receive to handle osc events:" time address args))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; LIST HELPER FUNCTIONS
@@ -1689,7 +1688,7 @@
           ((= (length args) 3)
            (make-list-with-proc (/ (- (cadr args) (car args)) (caddr args))
                                 (lambda (i) (+ (car args) (* i (caddr args))))))
-          (else (println 'bad 'range!) '()))))
+          (else (log:warn "bad range arguments") '()))))
 
 ;; (define-macro (inc x y)
 ;;   `(set! ,x (+ ,x ,y)))

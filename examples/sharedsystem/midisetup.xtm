@@ -92,16 +92,16 @@
                               (filter (lambda (dev) (regex:match? (cdr dev) midi-out-device-name))
                                       (get-midi-output-device-names-alist)))))
   (cond ((not midi-out-device-name)
-         (log-warn "no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified")
-         (log-warn "No midi output device configured"))
+         (log:warn "no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified")
+         (log:warn "no MIDI output device configured"))
         ((null? matching-devices)
-         (log-warn "no MIDI output device found matching regex" midi-out-device-name)
-         (log-warn "No midi output device configured"))
+         (log:warn "no MIDI output device found matching regex" midi-out-device-name)
+         (log:warn "no MIDI output device configured"))
         (else
          (let ((device (car matching-devices))) ;; pick the first one with name matching regex
            (set_midi_out (car device))
            (set! *mout* (get_midi_out))
-           (println 'midiout '*mout* (cptr->string (pm_device_name (car device))) 'is *mout*)))))
+           (log:emit 'info 'midi "Midi output device" (cptr->string (pm_device_name (car device))) "is" *mout*)))))
 
 ;;;;;;;;;;;;;;;;;
 ;; midi input ;;
@@ -114,16 +114,16 @@
                               (filter (lambda (dev) (regex:match? (cdr dev) midi-in-device-name))
                                       (get-midi-input-device-names-alist)))))
   (cond ((not midi-in-device-name)
-         (log-warn "no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified")
-         (log-warn "No midi input device configured\n"))
+         (log:warn "no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified")
+         (log:warn "no MIDI input device configured"))
         ((null? matching-devices)
-         (log-warn "Warning: no MIDI input device found matching regex" midi-in-device-name)
-         (log-warn "No midi input device configured"))
+         (log:warn "no MIDI input device found matching regex" midi-in-device-name)
+         (log:warn "no MIDI input device configured"))
         (else
          (let ((device (car matching-devices))) ;; pick the first one with name matching regex
            (set_midi_in (car device))
            (set! *min* (get_midi_in))
-           (println 'midiin '*min* (cptr->string (pm_device_name (car device))) 'is *min*)))))
+           (log:emit 'info 'midi "Midi input device" (cptr->string (pm_device_name (car device))) "is" *min*)))))
 
 (bind-val MCC_ARR |127,float|)
 
@@ -150,6 +150,6 @@
 (if *min*
     (begin
       (start_midi_scheduler)
-      (log-info "started MIDI scheduler with *min*" *min*)))
+      (log:info "Started MIDI scheduler with *min*" *min*)))
 
-(log-info "sharedsystem MIDI setup complete")
+(log:info "Sharedsystem MIDI setup complete")

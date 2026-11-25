@@ -218,8 +218,7 @@
        ((not (null? (sys:directory-list (string-append (sys:share-dir) "/llvm"))))
         (sanitize-platform-path (string-append (sys:share-dir) "/llvm")))
        (else
-        (print-with-colors 'yellow 'default #t (print "Warning"))
-        (print " could not find llvm path\n")
+        (log:emit 'warning 'compiler "could not find llvm path")
         #f)))))
 
 ;; insert arbitrary sexp into the AOT-compilation
@@ -291,26 +290,18 @@
                               " " (string-join link-libs " ") " " libs
                               " msvcrt.lib legacy_stdio_definitions.lib "
                               asm-path))))
-      (begin
-        (print-with-colors 'black 'yellow #t (print " Exporting executable "))
-        (print "\n  " asm-path "\n\n"))
+      (log:emit 'info 'compiler "Exporting executable" asm-path)
       (sys:command (string-append (unix-or-Windows "mkdir -p " "md ") tmp-dir))
       (if (not (llvm:emit-object-file module asm-path))
-          (begin (print-with-colors 'red 'default #t
-                                    (print "llvm:emit-object-file failed\n"))
+          (begin (log:emit 'error 'compiler "llvm:emit-object-file failed")
                  (quit 1)))
       (let ((linker-res 0))
-        (begin
-          (print-with-colors 'black 'yellow #t (print " Compiling native executable "))
-          (print "\n  " link-command "\n\n"))
+        (log:emit 'info 'compiler "Compiling native executable:" link-command)
         (set! linker-res (sys:command link-command))
         (if (<> linker-res 0)
-            (begin (print-with-colors 'red 'default #t
-                                      (print "linking failed with exit code " linker-res "\n"))
+            (begin (log:emit 'error 'compiler "linking failed with exit code" linker-res)
                    (quit 1))
-            (begin
-              (print-with-colors 'black 'green #t (print " Successfully compiled "))
-              (print "\n  " output-exe-path "\n\n")))))))
+            (log:emit 'info 'compiler "Successfully compiled" output-exe-path))))))
 
 (define xtc:aot:compile-module
   (lambda (module-name module)
@@ -345,26 +336,18 @@
                               " " (string-join link-libs " ")
                               " msvcrt.lib legacy_stdio_definitions.lib "
                               asm-path))))
-      (begin
-        (print-with-colors 'black 'yellow #t (print " Exporting module "))
-        (print "\n  " asm-path "\n\n"))
+      (log:emit 'info 'compiler "Exporting module" asm-path)
       (sys:command (string-append (unix-or-Windows "mkdir -p " "md ") tmp-dir))
       (if (not (llvm:emit-object-file module asm-path))
-          (begin (print-with-colors 'red 'default #t
-                                    (print "llvm:emit-object-file failed\n"))
+          (begin (log:emit 'error 'compiler "llvm:emit-object-file failed")
                  (quit 1)))
       (let ((linker-res 0))
-        (begin
-          (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
-          (print "\n  " link-command "\n\n"))
+        (log:emit 'info 'compiler "Compiling native shared library:" link-command)
         (set! linker-res (sys:command link-command))
         (if (<> linker-res 0)
-            (begin (print-with-colors 'red 'default #t
-                                      (print "linking failed with exit code " linker-res "\n"))
+            (begin (log:emit 'error 'compiler "linking failed with exit code" linker-res)
                    (quit 1))
-            (begin
-              (print-with-colors 'black 'green #t (print " Successfully compiled "))
-              (print "\n  " output-shlib-path "\n\n")))))))
+            (log:emit 'info 'compiler "Successfully compiled" output-shlib-path))))))
 
 (define xtc:aot:insert-header
   (lambda (libname)
@@ -419,14 +402,14 @@
 
 (define xtc:aot:print-compilation-details
   (lambda (start-time)
-    (log-info "Total compile time:" (real->integer (- (clock:clock) start-time)) "seconds")
-    (log-info "type aliases:" (hashtable-count *xtc:cache:typealias-cache*))
-    (log-info "named types:" (hashtable-count *xtc:cache:namedtype-cache*))
-    (log-info "generic types:" (hashtable-count *xtc:cache:generictype-cache*))
-    (log-info "type specialisations:" (hashtable-count *xtc:cache:polytype-cache*))
-    (log-info "top-level closures:" (hashtable-count *xtc:cache:closure-cache*))
-    (log-info "generic functions:" (hashtable-count *xtc:cache:genericfunc-cache*))
-    (log-info "function specialisations:" (hashtable-count *xtc:cache:polyfunc-cache*))))
+    (log:emit 'info 'compiler "Total compile time:" (real->integer (- (clock:clock) start-time)) "seconds")
+    (log:emit 'info 'compiler "Type aliases:" (hashtable-count *xtc:cache:typealias-cache*))
+    (log:emit 'info 'compiler "Named types:" (hashtable-count *xtc:cache:namedtype-cache*))
+    (log:emit 'info 'compiler "Generic types:" (hashtable-count *xtc:cache:generictype-cache*))
+    (log:emit 'info 'compiler "Type specialisations:" (hashtable-count *xtc:cache:polytype-cache*))
+    (log:emit 'info 'compiler "Top-level closures:" (hashtable-count *xtc:cache:closure-cache*))
+    (log:emit 'info 'compiler "Generic functions:" (hashtable-count *xtc:cache:genericfunc-cache*))
+    (log:emit 'info 'compiler "Function specialisations:" (hashtable-count *xtc:cache:polyfunc-cache*))))
 
 (define-macro (unix-or-Windows unix-expr win-expr)
   (if (string=? (sys:platform) "Windows")
@@ -472,14 +455,12 @@
             (set! *xtc:globals:scheme-stubs* #f)
             ;; turn off aot-cache loading
             (set! *xtc:globals:with-cache* #f)
-            (log-info "Started compiling: ")
+            (log:emit 'info 'compiler "Started compiling" file-path)
             (if asdll? ;; need to preregister init function
                 (xtc:cache:register-new-nativefunc
                  (string-append file-no-extension "_init")
                  (xtc:codegen:get-type-from-pretty-str "[void]*") "" '()))
-            (println)
             (sys:load file-path)
-            (println)
             ;; static functions don't get a _setter()
             ;; use insertion-order list to ensure correct init order
             (define all-closure-setters
@@ -504,13 +485,12 @@
                                 "%res = call i32 @run_adhoc_W2kzMixpMzIsaTgqKl0_native(i32 %args, i8** %argv);
                 ret i32 %res;
               }")))
-            (log-info "Finished compiling:" file-path)
-            (println file-path)
+            (log:emit 'info 'compiler "Finished compiling" file-path)
             ;; turn back on scheme stubs
             (set! *xtc:globals:scheme-stubs* #t)
             ;; turn back on cache loading
             (set! *xtc:globals:with-cache* #t)
-            (log-info "JIT-compiling IR...")
+            (log:emit 'info 'compiler "JIT-compiling IR")
             (let ((module (xtc:codegen:flush-jit-compilation-queue)))
               (if (not module)
                   (xtc:diagnostics:print-compiler-error "Failed compiling LLVM IR"))
@@ -519,8 +499,7 @@
             ;; (close-port *xtc:aot:current-output-port*)
             (quit 0))
           (begin
-            (begin (print-with-colors 'black 'red #t (print " Error "))
-                   (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
+            (begin (log:emit 'error 'compiler "cannot write AOT-compilation file at" aot-compilation-file)
                    (quit 2)))))))
 
 ;;
@@ -532,7 +511,7 @@
     (for-each (lambda (m)
                 (let* ((res (regex:matched m "declare cc 0.*@([^(]*).*nounwind"))
                        (result (eval `(llvm:bind-symbol ,(string->symbol libname) ,(cadr res)))))
-                  (if (not result) (println "Error binding " res " to " libname " in declaration from " ll-file-path))))
+                  (if (not result) (log:emit 'error 'compiler "could not bind" res "to" libname "in declaration from" ll-file-path))))
               (regex:match-all (sys:slurp-file (sys:build-path (string-append "libs/aot-cache/" ll-file-path ".ll"))) "declare cc 0.*@([^(]*).*nounwind"))
     #t))
 
@@ -549,9 +528,7 @@
                          (open-input-file (sanitize-platform-path lib-path))
                          (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
       (if (not in-file-port)
-          (begin (print-with-colors 'black 'red #t
-                                    (print "Error:"))
-                 (print " no .xtm file at" (sanitize-platform-path lib-path) "\n"))
+          (log:emit 'error 'compiler "no .xtm file at" (sanitize-platform-path lib-path))
           (let* ((res (close-port in-file-port))
                  (libname (if (null? cache-name)
                               (sanitize-platform-path (filename-from-path lib-path))
@@ -561,7 +538,7 @@
                  (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
                  (ll-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".ll"))))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
-                (begin (print "AOT-compilation file not written ")
+                (begin (log:emit 'error 'compiler "AOT-compilation file not written for" libname)
                        (close-port *xtc:aot:current-output-port*)
                        (set! *xtc:aot:current-output-port* #f))
                 (begin
@@ -586,26 +563,22 @@
                         ;; module name for globals
                         (set! *xtc:globals:global-module-name* libname-no-extension)
                         ;; (xtc:aot:insert-header libname-no-extension)
-                        (log-info "started compiling" lib-path)
+                        (log:emit 'info 'compiler "Started compiling" lib-path)
                         (sys:load lib-path)
-                        (log-info "finished compiling" lib-path)
-                        (log-info "JIT-compiling IR...")
+                        (log:emit 'info 'compiler "Finished compiling" lib-path)
+                        (log:emit 'info 'compiler "JIT-compiling IR")
                         (sys:dump-string-to-file ll-path (xtc:emit:buffer->string *xtc:codegen:queued-llvm-ir-string*))
                         (close-port *xtc:aot:current-output-port*)
                         (set! *xtc:globals:global-module-name* #f)
                         (set! *xtc:aot:current-lib-name* "xtmdylib")
                         (if  *xtc:aot:current-output-port*
                              (begin (set! *xtc:aot:current-output-port* #f)
-                                    (print "Successfully wrote file to ")
-                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
+                                    (log:emit 'info 'compiler "Successfully wrote file to" aot-compilation-file-path)
                                     (xtc:aot:print-compilation-details start-time)
                                     (quit 0))
-                             (begin (print-with-colors 'black 'red #t (print " Error "))
-                                    (print "\n\nsomething went wrong in writing the output file ")
-                                    (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
+                             (begin (log:emit 'error 'compiler "something went wrong in writing the output file" aot-compilation-file-path)
                                     (quit 1))))
-                      (begin (print-with-colors 'black 'red #t (print " Error "))
-                             (print "\n\ncannot write file at " aot-compilation-file-path "\n")
+                      (begin (log:emit 'error 'compiler "cannot write file at" aot-compilation-file-path)
                              (quit 2))))))))))
 
 
@@ -617,9 +590,7 @@
                          (open-input-file (sanitize-platform-path lib-path))
                          (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
       (if (not in-file-port)
-          (begin (print-with-colors 'black 'red #t
-                                    (print "Error:"))
-                 (print " no .xtm file at" (sanitize-platform-path lib-path) "\n"))
+          (log:emit 'error 'compiler "no .xtm file at" (sanitize-platform-path lib-path))
           (let* ((res (close-port in-file-port))
                  (libname (sanitize-platform-path (filename-from-path lib-path)))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
@@ -627,7 +598,7 @@
                  (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
                  (original-opt-level (llvm:optimization-level)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
-                (begin (print "AOT-compilation file not written ")
+                (begin (log:emit 'error 'compiler "AOT-compilation file not written for" libname)
                        (close-port *xtc:aot:current-output-port*)
                        (set! *xtc:aot:current-output-port* #f))
                 (begin
@@ -649,18 +620,10 @@
                         ;; this is the 'success' branch
                         (set! *xtc:aot:current-lib-name* libname-no-extension)
                         ;; (xtc:aot:insert-header libname-no-extension)
-                        (print-with-colors 'cyan 'black #t (print "Started compiling: "))
-                        (println lib-path)
-                        (println)
+                        (log:emit 'info 'compiler "Started compiling" lib-path)
                         (sys:load lib-path)
-                        (println)
-                        (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
-                        (println lib-path)
-                        (println)
-                        (begin
-                          (println)
-                          (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
-                          (print "\n"))
+                        (log:emit 'info 'compiler "Finished compiling" lib-path)
+                        (log:emit 'info 'compiler "JIT-compiling IR")
                         (let ((module (xtc:codegen:flush-jit-compilation-queue)))
                           (if (not module)
                               (xtc:diagnostics:print-compiler-error "Failed compiling LLVM IR")
@@ -672,16 +635,12 @@
                         (set! *xtc:aot:current-lib-name* "xtmdylib")
                         (if  *xtc:aot:current-output-port*
                              (begin (set! *xtc:aot:current-output-port* #f)
-                                    (print "Successfully wrote AOT-compilation file to ")
-                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
+                                    (log:emit 'info 'compiler "Successfully wrote AOT-compilation file to" aot-compilation-file-path)
                                     (xtc:aot:print-compilation-details start-time)
                                     (quit 0))
-                             (begin (print-with-colors 'black 'red #t (print " Error "))
-                                    (print "\n\nsomething went wrong in writing the output file ")
-                                    (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
+                             (begin (log:emit 'error 'compiler "something went wrong in writing the output file" aot-compilation-file-path)
                                     (quit 1))))
-                      (begin (print-with-colors 'black 'red #t (print " Error "))
-                             (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
+                      (begin (log:emit 'error 'compiler "cannot write AOT-compilation file at" aot-compilation-file-path)
                              (quit 2))))))))))
 
 ;; (xtc:aot:compile-xtm-file path)                 a .ll cache named after the file

@@ -113,7 +113,7 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
 
 ;; Bail out early if there's no display (e.g. CI / headless)
 (if (<> (glfw_init) 1)
-    (begin (println "no display available, exiting") (quit 0)))
+    (begin (log:warn "no display available, exiting") (quit 0)))
 
 (bind-val st_window GLFWwindow*
   (glfw_create_webgpu_window 800 600))
@@ -207,7 +207,7 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
   (lambda (wgsl:i8*)
     (let ((new_shader (xtm_wgpu_create_shader st_device wgsl)))
       (if (null? new_shader)
-          (begin (println "shader compilation failed") void)
+          (begin (log_error "shader compilation failed") void)
           (let ((new_pipeline (xtm_wgpu_create_pipeline_with_layout
                                st_device new_shader st_format
                                "vs_main" "fs_main" st_bind_group_layout)))
@@ -309,10 +309,10 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
                 (shadertoy_draw_frame)))
           (let ((next_time (+ time (convert (* 44100. delta_t)))))
             (callback next_time shadertoy_render_loop next_time delta_t time)))
-        (println "shadertoy window closed"))))
+        (log:info "Shadertoy window closed"))))
 
 ;; Start (or restart) the render loop.
 (define (shadertoy-start)
   (shadertoy_render_loop (now) (/ 1.0 60.0) (now)))
 
-(println "shadertoy ready")
+(log:info "Shadertoy ready")

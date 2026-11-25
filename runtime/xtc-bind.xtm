@@ -1298,10 +1298,9 @@ e.g.
         (lambda ()
           (if (not (xtc:aot:currently-compiling?))
               (begin
-                (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
-                (print " the scheme wrapper for ")
-                (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print (string->symbol func-name)))
-                (print " was called, but it doesn't exist (yet)\n"))))
+                (log:emit 'warning 'compiler "the scheme wrapper for"
+                          (xtc:diagnostics:name func-name)
+                          "was called, but it doesn't exist (yet)"))))
         (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme")))
               (p (regex:split func-name "_adhoc_")))
           (if (and
@@ -1325,7 +1324,7 @@ e.g.
                             (interaction-environment))
                       (eval `(define ,(string->symbol (car p))
                                (lambda args
-                                 (println 'Ambiguous 'or 'unavailable 'xtlang 'wrapper: ,(car p))))
+                                 (log:warn "ambiguous or unavailable xtlang wrapper:" ,(car p))))
                             (interaction-environment))))))
           (if scheme-func
               (begin
@@ -1912,7 +1911,7 @@ e.g.
             (begin
               (display "\n]" outfile-port)
               (close-port outfile-port)
-              (print "Succesfully exported docs as json to " file-path "\n")
+              (log:info "Exported docs as json to" file-path)
               #t)
             (begin
               (xtmdoc-write-alist-as-json (car doc-alists) outfile-port)

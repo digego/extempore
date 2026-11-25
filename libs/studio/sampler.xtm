@@ -1604,16 +1604,16 @@ parameters (the first seven are *sampler:params*)"
 (define sampler:report
   (lambda (what seconds loaded skipped unknown)
     (let ((tenths (lambda (x) (/ (round (* 10.0 x)) 10.0))))
-      (studio:say "sampler: loaded" what "---" loaded "regions in" (tenths seconds) "s,"
-                  (round (sampler_megabytes_loaded)) "MB of samples in memory in all")
+      (log:emit 'info 'sampler "Loaded" what "---" loaded "regions in" (tenths seconds) "s,"
+                (round (sampler_megabytes_loaded)) "MB of samples in memory in all")
       (if (pair? skipped)
           (let ((reasons (let loop ((lst skipped) (acc '()))
                            (if (null? lst) (reverse acc)
                                (loop (cdr lst) (if (member (car lst) acc) acc (cons (car lst) acc)))))))
-            (studio:say "  skipped" (length skipped) "regions, because")
-            (for-each (lambda (r) (studio:say "   " r)) (list-head reasons (min 5 (length reasons))))))
+            (log:emit 'warning 'sampler "skipped" (length skipped) "regions, because"
+                      (string-join (list-head reasons (min 5 (length reasons))) "; "))))
       (if (pair? unknown)
-          (apply studio:say "  ignored opcodes (and how often):"
+          (apply log:emit 'info 'sampler "ignored opcodes (and how often):"
                  (map (lambda (u) (string-append (car u) " (" (number->string (cadr u)) ")")) unknown))))))
 
 ;; (sampler-load 'track "path/to/instrument.sfz")

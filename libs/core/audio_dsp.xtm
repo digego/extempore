@@ -455,7 +455,7 @@
     (let ((data (sys_slurp_file fname)) ;; data will be heap-allocated
           (offset 0))
       (if (null? data)
-          (begin (println "Failed to open bleptable dump file") void)
+          (begin (log_error "failed to open bleptable dump file") void)
           (begin
             (set! BLEPTable (convert (pref-ptr data offset)))
             (set! offset (+ offset (* 4096 8)))
@@ -806,7 +806,7 @@
 
 (bind-func static va_onepole
   (lambda (type) ;; either LPF1 or HPF1
-    (if (and (<> type HPF1) (<> type LPF1)) (println "BAD TYPE FOR FILTER: should be LPF1 or HPF1"))
+    (if (and (<> type HPF1) (<> type LPF1)) (log_error "va_onepole: the filter type must be LPF1 or HPF1"))
     (let ((m_dAlpha:SAMPLE* (alloc 1))    ;; feed forward coeff
           (m_dBeta:SAMPLE* (alloc 1))     ;; for korg and moog
           (m_dGamma 1.0)    ;; pre gain

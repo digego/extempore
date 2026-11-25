@@ -232,19 +232,14 @@
                (set! *topclock-master-ip* srcip)
                (if (not (string=? *topclock-master-ip* *topclock-old-master-ip*))
                    (begin
-                     (print "There's a ")
-                     (print-with-colors 'magenta 'default #f
-                                        (print "new topclock"))
-                     (print " in town at ")
-                     (print-with-colors 'blue 'default #f
-                                        (print srcip "\n"))
+                     (log:emit 'info 'topclock "There's a new topclock in town at" srcip)
                      (set! *topclock-master* #f)
                      (set! *topclock-old-master-ip* *topclock-master-ip*)))
                (set! *topclock-lastmsg* (clock:clock))
                ;; check for bpm updates (redundancy for missed bpm/update events)
                (if (and (not *topclock-master*) (or (<> bpm oldbpm) (<> cycle oldcycle)))
                    (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/bpm/q"))))
-            (else (println 'bad 'osc 'message: address))))))
+            (else (log:warn "bad osc message:" address))))))
 
 ;; sends OSC message /clock/bpm/set to current master
 ;; of type <double,double>
@@ -294,8 +289,7 @@
   (lambda ()
     ;; assume we won :)
     (set! *topclock-election-winner* #t)
-    (print-with-colors 'yellow 'default #f
-                       (print "Nominating myself in topclock election...\n"))
+    (log:emit 'info 'topclock "Nominating myself in topclock election")
     ;; send message to the world!
     (io:osc:send (now) *topclock-broadcast* "/clock/election/q" *topclock-election-val*)
     ;; wait 4 seconds to find out if we really won!
@@ -305,11 +299,9 @@
     (if *topclock-election-winner*
         (begin
           (set! *topclock-master* #t)
-          (print-with-colors 'green 'default #t
-                             (print "which I won!\n"))
+          (log:emit 'info 'topclock "Won the topclock election")
           (topclock-streamer (*metro* 'get-beat 1) 1/4))
-        (print-with-colors 'red 'default #t
-                           (print "which I lost!\n")))
+        (log:emit 'info 'topclock "Lost the topclock election"))
     (set! *topclock-election-winner* #f)
     *topclock-election-winner*))
 
@@ -358,8 +350,7 @@
           (io:osc:set-real-64bit? #t)
           ;; have OSC emit both source IP and PORT
           (io:osc:netaddress? #t)
-          (print-with-colors 'magenta 'default #f
-                             (print "Starting TOPClock\n"))
+          (log:emit 'info 'topclock "Starting TOPClock")
           ;; all clients (including the master) run this loop
           (topclock-sync 0)
           #t))))
