@@ -33,72 +33,91 @@ the command-line modes, so they are designed together.
 ```
 extempore [FILE]                    live session: audio, eval servers, nREPL
 extempore exec FILE | -e EXPR       script: no audio, no servers
+extempore test FILE...              run .xtm test files
 extempore render FILE -o OUT.wav    offline render (below)
-extempore compile FILE              AOT-compile FILE to a native executable
+extempore compile FILE              AOT-compile a library, or --exe an executable
+extempore doc -o OUT.json [FILE...] export docstrings and types (xtmdoc)
 extempore send [CODE]               evaluate code in a running extempore (nREPL)
 extempore repl                      interactive REPL on a running extempore
 extempore devices                   list audio devices
 extempore version
 ```
 
-- **session** (no subcommand) is today's default. `FILE` replaces `--run`.
-  Session options keep their current names, since editors and users' scripts
+- **session** (no subcommand) is today's default, taking a file to load and
+  `-e EXPR`. Session options keep their names, since editors and users' scripts
   pass them: `--port`, `--device`, `--device-name`, `--indevice`,
   `--indevice-name`, `--samplerate`, `--frames`, `--channels`, `--inchannels`,
-  `--latency`, `--nrepl-port`, `--nrepl-bind`, `--no-nrepl`, `--no-audio`.
+  `--latency`, `--realtime` (Windows), `--repl`, `--nrepl-port`, `--nrepl-bind`,
+  `--no-nrepl`, `--no-audio`.
 - **exec** evaluates the file or expression and exits when it finishes: status
   0, or 1 on an uncaught error (as `--batch` does now). Scheduled callbacks
   still pending then are dropped, since a temporal recursion would otherwise
   keep it running forever. `--wait` keeps it running until `(quit)`, which is
   today's `--batch` behaviour, for scripts that schedule work (the scheduler
   and topclock tests). It has to be a flag: callbacks run on the script's own
-  task thread, so the script can't block waiting for them. This replaces
-  `--batch` and the `sys:load-then-quit` wrapper.
+  task thread, so the script can't block waiting for them.
+- **test** runs each file through `xtmtest-run-tests` (`libs/core/test.xtm`)
+  and exits 1 if any assertion failed. `--junit DIR` writes the per-file XML
+  reports ctest and CI collect. `tests.cmake` becomes a list of files, and
+  rerunning one file is `extempore test tests/core/adt.xtm`. The batch tests
+  also stop taking a `--port` each: batch mode starts no server, so only the
+  IPC test needs ports.
 - **render** takes `--duration SECONDS` (required) plus the audio-format
-  options (`--samplerate`, `--channels`, `--frames`).
-- **compile** owns `--arch`, `--cpu` and `--attr`.
+  options (`--samplerate`, `--channels`, `--frames`). Lockstep rendering ends
+  exactly at the duration, so `extras/studio/render` drops its port choice,
+  log polling and kill timers and keeps only the analysis (numpy and scipy,
+  which stay outside the binary).
+- **compile** AOT-compiles a library into the cache (`xtc:aot:compile-xtm-file`,
+  today reached only through `--batch` from CMake), or with `--exe` builds an
+  executable (`xtc:aot:compile-xtm-exe`, today's `--compile`). It owns
+  `--arch`, `--cpu` and `--attr`.
+- **doc** loads the named libraries (by default the set the `xtmdoc` target
+  loads) and writes `xtmdoc-export-caches-to-json`'s output, replacing that
+  target's 600-character `--eval`.
 - **send** is the nREPL client, built into the binary with the server's C++
   bencode codec: code from an argument or stdin, or `--file F --line L --column
 C` for the top-level form at a position, with `--editor`, `--wait-for-save`
-  and the port lookup of today's `extras/nrepl/extempore-nrepl`. It replaces
-  that Python script, so editors need nothing but extempore (no Python on
-  Windows, no symlink or wrapper), and the client is versioned with the server.
-  It dispatches before LLVM, audio or Scheme start, so each call costs a
-  process start and nothing more.
-- **repl** is an interactive client of a running extempore's nREPL server,
-  replacing `--repl` (a line-editing client of the 7099 server started inside
-  the session). It shows output, values and errors apart, and Ctrl-C
-  interrupts the running eval, which 7099 can't do. Linux and macOS only, as
-  now (linenoise).
+  and the port lookup of today's `extras/nrepl/extempore-nrepl`. Editors then
+  need nothing but extempore (no Python on Windows, no symlink or wrapper), and
+  the client is versioned with the server. It dispatches before LLVM, audio or
+  Scheme start, so each call costs a process start and nothing more.
+- **repl** is an interactive client of a running extempore's nREPL server. It
+  shows output, values and errors apart, and Ctrl-C interrupts the running
+  eval, which the 7099 server can't do. The session's `--repl` runs the same
+  client in the session's terminal. Linux and macOS only, as now (linenoise).
 - **devices** replaces `--print-devices`.
 
 Options for every subcommand: `--sharedir`, `--no-base`, `--opt-level`,
 `--term`.
 
-Removed: `--timediv` (no users) and `--runtime` (deprecated already).
-`--realtime` stays a session option, documented as Windows-only.
+### Compatibility
 
-### Deprecation
+Old forms keep working as aliases for the new ones and print the new spelling
+once, on stderr. Aliases stay: there is no release that removes them.
 
-One release where the old forms still work and print the new spelling once:
+| old                                | becomes                                  |
+| ---------------------------------- | ---------------------------------------- |
+| `--run FILE`                       | `extempore FILE`                         |
+| `--eval EXPR`                      | `extempore -e EXPR`                      |
+| `--batch EXPR`                     | `extempore exec --wait -e EXPR`          |
+| `--audio-outfile F [--duration S]` | `extempore render ... -o F --duration S` |
+| `--compile F`                      | `extempore compile --exe F`              |
+| `--print-devices`                  | `extempore devices`                      |
+| `--noaudio`, `--nobase`            | `--no-audio`, `--no-base`                |
 
-| old                                      | new                                    |
-| ---------------------------------------- | -------------------------------------- |
-| `--run FILE`                             | `extempore FILE`                       |
-| `--eval EXPR`                            | `extempore -e EXPR` (session)          |
-| `--batch EXPR`                           | `extempore exec -e EXPR`               |
-| `--batch "(sys:load-then-quit F 0)"`     | `extempore exec F`                     |
-| `--audio-outfile F --duration S --run X` | `extempore render X -o F --duration S` |
-| `--compile F`                            | `extempore compile F`                  |
-| `--print-devices`                        | `extempore devices`                    |
-| `--repl`                                 | `extempore repl` (second terminal)     |
-| `extras/nrepl/extempore-nrepl`           | `extempore send`                       |
-| `--noaudio`, `--nobase`                  | `--no-audio`, `--no-base`              |
+`--batch` maps to `exec --wait` so a script relying on it running until
+`(quit)` behaves as before; scripts that end with `(quit)` anyway can move to
+plain `exec`.
 
-The next release removes them. The repo's own callers (`extras/cmake`,
-`extras/studio/render`, `extras/compiler-stress`, the docs, AGENTS.md and the
-backlog) move in the release that adds the subcommands, so the warnings only
-reach outside users.
+Two options go outright, with an error naming the reason: `--timediv` (no users
+in the repo, and no documentation) and `--runtime` (deprecated for
+`--sharedir` already). `extras/nrepl/extempore-nrepl` goes too; it has never
+been in a release.
+
+The repo's own callers (`extras/cmake`, `extras/studio/render`,
+`extras/compiler-stress`, `docs/verify-examples.py`, the docs and AGENTS.md)
+move to the new forms in the same change, so the notices only reach outside
+users.
 
 ### Editor plugins
 
@@ -172,11 +191,10 @@ point can then be asserted to the block.
 
 1. The lockstep render behind the existing `--audio-outfile` flag, so the
    audio-offline tests stop flaking before any interface changes.
-2. The subcommands, including `send` and `repl`, with the old flags as
-   deprecated aliases; move the repo's callers over. `extras/nrepl/extempore-nrepl`
+2. The subcommands, with the old forms as aliases; move the repo's callers
+   over. `extras/nrepl/extempore-nrepl`
    goes, and the bencode client and form finder it holds move into
    `tests/nrepl`: protocol tests need to send what no real client would
    (malformed bencode, a message a byte at a time, replies never read), which
    is easiest from Python. The helix binding in the docs (and on benswift.me)
    changes to `extempore send`.
-3. Remove the aliases in the following release.
