@@ -112,3 +112,31 @@ TEST(PriorityQueue, TasksPopInStartTimeOrder) {
     EXPECT_EQ(previous, 4000u);
     EXPECT_EQ(queue.peek(), nullptr);
 }
+
+// Two callbacks scheduled for the same instant run in the order they were
+// scheduled. (The key used to end in the task's address, so the order changed
+// from run to run with the allocator's whim.)
+TEST(PriorityQueue, EqualStartTimesPopInTheOrderAdded) {
+    extemp::PriorityQueue<extemp::TaskI> queue;
+    std::vector<extemp::TaskI*> made;
+    for (int i = 0; i < 64; ++i) {
+        made.push_back(new extemp::Task<int>(i % 2 ? 1000 : 2000, 0, nullptr, i));
+    }
+    // added in an order unrelated to their addresses
+    for (int i = 63; i >= 0; --i) {
+        queue.add(made[size_t(i)]);
+    }
+    std::vector<int> order;
+    while (auto* task = queue.pop()) {
+        order.push_back(static_cast<extemp::Task<int>*>(task)->getArg());
+        delete task;
+    }
+    std::vector<int> expected;
+    for (int i = 63; i >= 0; i -= 2) {
+        expected.push_back(i);  // the odd ones, due at 1000
+    }
+    for (int i = 62; i >= 0; i -= 2) {
+        expected.push_back(i);  // then the even ones, due at 2000
+    }
+    EXPECT_EQ(order, expected);
+}

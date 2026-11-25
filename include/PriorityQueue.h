@@ -44,13 +44,24 @@
 
 namespace extemp {
 
+// Tasks come out in order of start time, and those with the same start time
+// in the order they were added (the counter in the key), so two callbacks
+// scheduled for one instant run first-scheduled first, every time.
 template <typename T> class PriorityQueue {
   private:
-    typedef std::pair<uint64_t, T*> key_type;
-    typedef std::priority_queue<key_type, std::vector<key_type>, std::greater<key_type>> queue_type;
+    struct Entry {
+        uint64_t time;
+        uint64_t added;
+        T* value;
+        bool operator>(const Entry& Other) const {
+            return time != Other.time ? time > Other.time : added > Other.added;
+        }
+    };
+    typedef std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> queue_type;
 
   private:
     queue_type m_queue;
+    uint64_t m_added = 0;
 
   public:
     ~PriorityQueue() {
@@ -58,11 +69,11 @@ template <typename T> class PriorityQueue {
     }
 
     void add(T* Val) {
-        m_queue.push(key_type(Val->getStartTime(), Val));
+        m_queue.push(Entry{Val->getStartTime(), m_added++, Val});
     }
     void clear() {
         while (!m_queue.empty()) {
-            delete m_queue.top().second;
+            delete m_queue.top().value;
             m_queue.pop();
         }
     }
@@ -70,7 +81,7 @@ template <typename T> class PriorityQueue {
         if (m_queue.empty()) [[unlikely]] {
             return nullptr;
         }
-        auto element(m_queue.top().second);
+        auto element(m_queue.top().value);
         m_queue.pop();
         return element;
     }
@@ -78,7 +89,7 @@ template <typename T> class PriorityQueue {
         if (m_queue.empty()) [[unlikely]] {
             return nullptr;
         }
-        return m_queue.top().second;
+        return m_queue.top().value;
     }
     size_t size() {
         return m_queue.size();
