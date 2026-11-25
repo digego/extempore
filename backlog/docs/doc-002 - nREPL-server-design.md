@@ -79,7 +79,8 @@ agent working beside a performance should use the utility process or its own
 3. `completions` and `lookup`.
 4. `extempore/log-subscribe`: a process's console output, for a client to watch
    what callbacks print.
-5. The language server, as `extempore lsp` (doc-003).
+5. The language server, as `extempore lsp` (doc-003). Its eval needs only
+   phase 2, so it comes before phase 3; completion and hover follow phase 3.
 
 Run [proof](https://github.com/nrepl/proof) against the server now and then; it
 needs Clojure tooling, so it isn't in CI.
