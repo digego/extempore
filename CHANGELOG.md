@@ -136,7 +136,8 @@ releases from now. `--timediv` and `--runtime` are gone.
 
 Extempore runs an [nREPL](https://nrepl.org) server, on `127.0.0.1:7888`,
 beside the eval server on 7099: clients get each form's value, the output it
-printed, errors with their kind and line, and can interrupt an evaluation. The
+printed, errors with their kind and line, completions and a symbol's
+documentation, and can interrupt an evaluation. The
 binary is its own client: `extempore send '(+ 1 2)'` (or `--file F`, or `--file
 F --line L` for the form at a position), `extempore repl` (which `extempore
 --repl` now runs, so Ctrl-C stops a runaway evaluation) and `extempore status`.
@@ -146,8 +147,9 @@ in the docs has the details.
 `extempore lsp` is a language server, so any editor with a language client
 works with Extempore from configuration alone: evaluate the form at the cursor,
 a selection or the whole buffer (as it stands, saved or not), with values in
-the status line and errors marked on their forms; interrupt an evaluation; and,
-with nothing running, unbalanced parentheses, an outline and folding. The
+the status line and errors marked on their forms; interrupt an evaluation;
+complete names and show a function's arguments, type and docstring on hover;
+and, with nothing running, unbalanced parentheses, an outline and folding. The
 editor support guide has the Helix setup.
 
 Offline rendering is now deterministic. The render keeps the audio clock in

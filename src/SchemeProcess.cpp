@@ -213,6 +213,13 @@ bool SchemeProcess::start(bool subsume) {
             m_running = false;
             return false;
         }
+        // said once it is true: a client may connect the moment it reads this
+        if (m_name == "primary") {
+            ascii_info();
+            std::cout << "Listening on TCP port " << m_serverPort
+                      << " --- connect your editor to send code." << std::endl;
+            ascii_default();
+        }
     }
     if (subsume) {
         m_threadTask.setSubsume();

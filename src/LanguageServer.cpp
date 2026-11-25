@@ -7,6 +7,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -119,6 +121,12 @@ std::string pathFromUri(std::string_view Uri) {
     return path;
 }
 
+// A character of a symbol, as far as finding the one at the cursor goes.
+bool isSymbolChar(char C) {
+    return static_cast<unsigned char>(C) > ' ' && C != '(' && C != ')' && C != '"' && C != ';' &&
+           C != '\'' && C != '`' && C != ',';
+}
+
 std::string trimmed(std::string_view Text) {
     const auto first = Text.find_first_not_of(" \t\r\n");
     if (first == std::string_view::npos) {
@@ -162,6 +170,12 @@ struct Pending {
     bool interrupted = false;
 };
 
+// A question the main thread is waiting on the answer to (completions, lookup).
+struct Query {
+    bool answered = false;
+    bencode::Dict reply;
+};
+
 // The connection to an extempore, and the thread reading from it.
 struct Link {
     Connection connection;
@@ -169,10 +183,11 @@ struct Link {
     std::uint16_t port = 0;
     std::string session;
     std::map<std::string, Pending, std::less<>> pending;  // by request id
+    std::map<std::string, std::shared_ptr<Query>, std::less<>> queries;
     bool alive = true;
 };
 
-enum MessageType { Error = 1, Warning = 2, Info = 3, Log = 4 };
+enum MessageType : std::uint8_t { Error = 1, Warning = 2, Info = 3, Log = 4 };
 
 class Server {
   public:
@@ -198,9 +213,9 @@ class Server {
             if (*method == "exit") {
                 return m_shutdown ? 0 : 1;
             }
-            const std::lock_guard<std::mutex> lock(m_mutex);
+            std::unique_lock<std::mutex> lock(m_mutex);
             if (id) {
-                request(*method, *id, params ? *params : none);
+                request(*method, *id, params ? *params : none, lock);
             } else {
                 notification(*method, params ? *params : none);
             }
@@ -270,7 +285,8 @@ class Server {
 
     // --- requests and notifications (m_mutex is held)
 
-    void request(llvm::StringRef Method, const json::Value& Id, const json::Object& Params) {
+    void request(llvm::StringRef Method, const json::Value& Id, const json::Object& Params,
+                 std::unique_lock<std::mutex>& Lock) {
         if (Method == "initialize") {
             respond(Id, initialize(Params));
         } else if (Method == "shutdown") {
@@ -287,6 +303,10 @@ class Server {
             respond(Id, folds(uriOf(Params)));
         } else if (Method == "textDocument/codeAction") {
             respond(Id, codeActions(Params));
+        } else if (Method == "textDocument/completion") {
+            respond(Id, completion(Params, Lock));
+        } else if (Method == "textDocument/hover") {
+            respond(Id, hover(Params, Lock));
         } else if (Method == "workspace/executeCommand") {
             executeCommand(Params);
             respond(Id, nullptr);
@@ -374,6 +394,8 @@ class Server {
                  {"documentSymbolProvider", true},
                  {"foldingRangeProvider", true},
                  {"codeActionProvider", true},
+                 {"completionProvider", json::Object{}},
+                 {"hoverProvider", true},
                  {"executeCommandProvider",
                   json::Object{{"commands", json::Array{"extempore.eval", "extempore.evalBuffer",
                                                         "extempore.interrupt"}}}},
@@ -478,6 +500,149 @@ class Server {
                json::Object{{"uri", uri}, {"range", json::Object(*where)}});
         action("Evaluate buffer", "extempore.evalBuffer", json::Object{{"uri", uri}});
         return result;
+    }
+
+    // --- completion and hover: questions for the extempore, when there is one
+
+    // Asks the extempore and waits a moment for its answer: a process which
+    // is busy with an evaluation answers after it, which is too late for a
+    // menu. Lock (m_mutex) is released while waiting.
+    std::optional<bencode::Dict> ask(const std::string& Uri, bencode::Dict Message,
+                                     std::unique_lock<std::mutex>& Lock) {
+        if (!connect(pathFromUri(Uri), true)) {
+            return std::nullopt;
+        }
+        const std::shared_ptr<Link> link = m_link;
+        Message["session"] = bencode::Value(link->session);
+        const std::string id = link->connection.send(std::move(Message));
+        if (id.empty()) {
+            link->alive = false;
+            return std::nullopt;
+        }
+        const auto query = std::make_shared<Query>();
+        link->queries.emplace(id, query);
+        m_answered.wait_for(Lock, std::chrono::milliseconds(1500),
+                            [&] { return query->answered || !link->alive; });
+        link->queries.erase(id);
+        if (!query->answered) {
+            return std::nullopt;
+        }
+        return std::move(query->reply);
+    }
+
+    // The symbol at (or ending at) a position: [begin, end) in the text.
+    static std::pair<std::size_t, std::size_t> symbolAt(std::string_view Text, std::size_t Offset,
+                                                        bool Whole) {
+        std::size_t begin = std::min(Offset, Text.size());
+        std::size_t end = begin;
+        while (begin > 0 && isSymbolChar(Text[begin - 1])) {
+            --begin;
+        }
+        while (Whole && end < Text.size() && isSymbolChar(Text[end])) {
+            ++end;
+        }
+        return {begin, end};
+    }
+
+    json::Value completion(const json::Object& Params, std::unique_lock<std::mutex>& Lock) {
+        json::Array items;
+        const std::string uri = uriOf(Params);
+        const auto found = m_documents.find(uri);
+        if (found == m_documents.end()) {
+            return items;
+        }
+        const std::size_t cursor = offsetIn(found->second, Params.getObject("position"));
+        const auto [begin, end] = symbolAt(found->second.text, cursor, false);
+        const std::string prefix = found->second.text.substr(begin, end - begin);
+        // what is replaced is said outright: editors differ over where a word
+        // with a colon or a star in it begins
+        const json::Object replaced = range(found->second, begin, end);
+        if (prefix.empty()) {
+            return items;
+        }
+        const auto reply = ask(
+            uri, bencode::Dict{{"op", bencode::Value("completions")}, {"prefix", bencode::Value(prefix)}},
+            Lock);
+        const bencode::Value* candidates = reply ? bencode::find(*reply, "completions") : nullptr;
+        if (!candidates || !candidates->isList()) {
+            return items;
+        }
+        for (const auto& candidate : candidates->list) {
+            if (!candidate.isDict()) {
+                continue;
+            }
+            const std::string name(bencode::findString(candidate.dict, "candidate"));
+            const auto type = bencode::findString(candidate.dict, "type");
+            // 3 function, 14 keyword, 7 class, 6 variable
+            const int kind = type == "function" ? 3
+                             : (type == "macro" || type == "special-form") ? 14
+                             : type == "class" ? 7
+                                               : 6;
+            items.push_back(json::Object{
+                {"label", json::fixUTF8(name)},
+                {"kind", kind},
+                {"textEdit", json::Object{{"range", json::Object(replaced)},
+                                          {"newText", json::fixUTF8(name)}}},
+            });
+        }
+        return items;
+    }
+
+    json::Value hover(const json::Object& Params, std::unique_lock<std::mutex>& Lock) {
+        const std::string uri = uriOf(Params);
+        const auto found = m_documents.find(uri);
+        if (found == m_documents.end()) {
+            return nullptr;
+        }
+        const std::size_t cursor = offsetIn(found->second, Params.getObject("position"));
+        const auto [begin, end] = symbolAt(found->second.text, cursor, true);
+        if (end == begin) {
+            return nullptr;
+        }
+        const json::Object where = range(found->second, begin, end);
+        std::string name = found->second.text.substr(begin, end - begin);
+        // osc:[double,double]* is osc with its type; sys:load is one name. Ask
+        // for the whole of it first.
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            const auto reply = ask(
+                uri, bencode::Dict{{"op", bencode::Value("lookup")}, {"sym", bencode::Value(name)}},
+                Lock);
+            const bencode::Value* info = reply ? bencode::find(*reply, "info") : nullptr;
+            if (info && info->isDict()) {
+                const auto field = [&](const char* Key) {
+                    return std::string(bencode::findString(info->dict, Key));
+                };
+                const std::string args = field("arglists-str");
+                std::string text = "```extempore\n";
+                if (args.size() > 2) {
+                    text += "(" + name + " " + args.substr(1);
+                } else if (args == "()") {
+                    text += "(" + name + ")";
+                } else {
+                    text += name;
+                }
+                if (const std::string type = field("extempore/type"); !type.empty()) {
+                    text += "  ; " + type;
+                }
+                text += "\n```";
+                if (const std::string kind = field("extempore/kind"); !kind.empty()) {
+                    text += "\n\n" + kind;
+                }
+                if (const std::string doc = field("doc"); !doc.empty()) {
+                    text += "\n\n" + doc;
+                }
+                return json::Object{
+                    {"contents", json::Object{{"kind", "markdown"}, {"value", json::fixUTF8(text)}}},
+                    {"range", json::Object(where)},
+                };
+            }
+            const auto colon = name.find(':');
+            if (!reply || colon == std::string::npos || colon == 0) {
+                break;
+            }
+            name.erase(colon);
+        }
+        return nullptr;
     }
 
     // --- diagnostics
@@ -599,7 +764,7 @@ class Server {
                        {"file", bencode::Value(path)},
                        {"line", bencode::Value(line)}};
         }
-        if (!connect(path)) {
+        if (!connect(path, false)) {
             return;
         }
         message["session"] = bencode::Value(m_link->session);
@@ -612,12 +777,18 @@ class Server {
         m_link->pending.emplace(id, std::move(pending));
     }
 
-    // Makes sure there is a connection to the extempore for a file at Path,
-    // with a message to the user if there is none to be had.
-    bool connect(const std::string& Path) {
+    // Makes sure there is a connection to the extempore for a file at Path.
+    // If there is none to be had, a command says so to the user; a question
+    // asked on the user's behalf (Quiet) doesn't, and isn't asked again for a
+    // few seconds.
+    bool connect(const std::string& Path, bool Quiet) {
         const std::uint16_t port = nrepl::client::findPort(m_target.port, Path);
         if (m_link && m_link->alive && m_link->port == port && m_link->host == m_target.host) {
             return true;
+        }
+        const auto now = std::chrono::steady_clock::now();
+        if (Quiet && now - m_lastFailure < std::chrono::seconds(3)) {
+            return false;
         }
         if (m_link) {
             m_link->connection.shutdown();  // its reader thread ends
@@ -628,8 +799,11 @@ class Server {
         const std::string where = link->host + ":" + std::to_string(port);
         if (const std::string why = link->connection.open(link->host, port); !why.empty()) {
             m_link.reset();
-            showMessage(Error, "no extempore to talk to: no nREPL server at " + where + " (" +
-                                   why + ")");
+            m_lastFailure = now;
+            if (!Quiet) {
+                showMessage(Error, "no extempore to talk to: no nREPL server at " + where +
+                                       " (" + why + ")");
+            }
             return false;
         }
         bencode::Dict clone{{"op", bencode::Value("clone")}};
@@ -640,9 +814,12 @@ class Server {
         if (!link->connection.request(std::move(clone), reply) ||
             bencode::findString(reply, "new-session").empty()) {
             m_link.reset();
+            m_lastFailure = now;
             const auto err = bencode::findString(reply, "err");
-            showMessage(Error, err.empty() ? "the extempore at " + where + " gave no session"
-                                           : trimmed(err));
+            if (!Quiet) {
+                showMessage(Error, err.empty() ? "the extempore at " + where + " gave no session"
+                                               : trimmed(err));
+            }
             return false;
         }
         link->session = std::string(bencode::findString(reply, "new-session"));
@@ -656,7 +833,14 @@ class Server {
         bencode::Dict message;
         while (Link_->connection.read(message) == Connection::Read::Message) {
             const std::lock_guard<std::mutex> lock(m_mutex);
-            const auto found = Link_->pending.find(bencode::findString(message, "id"));
+            const auto id = bencode::findString(message, "id");
+            if (const auto query = Link_->queries.find(id); query != Link_->queries.end()) {
+                query->second->reply = std::move(message);
+                query->second->answered = true;
+                m_answered.notify_all();
+                continue;
+            }
+            const auto found = Link_->pending.find(id);
             if (found == Link_->pending.end()) {
                 continue;
             }
@@ -685,6 +869,7 @@ class Server {
         }
         const std::lock_guard<std::mutex> lock(m_mutex);
         Link_->alive = false;
+        m_answered.notify_all();
         if (!Link_->pending.empty()) {
             Link_->pending.clear();
             showMessage(Error, "extempore went away before the evaluation finished");
@@ -744,6 +929,8 @@ class Server {
     bool m_shutdown = false;
     // Guards everything below; the reader threads take it for each message.
     std::mutex m_mutex;
+    std::condition_variable m_answered;  // a Query has its reply
+    std::chrono::steady_clock::time_point m_lastFailure{};
     std::mutex m_outMutex;
     std::map<std::string, Document> m_documents;  // by URI
     std::shared_ptr<Link> m_link;

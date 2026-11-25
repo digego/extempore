@@ -37,10 +37,12 @@ class Protocol(unittest.TestCase):
             {
                 "clone",
                 "close",
+                "completions",
                 "describe",
                 "eval",
                 "interrupt",
                 "load-file",
+                "lookup",
                 "ls-sessions",
             },
         )
@@ -232,6 +234,66 @@ class Protocol(unittest.TestCase):
                 if other != name:
                     self.assertNotIn(other, text)
             self.assertEqual(values(rs)[-1], f'"{name}"')
+
+    # --- completions and lookup -------------------------------------------
+
+    def candidates(self, c, prefix: str) -> dict[str, str]:
+        (reply,) = c.request(op="completions", prefix=prefix)
+        self.assertEqual(reply["status"], ["done"])
+        return {item["candidate"]: item["type"] for item in reply["completions"]}
+
+    def test_completions_of_scheme_and_xtlang_names(self) -> None:
+        with self.xtm.client() as c:
+            c.request(op="eval", code="""
+                (define nrepl-complete-var 1)
+                (define (nrepl-complete-fn x) x)
+                (define-macro (nrepl-complete-macro x) x)
+                (bind-func nrepl_complete_xt (lambda (x:i64) (* x 2)))
+                (bind-type NreplCompleteType <i64,double>)""")
+            found = self.candidates(c, "nrepl-complete-")
+            self.assertEqual(found, {"nrepl-complete-fn": "function",
+                                     "nrepl-complete-macro": "macro",
+                                     "nrepl-complete-var": "var"})
+            self.assertEqual(list(found), sorted(found))
+            self.assertEqual(self.candidates(c, "nrepl_complete_"),
+                             {"nrepl_complete_xt": "function"})
+            # a type has no Scheme binding: the compiler's caches know it
+            self.assertEqual(self.candidates(c, "NreplComplete")["NreplCompleteType"], "class")
+            self.assertEqual(self.candidates(c, "bind-fu")["bind-func"], "special-form")
+            self.assertEqual(self.candidates(c, "no-such-prefix-anywhere"), {})
+            self.assertEqual(self.candidates(c, ""), {})
+
+    def test_completions_are_capped(self) -> None:
+        with self.xtm.client() as c:
+            self.assertEqual(len(self.candidates(c, "x")), 200)
+
+    def test_lookup(self) -> None:
+        with self.xtm.client() as c:
+            c.request(op="eval", code="""
+                (bind-func nrepl_lookup_xt "doubles its argument" (lambda (x:i64) (* x 2)))
+                (define (nrepl-lookup-fn a b) a)""")
+            (reply,) = c.request(op="lookup", sym="nrepl_lookup_xt")
+            self.assertEqual(reply["status"], ["done"])
+            info = reply["info"]
+            self.assertEqual(info["name"], "nrepl_lookup_xt")
+            self.assertEqual(info["extempore/type"], "[i64,i64]*")
+            self.assertEqual(info["extempore/kind"], "closure")
+            self.assertEqual(info["arglists-str"], "(x)")
+            self.assertEqual(info["doc"], "doubles its argument")
+            (reply,) = c.request(op="lookup", sym="nrepl-lookup-fn")
+            self.assertEqual(reply["info"]["arglists-str"], "(a b)")
+            self.assertEqual(reply["info"]["extempore/kind"], "scheme closure")
+            self.assertNotIn("doc", reply["info"])
+            (reply,) = c.request(op="lookup", sym="nothing-by-this-name")
+            self.assertEqual(reply["status"], ["no-info", "done"])
+            self.assertNotIn("info", reply)
+
+    def test_completions_and_lookup_need_their_argument(self) -> None:
+        with self.xtm.client() as c:
+            (reply,) = c.request(op="completions")
+            self.assertEqual(reply["status"], ["error", "no-symbol", "done"])
+            (reply,) = c.request(op="lookup")
+            self.assertEqual(reply["status"], ["error", "no-symbol", "done"])
 
     # --- interrupt ------------------------------------------------------
 

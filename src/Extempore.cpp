@@ -608,7 +608,7 @@ int run_test_files(const extemp::cli::Invocation& Inv) {
                 args.push_back(value);
             }
         }
-        std::vector<llvm::StringRef> argv(args.begin(), args.end());
+        const std::vector<llvm::StringRef> argv(args.begin(), args.end());
         std::cout << "\n=== " << file << std::endl;
         std::string error;
         const int rc = llvm::sys::ExecuteAndWait(self, argv, std::nullopt, {}, 0, 0, &error);
@@ -803,7 +803,7 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         UNIV::AUDIO_NONE = true;
         UNIV::MESSAGES_TO_STDERR = true;
         settings.exit_when_done = !Inv.has("wait");
-        settings.initexpr = file.empty() ? std::string(*Inv.get("e")) : load(file);
+        settings.initexpr = file.empty() ? std::string(Inv.get("e").value_or("")) : load(file);
         break;
     case Command::Test: {
         UNIV::AUDIO_NONE = true;
@@ -816,14 +816,16 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
             std::string safe = file;
             std::ranges::replace(safe, '/', '_');
             std::ranges::replace(safe, '\\', '_');
+            std::ranges::replace(safe, ':', '_');
             report = " " + scheme_string((std::filesystem::path(*dir) / (safe + ".xml")).string());
         }
         settings.initexpr = "(xtmtest-run-tests " + scheme_string(file) + " #t #t" + report + ")";
     } break;
     case Command::Render: {
         UNIV::MESSAGES_TO_STDERR = true;
-        UNIV::AUDIO_OUTFILE_PATH = std::string(*Inv.get("o"));
-        UNIV::AUDIO_OUTFILE_DURATION = std::strtod(std::string(*Inv.get("duration")).c_str(), nullptr);
+        UNIV::AUDIO_OUTFILE_PATH = std::string(Inv.get("o").value_or(""));
+        UNIV::AUDIO_OUTFILE_DURATION =
+            std::strtod(std::string(Inv.get("duration").value_or("0")).c_str(), nullptr);
         UNIV::SEEDED = true;
         if (!set_whole(Inv, "seed", UNIV::SEED)) {
             status = 2;
@@ -906,7 +908,6 @@ void print_old_grammar_notice(std::span<const std::string_view> Args) {
 }  // namespace
 
 EXPORT int extempore_init(int argc, char** argv) {
-    const std::string host("localhost");
     const std::string primary_name("primary");
     const std::string utility_name("utility");
     // Under ctest or a pipe stdout would be fully buffered, and a process
@@ -1068,13 +1069,6 @@ EXPORT int extempore_init(int argc, char** argv) {
         target.host = settings.nrepl_bind == "0.0.0.0" ? "127.0.0.1" : settings.nrepl_bind;
         target.port = extemp::nrepl::boundPort();
         std::thread([target] { extemp::nrepl::client::repl(target, true); }).detach();
-    }
-
-    if (extemp::UNIV::LEGACY_SERVER) {
-        ascii_info();
-        std::cout << "Listening on TCP port " << primary_port
-                  << " --- connect your editor to send code." << std::endl;
-        ascii_default();
     }
 
     extemp::AudioDevice::startFileDriver();

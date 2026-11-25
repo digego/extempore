@@ -421,6 +421,18 @@ is the argument as specified. Vim and Sublime have language clients as
 packages. None is tested yet. The VS Code extension and the Emacs mode
 can then drop their own TCP clients, which is what lets the legacy server go.
 
+### Completion and hover
+
+`textDocument/completion` asks nREPL for `completions` of the symbol before the
+cursor, and each item says outright which text it replaces, since editors
+differ over where a word with a colon or a star in it begins.
+`textDocument/hover` asks for `lookup` of the symbol at the cursor: the whole
+of it first (`sys:load` is one name), then what comes before its first colon
+(`osc:[double,double]*` is `osc` with its type). Both wait a second and a half
+for the answer and then give none, because a process answers after the
+evaluation it is busy with. With no extempore they say nothing, and try for a
+connection again a few seconds later.
+
 `tests/lsp` drives the server as a client would, over stdin and stdout.
 
 ## Order of work
@@ -442,5 +454,5 @@ can then drop their own TCP clients, which is what lets the legacy server go.
 5. nREPL `completions` and `lookup` (doc-002 phase 3), then completion and
    hover in the language server.
 
-Steps 2 to 4 land before the next release, so no released `extempore` has the
-Python client or an option made for one editor.
+All five are done. Steps 2 to 4 landed before any release, so no released
+`extempore` has the Python client or an option made for one editor.

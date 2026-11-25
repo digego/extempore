@@ -70,6 +70,12 @@ agent working beside a performance should use the utility process or its own
   xtlang goes to the console only
 - interrupt stops Scheme code, including the xtlang compiler, at s7's
   `begin_hook`; it can't stop compiled xtlang or LLVM codegen
+- `completions` answers from Scheme's symbol table and the xtlang compiler's
+  caches, which hold what has no Scheme binding (types, generic functions)
+- `lookup`'s `info` follows cider-nrepl (`arglists-str`, `doc`) and adds
+  `extempore/type` and `extempore/kind`. A `bind-func` is described by its
+  overloads' types and the first one's arguments and docstring. There is no
+  `file` or `line`: the compiler keeps no source positions
 
 ## Phases
 
@@ -77,11 +83,10 @@ agent working beside a performance should use the utility process or its own
    uncaught error. Done.
 2. The server (`describe`, sessions, `eval`, `load-file`, `interrupt`), the
    command-line client, tests (`ctest -L nrepl`) and docs. Done.
-3. `completions` and `lookup`.
+3. `completions` and `lookup`. Done.
 4. `extempore/log-subscribe`: a process's console output, for a client to watch
    what callbacks print.
-5. The language server, as `extempore lsp` (doc-003). Its eval needs only
-   phase 2, so it comes before phase 3; completion and hover follow phase 3.
+5. The language server, as `extempore lsp` (doc-003). Done.
 
 Run [proof](https://github.com/nrepl/proof) against the server now and then; it
 needs Clojure tooling, so it isn't in CI.
@@ -90,5 +95,3 @@ needs Clojure tooling, so it isn't in CI.
 
 - interrupting from the command line, where each `eval` has an ephemeral
   session: an `interrupt` naming a process instead of a session?
-- the shape of `lookup`'s `info`: follow cider-nrepl's (`arglists-str`, `doc`,
-  `file`, `line`) plus the xtlang type

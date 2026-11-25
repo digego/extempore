@@ -62,7 +62,8 @@ i = ':lsp-workspace-command extempore.interrupt'
 for), <kbd>,</kbd> <kbd>b</kbd> the whole buffer and <kbd>,</kbd> <kbd>i</kbd>
 interrupts an evaluation. The buffer is evaluated as it stands, saved or not.
 Values and the first line of output appear in the status line, and an error is
-marked on its form until the form is edited or evaluates cleanly. The bindings
+marked on its form until the form is edited or evaluates cleanly. Completion
+and hover (<kbd>Space</kbd> <kbd>k</kbd>) work as for any language. The bindings
 take over Helix's <kbd>,</kbd> (keep primary selection); pick another prefix if
 you use it. On Windows the path in `%{file_path_absolute}` isn't valid inside
 the JSON, so use the <kbd>Space</kbd> <kbd>a</kbd> menu there.
@@ -77,8 +78,9 @@ as `extempore send` does (`.nrepl-port`, or 7888); the `initializationOptions`
 
 Without a running extempore it reports unbalanced parentheses (when a file is
 opened or saved), and gives an outline of the definitions in a file and folding
-ranges. With one, it adds three commands, which are also offered as code
-actions:
+ranges. With one, it completes names (Scheme's and xtlang's), shows a
+function's arguments, type and docstring on hover, and adds three commands,
+which are also offered as code actions:
 
 | command                | argument       | what it does                                                         |
 | ---------------------- | -------------- | -------------------------------------------------------------------- |

@@ -506,7 +506,7 @@ class Server {
                   session);
         } else if (op == "interrupt") {
             interrupt(Conn, Msg, session);
-        } else if (op == "eval" || op == "load-file") {
+        } else if (op == "eval" || op == "load-file" || op == "completions" || op == "lookup") {
             dispatch(Conn, std::move(Msg), op, session);
         } else {
             Dict response{{"status", Value(statuses({"error", "unknown-op", "done"}))},
@@ -521,6 +521,9 @@ class Server {
             {"clone", op("Creates a session on a process: extempore/process names it (default "
                          "\"primary\"), or the cloned session's process.")},
             {"close", op("Closes a session.")},
+            {"completions", op("Lists what is defined and starts with prefix, each candidate "
+                               "with its type: Scheme's globals and the names the xtlang "
+                               "compiler knows.")},
             {"describe", op("Describes this server.")},
             {"eval", op("Evaluates code on the session's process. Evals on one process run "
                         "one at a time, in arrival order, whichever session sent them.")},
@@ -528,6 +531,9 @@ class Server {
                              "Scheme; compiled xtlang code runs on to completion.")},
             {"load-file", op("Evaluates file (the contents), reporting errors against "
                              "file-path.")},
+            {"lookup", op("Describes sym in info: its arglists-str and doc, and its "
+                          "extempore/type and extempore/kind. The status no-info means "
+                          "nothing is known of it.")},
             {"ls-sessions", op("Lists sessions.")},
         };
         List processes;
@@ -596,6 +602,11 @@ class Server {
         if ((Op == "eval" && !bencode::find(Msg, "code")) ||
             (Op == "load-file" && !bencode::find(Msg, "file"))) {
             replyStatus(Conn, Msg, {"error", "no-code", "done"}, Session);
+            return;
+        }
+        if ((Op == "completions" && !bencode::find(Msg, "prefix")) ||
+            (Op == "lookup" && !bencode::find(Msg, "sym"))) {
+            replyStatus(Conn, Msg, {"error", "no-symbol", "done"}, Session);
             return;
         }
         std::string process = "primary";

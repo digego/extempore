@@ -439,7 +439,7 @@ Invocation parse(std::span<const std::string_view> Args) {
         if (!inv.has("duration")) {
             return fail("extempore render needs --duration SECONDS");
         }
-        if (std::strtod(std::string(*inv.get("duration")).c_str(), nullptr) <= 0.0) {
+        if (std::strtod(std::string(inv.get("duration").value_or("0")).c_str(), nullptr) <= 0.0) {
             return fail("--duration must be more than 0");
         }
         break;

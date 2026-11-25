@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -57,7 +58,8 @@ class Exec(Scratch):
     def test_no_colour_through_a_pipe_unless_asked(self) -> None:
         code = "(bind-func cube (lambda (x:i64) (* x x x)))"
         self.assertNotIn("\x1b[", run("exec", "-e", code).stderr)
-        self.assertIn("\x1b[", run("exec", "--color", "always", "-e", code).stderr)
+        if sys.platform != "win32":  # whose console is coloured through its own API
+            self.assertIn("\x1b[", run("exec", "--color", "always", "-e", code).stderr)
 
     def test_scheduled_work_finishes_before_it_exits(self) -> None:
         file = self.write(

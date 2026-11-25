@@ -114,6 +114,138 @@
           ((and (string? line) (string->number line)) (string->number line))
           (else 1))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; completions and lookup ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The xtlang compiler's caches, each with the kind of thing it names (one of
+;; nREPL's completion types).
+(define (nrepl:xtlang-caches)
+  (list (cons *xtc:cache:builtin-cache* "special-form")
+        (cons *xtc:cache:closure-cache* "function")
+        (cons *xtc:cache:genericfunc-cache* "function")
+        (cons *xtc:cache:polyfunc-cache* "function")
+        (cons *xtc:cache:nativefunc-cache* "function")
+        (cons *xtc:cache:namedtype-cache* "class")
+        (cons *xtc:cache:generictype-cache* "class")
+        (cons *xtc:cache:polytype-cache* "class")
+        (cons *xtc:cache:typealias-cache* "class")
+        (cons *xtc:cache:globalvar-cache* "var")))
+
+;; names the compiler makes for its own use
+(define (nrepl:internal-name? name)
+  (regex:match? name "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$|_xtlang_name$|_poly_|_adhoc_)"))
+
+(define *nrepl:max-completions* 200)
+
+;; What is defined and starts with PREFIX: Scheme's globals, and what the
+;; xtlang compiler knows (types and generic functions have no Scheme binding).
+;; Each candidate is sent with its kind, in alphabetical order.
+(define (nrepl:completions prefix)
+  (let ((found (make-hash-table))
+        (n (string-length prefix)))
+    (define (match? name)
+      (and (>= (string-length name) n)
+           (string=? (substring name 0 n) prefix)
+           (not (nrepl:internal-name? name))))
+    (if (> n 0)
+        (begin
+          (for-each
+            (lambda (sym)
+              (let ((name (symbol->string sym)))
+                (if (and (match? name) (defined? sym (rootlet)))
+                    (let ((value (symbol->value sym (rootlet))))
+                      (hash-table-set! found name
+                                       (cond ((macro? value) "macro")
+                                             ((procedure? value) "function")
+                                             (else "var")))))))
+            (symbol-table))
+          ;; after Scheme's, so that a function with a Scheme stub keeps the
+          ;; kind the compiler gives it
+          (for-each
+            (lambda (cache)
+              (for-each (lambda (entry)
+                          (if (and (string? (car entry)) (match? (car entry)))
+                              (hash-table-set! found (car entry) (cdr cache))))
+                        (car cache)))
+            (nrepl:xtlang-caches))))
+    (let* ((names (sort! (map car found) string<?))
+           (names (if (> (length names) *nrepl:max-completions*)
+                      (list-head names *nrepl:max-completions*)
+                      names)))
+      (nrepl:send "completions"
+                  (map (lambda (name)
+                         (nrepl:dict "candidate" name "type" (hash-table-ref found name)))
+                       names)
+                  "status" '("done")))))
+
+;; What xtmdoc knows of NAME, as an association list, or #f.
+(define (nrepl:documentation name)
+  (let ((doc (*s7-catch* #t
+               (lambda () (xtmdoc-documentation-function name))
+               (lambda (tag info) #f))))
+    (and (pair? doc) (eq? (car doc) 'xtmdoc-docstring) (cdr doc))))
+
+;; the argument names of the first lambda in FORM, or #f
+(define (nrepl:lambda-args form)
+  (cond ((not (pair? form)) #f)
+        ((and (eq? (car form) 'lambda) (pair? (cdr form)) (list? (cadr form)))
+         (xtmdoc-strip-arg-type-annotations (cadr form)))
+        (else (let loop ((rest form))
+                (and (pair? rest)
+                     (or (nrepl:lambda-args (car rest))
+                         (loop (cdr rest))))))))
+
+;; A bind-func is kept as a polymorphic function with one overload or more,
+;; each of them a closure under a name of the compiler's making. Describe the
+;; function by its overloads' types, and by the arguments and docstring of the
+;; first.
+(define (nrepl:polyfunc-documentation name)
+  (let* ((overloads (cl:remove-if (lambda (pf) (regex:match? (vector-ref pf 0) "_poly_"))
+                                  (xtc:cache:get-polyfunc-candidate-list name)))
+         (types (map (lambda (pf) (xtc:codegen:pretty-print-type (vector-ref pf 1))) overloads))
+         (first (and (pair? overloads) (vector-ref (car overloads) 0)))
+         (compiled? (and first (xtc:cache:closure-exists? first)))
+         (own-doc (xtc:cache:get-polyfunc-docstring name)))
+    (list (cons 'category (if (= (length overloads) 1) "closure" "polymorphic closure"))
+          (cons 'args (and compiled? (nrepl:lambda-args (xtc:cache:get-closure-body first))))
+          (cons 'type (string-join types " | "))
+          (cons 'docstring (if (and (string? own-doc) (> (string-length own-doc) 0))
+                               own-doc
+                               (and compiled? (xtc:cache:get-closure-docstring first)))))))
+
+;; What is known about NAME, as nREPL's lookup gives it: its arguments
+;; (arglists-str) and docstring (doc), and beside them its xtlang type and what
+;; kind of thing it is. The compiler keeps no source positions, so there is no
+;; file or line.
+(define (nrepl:lookup name)
+  (let* ((found (nrepl:documentation name))
+         (doc (if (and found (equal? (cdr (assq 'category found)) "polymorphic closure"))
+                  (nrepl:polyfunc-documentation name)
+                  found)))
+    (if doc
+        (let* ((field (lambda (key)
+                        (let ((entry (assq key doc)))
+                          (and entry (cdr entry)))))
+               (text (lambda (x)
+                       (cond ((string? x) (and (> (string-length x) 0) x))
+                             ((pair? x) (#_format #f "~A" x))
+                             (else #f))))
+               (args (field 'args)))
+          (nrepl:send "info" (nrepl:dict "name" name
+                                         ;; () is an argument list too, where
+                                         ;; the thing is known to be a function
+                                         "arglists-str" (if (and (null? args)
+                                                                 (member (field 'category)
+                                                                         '("closure" "scheme closure")))
+                                                            "()"
+                                                            (text args))
+                                         "doc" (text (field 'docstring))
+                                         "extempore/type" (text (field 'type))
+                                         "extempore/kind" (text (field 'category)))
+                      "status" '("done")))
+        (nrepl:send "status" '("no-info" "done")))))
+
 ;;;;;;;;;;;;;;
 ;; dispatch ;;
 ;;;;;;;;;;;;;;
@@ -126,4 +258,8 @@
       ((equal? op "load-file")
        (nrepl:eval-code (nrepl:get msg "file")
                         (or (nrepl:get msg "file-path") (nrepl:get msg "file-name"))
-                        1 #t)))))
+                        1 #t))
+      ((equal? op "completions")
+       (nrepl:completions (nrepl:->string (nrepl:get msg "prefix" ""))))
+      ((equal? op "lookup")
+       (nrepl:lookup (nrepl:->string (nrepl:get msg "sym" "")))))))

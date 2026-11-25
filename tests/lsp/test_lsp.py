@@ -175,6 +175,8 @@ class WithoutExtempore(unittest.TestCase):
                          {"extempore.eval", "extempore.evalBuffer", "extempore.interrupt"})
         self.assertTrue(caps["documentSymbolProvider"])
         self.assertTrue(caps["codeActionProvider"])
+        self.assertTrue(caps["hoverProvider"])
+        self.assertIn("completionProvider", caps)
         utf8 = Editor(utf8=True)
         self.addCleanup(utf8.stop)
         self.assertEqual(utf8.capabilities["positionEncoding"], "utf-8")
@@ -239,6 +241,13 @@ class WithoutExtempore(unittest.TestCase):
         kind, text = self.editor.message()
         self.assertEqual(kind, ERROR)
         self.assertIn("no nREPL server at 127.0.0.1:1", text)
+
+    def test_completion_and_hover_have_nothing_to_say(self) -> None:
+        self.editor.open("(bind-fu\n")
+        where = {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 8}}
+        self.assertEqual(self.editor.request("textDocument/completion", where), [])
+        self.assertIsNone(self.editor.request("textDocument/hover", where))
+        self.editor.no_notification("window/showMessage")  # and no complaint about it
 
     def test_unknown_requests_get_an_error(self) -> None:
         with self.assertRaises(RuntimeError):
@@ -378,6 +387,53 @@ class WithExtempore(unittest.TestCase):
         self.editor.request("workspace/executeCommand",
                             {"command": "extempore.interrupt", "arguments": []})
         self.assertEqual(self.editor.message(), (INFO, "nothing is being evaluated"))
+
+    def test_completion(self) -> None:
+        self.open("(define lsp-complete-one 1)\n(define (lsp-complete-two x) x)\n")
+        self.editor.request("workspace/executeCommand", {
+            "command": "extempore.evalBuffer", "arguments": [{"uri": URI}]})
+        self.editor.message()
+        self.editor.change("(define lsp-complete-one 1)\n(+ 1 lsp-compl\n")
+        items = self.editor.request("textDocument/completion", {
+            "textDocument": {"uri": URI}, "position": {"line": 1, "character": 14}})
+        self.assertEqual([(i["label"], i["kind"]) for i in items],
+                         [("lsp-complete-one", 6), ("lsp-complete-two", 3)])
+        # the edit replaces the whole of what was typed, hyphens and all
+        self.assertEqual(items[0]["textEdit"], {
+            "newText": "lsp-complete-one",
+            "range": {"start": {"line": 1, "character": 5},
+                      "end": {"line": 1, "character": 14}}})
+        # xtlang's own names complete too
+        self.editor.change("(bind-fu\n")
+        items = self.editor.request("textDocument/completion", {
+            "textDocument": {"uri": URI}, "position": {"line": 0, "character": 8}})
+        self.assertIn(("bind-func", 14), [(i["label"], i["kind"]) for i in items])
+
+    def test_hover(self) -> None:
+        self.open('(bind-func lsp_hover_fn "halves its argument"\n'
+                  "  (lambda (x:double) (/ x 2.0)))\n(lsp_hover_fn 3.0)\n"
+                  "(bind-func lsp_hover_typed:[i64,i64]* (lambda (n) (+ n 1)))\n")
+        self.editor.request("workspace/executeCommand", {
+            "command": "extempore.evalBuffer", "arguments": [{"uri": URI}]})
+        self.assertEqual(self.editor.message(timeout=120)[0], INFO)
+
+        def hover(line: int, character: int):
+            return self.editor.request("textDocument/hover", {
+                "textDocument": {"uri": URI}, "position": {"line": line, "character": character}})
+
+        shown = hover(2, 5)
+        self.assertEqual(shown["range"], {"start": {"line": 2, "character": 1},
+                                          "end": {"line": 2, "character": 13}})
+        self.assertEqual(shown["contents"]["kind"], "markdown")
+        text = shown["contents"]["value"]
+        self.assertIn("(lsp_hover_fn x)  ; [double,double]*", text)
+        self.assertIn("halves its argument", text)
+        # a name with its type annotation is looked up by the name
+        self.assertIn("(lsp_hover_typed n)  ; [i64,i64]*", hover(3, 15)["contents"]["value"])
+        # a name with a colon of its own is looked up whole
+        self.editor.change("(sys:load \"x\")\n")
+        self.assertIn("sys:load", hover(0, 4)["contents"]["value"])
+        self.assertIsNone(hover(0, 12))  # a string is nothing
 
     def test_a_named_process(self) -> None:
         editor = Editor(options={"port": self.xtm.port, "process": "utility"})

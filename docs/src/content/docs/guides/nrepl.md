@@ -82,6 +82,15 @@ process evaluates one thing at a time, so evals sent to it queue in arrival
 order whichever client sent them. A coding agent working beside a performance is
 better pointed at the utility process.
 
+`completions` takes a `prefix` and answers with `completions`: each candidate
+which is defined and starts with it, with its `type` (`function`, `macro`,
+`special-form`, `class` or `var`), from Scheme's globals and the names the
+xtlang compiler knows; at most 200, in alphabetical order. `lookup` takes a
+`sym` and answers with `info`: `arglists-str` and `doc` where they are known,
+and beside them `extempore/type` (an xtlang type, or each overload's) and
+`extempore/kind`. A name nothing is known of gets the status `no-info`. Both
+queue behind whatever the process is evaluating.
+
 `interrupt` stops a session's running eval the next time control is in Scheme
 code; compiled xtlang, and LLVM compiling it, run to completion first. Evals
 also stop at the process's time limit (`sys:set-default-timeout`, 60 seconds by

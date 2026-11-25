@@ -254,7 +254,7 @@ int printResponses(Connection& Conn, const std::string& Id, const std::string& S
 }
 
 std::optional<std::string> readFile(const std::string& Path) {
-    std::ifstream in(Path, std::ios::binary);
+    const std::ifstream in(Path, std::ios::binary);
     if (!in) {
         return std::nullopt;
     }
