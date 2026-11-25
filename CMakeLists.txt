@@ -337,6 +337,7 @@ set(EXTEMPORE_SOURCES
     src/Extempore.cpp
     src/CommandLine.cpp
     src/FormFinder.cpp
+    src/Formatter.cpp
     src/LanguageServer.cpp
     src/NreplClient.cpp
     src/AudioDevice.cpp

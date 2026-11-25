@@ -176,6 +176,8 @@ class WithoutExtempore(unittest.TestCase):
         self.assertTrue(caps["documentSymbolProvider"])
         self.assertTrue(caps["codeActionProvider"])
         self.assertTrue(caps["hoverProvider"])
+        self.assertTrue(caps["documentFormattingProvider"])
+        self.assertTrue(caps["documentRangeFormattingProvider"])
         self.assertIn("completionProvider", caps)
         utf8 = Editor(utf8=True)
         self.addCleanup(utf8.stop)
@@ -216,6 +218,32 @@ class WithoutExtempore(unittest.TestCase):
         folds = self.editor.request("textDocument/foldingRange", {"textDocument": {"uri": URI}})
         self.assertEqual(folds, [{"startLine": 3, "endLine": 5}, {"startLine": 7, "endLine": 9}])
 
+    def test_formatting(self) -> None:
+        messy = "(define (f x)\n        (+ x 1))\n(define (g y)\n(* y 2))   \n"
+
+        def edits(method: str, **params) -> list[dict]:
+            return self.editor.request(method, {"textDocument": {"uri": URI},
+                                                "options": {"tabSize": 2, "insertSpaces": True},
+                                                **params})
+
+        self.editor.open(messy)
+        whole = edits("textDocument/formatting")
+        self.assertEqual(len(whole), 1)
+        self.assertEqual(whole[0]["newText"],
+                         "(define (f x)\n  (+ x 1))\n(define (g y)\n  (* y 2))\n")
+        self.assertEqual(whole[0]["range"]["start"], {"line": 0, "character": 0})
+        # a range reformats only its own lines
+        some = edits("textDocument/rangeFormatting",
+                     range={"start": {"line": 3, "character": 0}, "end": {"line": 3, "character": 2}})
+        self.assertEqual(some, [{"range": {"start": {"line": 3, "character": 0},
+                                           "end": {"line": 3, "character": 11}},
+                                 "newText": "  (* y 2))"}])
+        # a formatted document, or one which doesn't read, has nothing to change
+        self.editor.change(whole[0]["newText"])
+        self.assertEqual(edits("textDocument/formatting"), [])
+        self.editor.change("(define (f x)\n")
+        self.assertEqual(edits("textDocument/formatting"), [])
+
     def test_code_actions(self) -> None:
         self.editor.open(SONG)
 
@@ -251,7 +279,7 @@ class WithoutExtempore(unittest.TestCase):
 
     def test_unknown_requests_get_an_error(self) -> None:
         with self.assertRaises(RuntimeError):
-            self.editor.request("textDocument/formatting", {"textDocument": {"uri": URI}})
+            self.editor.request("textDocument/rename", {"textDocument": {"uri": URI}})
 
 
 class WithExtempore(unittest.TestCase):

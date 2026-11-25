@@ -342,5 +342,45 @@ class Test(Scratch):
         self.assertEqual(len(list(junit.glob("*.xml"))), 4)
 
 
+
+class Fmt(Scratch):
+    """extempore fmt: whitespace only, files in place or stdin to stdout."""
+
+    MESSY = "(define (f x)\n        (+ x 1))   \n\n\n"
+    TIDY = "(define (f x)\n  (+ x 1))\n"
+
+    def test_stdin_to_stdout(self) -> None:
+        p = subprocess.run([str(BIN), "fmt"], input=self.MESSY, capture_output=True, text=True)
+        self.assertEqual((p.returncode, p.stdout, p.stderr), (0, self.TIDY, ""))
+
+    def test_files_and_directories_in_place(self) -> None:
+        a = self.write("a.xtm", self.MESSY)
+        (self.dir / "sub").mkdir()
+        b = self.write("sub/b.xtm", self.MESSY)
+        other = self.write("sub/notes.txt", self.MESSY)
+        p = run("fmt", a, str(self.dir / "sub"))
+        self.assertEqual((p.returncode, p.stdout, p.stderr), (0, "", ""))
+        self.assertEqual(Path(a).read_text(), self.TIDY)
+        self.assertEqual(Path(b).read_text(), self.TIDY)
+        self.assertEqual(Path(other).read_text(), self.MESSY)
+
+    def test_check_changes_nothing_and_lists_what_it_would(self) -> None:
+        messy = self.write("messy.xtm", self.MESSY)
+        tidy = self.write("tidy.xtm", self.TIDY)
+        p = run("fmt", "--check", messy, tidy)
+        self.assertEqual((p.returncode, p.stdout), (1, messy + "\n"))
+        self.assertEqual(Path(messy).read_text(), self.MESSY)
+        self.assertEqual(run("fmt", "--check", tidy).returncode, 0)
+
+    def test_a_file_which_doesnt_read_is_left_alone(self) -> None:
+        broken = self.write("broken.xtm", "(define (f x)\n  (+ x 1)\n")
+        tidy = self.write("tidy.xtm", self.MESSY)
+        p = run("fmt", broken, tidy)
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("broken.xtm: line 1, column 1: this form never ends", p.stderr)
+        self.assertEqual(Path(broken).read_text(), "(define (f x)\n  (+ x 1)\n")
+        self.assertEqual(Path(tidy).read_text(), self.TIDY)
+
+
 if __name__ == "__main__":
     unittest.main()

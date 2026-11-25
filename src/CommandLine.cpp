@@ -168,6 +168,15 @@ const std::vector<Subcommand>& subcommands() {
          0, 0},
         {Command::Status, "status", "status",
          "show the running extempore: its version, processes and nREPL ops", client({}), 0, 0},
+        {Command::Fmt, "fmt", "fmt [FILE|DIR]... [--check]",
+         "format .xtm files in place (a directory's, recursively), or stdin to stdout",
+         with(
+             {
+                 {"check", Kind::Flag, "",
+                  "change nothing: list the files which aren't formatted, and exit 1 if any"},
+             },
+             false),
+         0, kAnyNumber},
         {Command::Devices, "devices", "devices", "list the audio devices", with({}, false), 0, 0},
         {Command::Version, "version", "version", "print the version", with({}, false), 0, 0},
     };
@@ -572,6 +581,7 @@ Invocation parseCurrent(std::span<const std::string_view> Args) {
     case Command::Repl:
     case Command::Lsp:
     case Command::Status:
+    case Command::Fmt:
     case Command::Test:
     case Command::Devices:
     case Command::Version:

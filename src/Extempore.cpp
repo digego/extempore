@@ -38,6 +38,7 @@
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
 #include "HangReport.h"
+#include "Formatter.h"
 #include "NreplServer.h"
 #include "NreplClient.h"
 #include "LanguageServer.h"
@@ -59,7 +60,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <span>
 #include <string>
@@ -221,6 +224,69 @@ int run_test_files(const extemp::cli::Invocation& Inv) {
     return failed.empty() ? 0 : 1;
 }
 
+// extempore fmt: format the .xtm files named (a directory's, recursively),
+// or stdin to stdout. With --check it changes nothing, lists the files which
+// aren't formatted and exits 1 if there are any.
+int run_fmt(const extemp::cli::Invocation& Inv) {
+    namespace fs = std::filesystem;
+    const bool check = Inv.has("check");
+    if (Inv.files.empty()) {
+        const std::string text{std::istreambuf_iterator<char>(std::cin), {}};
+        const auto result = extemp::format::format(text);
+        if (!result.error.empty()) {
+            std::cerr << "extempore: " << result.error << std::endl;
+            return 1;
+        }
+        if (check) {
+            return result.text == text ? 0 : 1;
+        }
+        std::cout << result.text;
+        return 0;
+    }
+    std::vector<fs::path> files;
+    for (const auto& name : Inv.files) {
+        std::error_code ec;
+        if (!fs::is_directory(name, ec)) {
+            files.emplace_back(name);
+            continue;
+        }
+        for (auto it = fs::recursive_directory_iterator(name, ec); it != fs::end(it);
+             it.increment(ec)) {
+            const auto leaf = it->path().filename().string();
+            if (it->is_directory(ec) && (leaf.starts_with(".") || leaf == "aot-cache")) {
+                it.disable_recursion_pending();
+            } else if (it->is_regular_file(ec) && it->path().extension() == ".xtm") {
+                files.push_back(it->path());
+            }
+        }
+    }
+    std::sort(files.begin(), files.end());
+    int status = 0;
+    for (const auto& file : files) {
+        std::ifstream in(file, std::ios::binary);
+        if (!in) {
+            std::cerr << "extempore: can't read " << file.string() << std::endl;
+            status = 1;
+            continue;
+        }
+        const std::string text{std::istreambuf_iterator<char>(in), {}};
+        const auto result = extemp::format::format(text);
+        if (!result.error.empty()) {
+            std::cerr << "extempore: " << file.string() << ": " << result.error << std::endl;
+            status = 1;
+        } else if (result.text != text) {
+            if (check) {
+                std::cout << file.string() << std::endl;
+                status = 1;
+            } else if (!(std::ofstream(file, std::ios::binary) << result.text)) {
+                std::cerr << "extempore: can't write " << file.string() << std::endl;
+                status = 1;
+            }
+        }
+    }
+    return status;
+}
+
 // Act on a parsed command line (src/CommandLine.cpp). Returns Exit, with the
 // process's exit status, when there is no runtime to start.
 ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& settings, int& status) {
@@ -245,6 +311,9 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         return ParseResult::Exit;
     case Command::Devices:
         AudioDevice::printDevices();
+        return ParseResult::Exit;
+    case Command::Fmt:
+        status = run_fmt(Inv);
         return ParseResult::Exit;
     case Command::Send:
     case Command::Repl:
@@ -457,6 +526,7 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
     case Command::Repl:
     case Command::Lsp:
     case Command::Status:
+    case Command::Fmt:
     case Command::Devices:
     case Command::Version:
         break;

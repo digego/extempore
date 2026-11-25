@@ -2,6 +2,7 @@
 
 #include "Bencode.h"
 #include "FormFinder.h"
+#include "Formatter.h"
 
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
@@ -301,6 +302,10 @@ class Server {
             respond(Id, symbols(uriOf(Params)));
         } else if (Method == "textDocument/foldingRange") {
             respond(Id, folds(uriOf(Params)));
+        } else if (Method == "textDocument/formatting") {
+            respond(Id, formatting(Params, false));
+        } else if (Method == "textDocument/rangeFormatting") {
+            respond(Id, formatting(Params, true));
         } else if (Method == "textDocument/codeAction") {
             respond(Id, codeActions(Params));
         } else if (Method == "textDocument/completion") {
@@ -393,6 +398,8 @@ class Server {
                                {"save", json::Object{{"includeText", false}}}}},
                  {"documentSymbolProvider", true},
                  {"foldingRangeProvider", true},
+                 {"documentFormattingProvider", true},
+                 {"documentRangeFormattingProvider", true},
                  {"codeActionProvider", true},
                  {"completionProvider", json::Object{}},
                  {"hoverProvider", true},
@@ -464,6 +471,61 @@ class Server {
             }
         }
         return result;
+    }
+
+    // The edits which format a document (extempore fmt), or the lines of a
+    // range of it: none if it doesn't read. Formatting keeps the line breaks,
+    // so a line of the formatted text replaces the same line of the document.
+    json::Value formatting(const json::Object& Params, bool InRange) {
+        json::Array edits;
+        const auto found = m_documents.find(uriOf(Params));
+        if (found == m_documents.end()) {
+            return edits;
+        }
+        const Document& doc = found->second;
+        const auto result = format::format(doc.text);
+        if (!result.error.empty() || result.text == doc.text) {
+            return edits;
+        }
+        const json::Object* where = InRange ? Params.getObject("range") : nullptr;
+        if (!where) {
+            edits.push_back(json::Object{{"range", range(doc, 0, doc.text.size())},
+                                         {"newText", result.text}});
+            return edits;
+        }
+        const std::size_t first = positionAt(doc.text, offsetIn(doc, where->getObject("start")), m_utf8).line;
+        const std::size_t last = positionAt(doc.text, offsetIn(doc, where->getObject("end")), m_utf8).line;
+        const auto lineStarts = [](std::string_view Text) {
+            std::vector<std::size_t> starts{0};
+            for (std::size_t i = 0; i < Text.size(); ++i) {
+                if (Text[i] == '\n') {
+                    starts.push_back(i + 1);
+                }
+            }
+            return starts;
+        };
+        const auto lineOf = [](std::string_view Text, const std::vector<std::size_t>& Starts,
+                               std::size_t Line) {
+            const std::size_t begin = Starts[Line];
+            const std::size_t end = Line + 1 < Starts.size() ? Starts[Line + 1] - 1 : Text.size();
+            return std::pair{begin, end};
+        };
+        const auto docStarts = lineStarts(doc.text);
+        const auto newStarts = lineStarts(result.text);
+        for (std::size_t line = first; line <= last && line < docStarts.size() &&
+                                       line < newStarts.size();
+             ++line) {
+            const auto [begin, end] = lineOf(doc.text, docStarts, line);
+            const auto [newBegin, newEnd] = lineOf(result.text, newStarts, line);
+            const std::string_view now = std::string_view(doc.text).substr(begin, end - begin);
+            const std::string_view then =
+                std::string_view(result.text).substr(newBegin, newEnd - newBegin);
+            if (now != then) {
+                edits.push_back(json::Object{{"range", range(doc, begin, end)},
+                                             {"newText", std::string(then)}});
+            }
+        }
+        return edits;
     }
 
     // The offset of an LSP position ({line, character}) in a document.

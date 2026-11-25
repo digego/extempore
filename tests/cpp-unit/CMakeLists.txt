@@ -9,9 +9,11 @@ add_executable(extempore_cpp_unit
     bencode_test.cpp
     commandline_test.cpp
     formfinder_test.cpp
+    formatter_test.cpp
     ${CMAKE_SOURCE_DIR}/src/Bencode.cpp
     ${CMAKE_SOURCE_DIR}/src/CommandLine.cpp
     ${CMAKE_SOURCE_DIR}/src/FormFinder.cpp
+    ${CMAKE_SOURCE_DIR}/src/Formatter.cpp
     ${CMAKE_SOURCE_DIR}/src/EXTThread.cpp
     ${CMAKE_SOURCE_DIR}/src/EXTZones.cpp)
 

@@ -29,6 +29,7 @@ enum class Command : std::uint8_t {
     Repl,
     Lsp,
     Status,
+    Fmt,
     Devices,
     Version,
 };
