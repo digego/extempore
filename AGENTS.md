@@ -81,7 +81,12 @@ cmake --build build --target xtmdoc              # generate docs
 cmake --build build --target tidy                # clang-tidy; CI fails on any finding
 build/extempore --no-audio                       # run without audio
 build/extempore --repl                           # interactive REPL (Linux/macOS only)
+build/extempore fmt libs examples tests runtime extras  # format the .xtm sources (CI checks)
 ```
+
+The formatter's table of special forms (`src/Formatter.cpp`) has copies in
+extempore-emacs-mode and tree-sitter-extempore's `queries/indents.scm`: change
+all three together.
 
 `extras/compiler-stress/stress.py` measures how compile time grows with input
 size. Its README describes how to check that a compiler change leaves the

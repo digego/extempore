@@ -217,6 +217,14 @@ if(Python3_Interpreter_FOUND)
         LABELS lsp)
 endif()
 
+# The .xtm sources are formatted: `build/extempore fmt libs examples tests
+# runtime extras` fixes any this lists.
+add_test(NAME cli/fmt-check
+    COMMAND extempore fmt --check libs examples tests runtime extras)
+set_tests_properties(cli/fmt-check PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    LABELS cli)
+
 # The command line itself: what each subcommand prints where, and how it exits.
 if(Python3_Interpreter_FOUND)
     add_test(NAME cli/test_cli

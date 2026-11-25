@@ -45,9 +45,13 @@ scope = "source.extempore"
 file-types = ["xtm"]
 comment-token = ";"
 language-servers = ["extempore"]
+auto-format = true
 ```
 
-Then <kbd>Space</kbd> <kbd>a</kbd> offers "Evaluate top-level form" and
+`auto-format` [formats](#formatting) each file as it's saved. For syntax
+highlighting, add the
+[tree-sitter grammar](https://github.com/extemporelang/tree-sitter-extempore#helix)
+as well. Then <kbd>Space</kbd> <kbd>a</kbd> offers "Evaluate top-level form" and
 "Evaluate buffer". For one key each, add this to `config.toml`:
 
 ```toml
@@ -77,8 +81,8 @@ as `extempore send` does (`.nrepl-port`, or 7888); the `initializationOptions`
 `host`, `port` and `process` say otherwise.
 
 Without a running extempore it reports unbalanced parentheses (when a file is
-opened or saved), and gives an outline of the definitions in a file and folding
-ranges. With one, it completes names (Scheme's and xtlang's), shows a
+opened or saved), gives an outline of the definitions in a file and folding
+ranges, and [formats](#formatting) a document or a range of its lines. With one, it completes names (Scheme's and xtlang's), shows a
 function's arguments, type and docstring on hover, and adds three commands,
 which are also offered as code actions:
 
@@ -95,6 +99,24 @@ line of output come back as `window/showMessage`, the whole output as
 An editor which can only run a shell command can use
 [`extempore send`](/guides/nrepl/#from-the-command-line): pipe the selection to
 it, or give it `--file` and `--line`.
+
+## Formatting {#formatting}
+
+`extempore fmt` formats `.xtm` files: `extempore fmt FILE` or `extempore fmt DIR`
+rewrites them in place, `--check` lists the ones which aren't formatted (and
+exits 1 if there are any), and with no files it formats stdin to stdout. It
+changes whitespace only. Each line is indented by the Lisp convention: a call's
+arguments align with the first one, a special form's body indents two columns,
+and data aligns with its first element. Whitespace at the ends of lines and of
+the file goes. Line breaks stay where they are, and so do the lines of a string
+or a block comment. The Extempore source tree is formatted this way, and CI
+checks that it stays so.
+
+The language server formats too, so an editor with a language client can format
+on save ([Helix](#helix) with `auto-format = true`); in [Emacs](#emacs) it's
+<kbd>M-x</kbd> `extempore-format-buffer`, or set `extempore-format-on-save`. The
+editors' own indentation (Emacs's extempore-mode, and Helix's through
+tree-sitter-extempore) follows the same rules as you type.
 
 ## Emacs {#emacs}
 
@@ -128,6 +150,7 @@ manual setup stuff to get it working).
 | `extempore-connect-or-disconnect`                                    | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>J</kbd> |
 | `extempore-send-dwim` (to evaluate current top-level form or region) | <kbd>CTRL</kbd>+<kbd>META</kbd>+<kbd>X</kbd>              |
 | `extempore-send-region`                                              | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>R</kbd> |
+| `extempore-format-buffer` (with `extempore fmt`)                     |                                                           |
 |                                                                      |                                                           |
 
 To restart the Extempore process, just <kbd
