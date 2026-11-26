@@ -1062,40 +1062,6 @@ EXPORT void free_after_delay(char* Data, double Delay) {
         extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(), &FreeWithDelayCM, Data));
 }
 
-#if 0  // TODO: What is this needed for???
-static long long llvm_get_next_prime(long long start)
-{
-    long long  how_many = start+100000;
-    long long  *array = (long long*) calloc(how_many, sizeof(long long));
-    long long  i, prime, multiple;
-    /*  mark each int as potentially prime */
-    for (i=0; i<how_many; i++)
-        array[i] = 1;
-    /* special cases: 0, 1 not considered prime */
-    array[0] = array[1] = 0;
-    /* foreach starting prime, mark every multiple as non-prime */
-    prime = 0;
-    while (1) {
-        /* skip non-primes to find first prime */
-        for (; (prime < how_many) && (!array[prime]); ++prime)
-            continue;
-        if (prime >= how_many)
-            break;
-        for (multiple=2*prime; multiple<how_many; multiple+=prime) {
-            array[multiple] = 0;
-        }
-        ++prime;
-    }
-    /* Now that we have marked all multiple of primes as non-prime, */
-    /* print the remaining numbers that fell through the sieve, and */
-    /* are thus prime */
-    for (i=start+1; i<how_many; i++) {
-        if(array[i]) return i;
-    }
-    return -1;
-}
-#endif
-
 EXPORT void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background) {
     fputs(extemp::log::colour_code(stdout, Bold != 0, unsigned(Foreground), unsigned(Background))
               .c_str(),
