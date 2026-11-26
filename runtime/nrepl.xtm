@@ -85,16 +85,16 @@
               ((eq? form nrepl:failed) (close-input-port port))
               ((eof-object? form) (loop last))
               (else
-                (let ((result (*s7-catch* #t
-                                          (lambda () (list (eval form (rootlet))))
-                                          (lambda (tag info)
-                                            (nrepl:report-error tag (copy info) form file start)
-                                            nrepl:failed))))
-                  (if (eq? result nrepl:failed)
-                      (close-input-port port)
-                      (let ((printed (#_object->string (if (pair? result) (car result) result))))
-                        (if (not last-only) (nrepl:send "value" printed))
-                        (loop printed)))))))))))
+               (let ((result (*s7-catch* #t
+                                         (lambda () (list (eval form (rootlet))))
+                                         (lambda (tag info)
+                                           (nrepl:report-error tag (copy info) form file start)
+                                           nrepl:failed))))
+                 (if (eq? result nrepl:failed)
+                     (close-input-port port)
+                     (let ((printed (#_object->string (if (pair? result) (car result) result))))
+                       (if (not last-only) (nrepl:send "value" printed))
+                       (loop printed)))))))))))
 
 (define (nrepl:line msg)
   (let ((line (nrepl:get msg "line")))
@@ -139,24 +139,24 @@
     (if (> n 0)
         (begin
           (for-each
-            (lambda (sym)
-              (let ((name (symbol->string sym)))
-                (if (and (match? name) (defined? sym (rootlet)))
-                    (let ((value (symbol->value sym (rootlet))))
-                      (hash-table-set! found name
-                                       (cond ((macro? value) "macro")
-                                             ((procedure? value) "function")
-                                             (else "var")))))))
-            (symbol-table))
+           (lambda (sym)
+             (let ((name (symbol->string sym)))
+               (if (and (match? name) (defined? sym (rootlet)))
+                   (let ((value (symbol->value sym (rootlet))))
+                     (hash-table-set! found name
+                                      (cond ((macro? value) "macro")
+                                            ((procedure? value) "function")
+                                            (else "var")))))))
+           (symbol-table))
           ;; after Scheme's, so that a function with a Scheme stub keeps the
           ;; kind the compiler gives it
           (for-each
-            (lambda (cache)
-              (for-each (lambda (entry)
-                          (if (and (string? (car entry)) (match? (car entry)))
-                              (hash-table-set! found (car entry) (cdr cache))))
-                        (car cache)))
-            (nrepl:xtlang-caches))))
+           (lambda (cache)
+             (for-each (lambda (entry)
+                         (if (and (string? (car entry)) (match? (car entry)))
+                             (hash-table-set! found (car entry) (cdr cache))))
+                       (car cache)))
+           (nrepl:xtlang-caches))))
     (let* ((names (sort! (map car found) string<?))
            (names (if (> (length names) *nrepl:max-completions*)
                       (list-head names *nrepl:max-completions*)

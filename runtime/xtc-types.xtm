@@ -169,13 +169,13 @@
                (vector k v)
                (xtc:type:trie-join k (vector k v) (vector-ref t 0) t)))
           (else
-            (let ((prefix (vector-ref t 0)) (bit (vector-ref t 1)))
-              (cond ((not (= (logand k (- bit 1)) prefix))
-                     (xtc:type:trie-join k (vector k v) prefix t))
-                    ((= 0 (logand k bit))
-                     (vector prefix bit (xtc:type:trie-set (vector-ref t 2) k v) (vector-ref t 3)))
-                    (else
-                      (vector prefix bit (vector-ref t 2) (xtc:type:trie-set (vector-ref t 3) k v)))))))))
+           (let ((prefix (vector-ref t 0)) (bit (vector-ref t 1)))
+             (cond ((not (= (logand k (- bit 1)) prefix))
+                    (xtc:type:trie-join k (vector k v) prefix t))
+                   ((= 0 (logand k bit))
+                    (vector prefix bit (xtc:type:trie-set (vector-ref t 2) k v) (vector-ref t 3)))
+                   (else
+                    (vector prefix bit (vector-ref t 2) (xtc:type:trie-set (vector-ref t 3) k v)))))))))
 
 (define xtc:type:empty-subst (vector '() '() 0))
 
@@ -280,10 +280,10 @@
         ((xtc:type:var? rt)
          (xtc:type:bind (xtc:type:var-id rt) (if (xtc:type:var? s) s rs) subst))
         (else
-          (let ((subst2 (xtc:type:unify-ground rs rt subst)))
-            (and subst2
-                 (xtc:type:refine-named t rt rs
-                                        (xtc:type:refine-named s rs rt subst2)))))))))
+         (let ((subst2 (xtc:type:unify-ground rs rt subst)))
+           (and subst2
+                (xtc:type:refine-named t rt rs
+                                       (xtc:type:refine-named s rs rt subst2)))))))))
 
 ;; The non-variable cases of unify: both terms already resolved.
 (define xtc:type:unify-ground

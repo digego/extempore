@@ -181,17 +181,17 @@
           (cond ((not i)
                  (studio:error "all" *studio:num-tracks* "tracks are in use"))
                 (else
-                  ;; re-evaluating the same (track ...) form leaves the
-                  ;; instrument playing, so it's safe to do mid-performance
-                  (if (not (equal? (vector-ref *studio:tracks* i) (list name instrument)))
-                      (begin
-                        (studio_set_instrument i (studio:make-instance instrument))
-                        (vector-set! *studio:tracks* i (list name instrument))
-                        ;; a new track is silent if others are soloed
-                        (if (pair? *studio:solo*) (studio:apply-solo))))
-                  (if (not (null? preset-name))
-                      (preset name (car preset-name)))
-                  name)))
+                 ;; re-evaluating the same (track ...) form leaves the
+                 ;; instrument playing, so it's safe to do mid-performance
+                 (if (not (equal? (vector-ref *studio:tracks* i) (list name instrument)))
+                     (begin
+                       (studio_set_instrument i (studio:make-instance instrument))
+                       (vector-set! *studio:tracks* i (list name instrument))
+                       ;; a new track is silent if others are soloed
+                       (if (pair? *studio:solo*) (studio:apply-solo))))
+                 (if (not (null? preset-name))
+                     (preset name (car preset-name)))
+                 name)))
         #f)))
 
 ;; Hear only the tracks named: (solo 'drums 'bass). (solo) with no names, or
@@ -304,10 +304,10 @@
     (cond ((eq? param 'gain) (list studio:event-note-param studio:note-gain))
           ((eq? param 'pan) (list studio:event-note-param studio:note-pan))
           (else
-            (let ((where (studio:find-param track-name param)))
-              (if (and where (= (car where) studio:event-inst-param))
-                  (list studio:event-note-param (cadr where))
-                  where))))))
+           (let ((where (studio:find-param track-name param)))
+             (if (and where (= (car where) studio:event-inst-param))
+                 (list studio:event-note-param (cadr where))
+                 where))))))
 
 (define studio:ctl-at
   (lambda (time track-name param value)
@@ -355,12 +355,12 @@
       (cond ((not instrument) (studio:error "there is no track called" track-name))
             ((not values) (studio:error instrument "has no preset called" preset-name))
             (else
-              ;; a preset starts from the defaults and changes what it names
-              (for-each (lambda (p) (studio:ctl-at time track-name (car p) (caddr p)))
-                        (studio:instrument-params instrument))
-              (for-each (lambda (pv) (studio:ctl-at time track-name (car pv) (cadr pv)))
-                        values)
-              preset-name)))))
+             ;; a preset starts from the defaults and changes what it names
+             (for-each (lambda (p) (studio:ctl-at time track-name (car p) (caddr p)))
+                       (studio:instrument-params instrument))
+             (for-each (lambda (pv) (studio:ctl-at time track-name (car pv) (cadr pv)))
+                       values)
+             preset-name)))))
 
 (define preset
   (lambda (track-name preset-name)
@@ -409,8 +409,8 @@
   (lambda ()
     (cl:sort (map (lambda (f) (string->symbol (car (regex:split f "[.]"))))
                   (cl:remove-if-not
-                    (lambda (f) (regex:match? f "[.]xtm$"))
-                    (sys:directory-list (string-append (sys:share-dir) "/libs/studio/instruments"))))
+                   (lambda (f) (regex:match? f "[.]xtm$"))
+                   (sys:directory-list (string-append (sys:share-dir) "/libs/studio/instruments"))))
              (lambda (a b) (string<? (symbol->string a) (symbol->string b))))))
 
 ;; list the instruments in libs/studio/instruments. This reads each file's
@@ -418,12 +418,12 @@
 (define instruments
   (lambda ()
     (for-each
-      (lambda (name)
-        (let* ((text (or (sys:slurp-file (string-append (sys:share-dir) "/" (studio:instrument-file name))) ""))
-               (found (regex:matched text "\\(def-instrument\\s+\\S+\\s+\"([^\"]*)\"")))
-          (print-with-colors 'green 'default #t (display name))
-          (studio:say " --" (if (and (pair? found) (pair? (cdr found))) (cadr found) ""))))
-      (studio:instrument-names))
+     (lambda (name)
+       (let* ((text (or (sys:slurp-file (string-append (sys:share-dir) "/" (studio:instrument-file name))) ""))
+              (found (regex:matched text "\\(def-instrument\\s+\\S+\\s+\"([^\"]*)\"")))
+         (print-with-colors 'green 'default #t (display name))
+         (studio:say " --" (if (and (pair? found) (pair? (cdr found))) (cadr found) ""))))
+     (studio:instrument-names))
     #t))
 
 ;;;;;;;;;;;
@@ -630,7 +630,7 @@
          ;; xtlang names use underscores: (acid_env_mod p) for the parameter env-mod
          (prefixed (lambda (sym)
                      (string->symbol
-                       (string-append prefix (regex:replace-all (symbol->string sym) "-" "_")))))
+                      (string-append prefix (regex:replace-all (symbol->string sym) "-" "_")))))
          (indices (let loop ((i 0) (ps (clause 'params)) (acc '()))
                     (if (null? ps) (reverse acc) (loop (+ i 1) (cdr ps) (cons i acc)))))
          (params (map (lambda (p i)
