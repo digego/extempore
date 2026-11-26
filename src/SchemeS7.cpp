@@ -864,7 +864,7 @@ int is_integer_extern(pointer p) {
 }
 
 char* string_value(pointer p) {
-    if (unlikely(!s7_is_string(p))) {
+    if (!s7_is_string(p)) [[unlikely]] {
         throw ScmRuntimeError("Attempting to return a string from a non-string obj", p);
     }
     return const_cast<char*>(s7_string(p));

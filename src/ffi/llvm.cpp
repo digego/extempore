@@ -381,7 +381,7 @@ static std::atomic<uint64_t> CALL_STUB_COUNTER{0};
 static pointer call_compiled(scheme* Scheme, pointer Args) {
     // Get the llvm::Function* from the cptr argument
     auto func = reinterpret_cast<llvm::Function*>(cptr_value(pair_car(Args)));
-    if (unlikely(!func)) {
+    if (!func) [[unlikely]] {
         log::error(log::jit, "call-compiled: no such function");
         return Scheme->F;
     }
@@ -390,7 +390,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
     Args = pair_cdr(Args);
 
     unsigned lgth = list_length(Scheme, Args);
-    if (unlikely(lgth != funcType->getNumParams())) {
+    if (lgth != funcType->getNumParams()) [[unlikely]] {
         log::error(log::jit, "call-compiled: wrong number of arguments for function");
         return Scheme->F;
     }
@@ -431,7 +431,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
 
         switch (argTy->getTypeID()) {
         case llvm::Type::IntegerTyID: {
-            if (unlikely(!is_integer(p))) {
+            if (!is_integer(p)) [[unlikely]] {
                 log::error(log::jit, "call-compiled: bad argument type at index {}", i);
                 return Scheme->F;
             }
@@ -440,7 +440,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
             break;
         }
         case llvm::Type::FloatTyID: {
-            if (unlikely(!is_real(p))) {
+            if (!is_real(p)) [[unlikely]] {
                 log::error(log::jit, "call-compiled: bad argument type at index {}", i);
                 return Scheme->F;
             }
@@ -449,7 +449,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
             break;
         }
         case llvm::Type::DoubleTyID: {
-            if (unlikely(!is_real(p))) {
+            if (!is_real(p)) [[unlikely]] {
                 log::error(log::jit, "call-compiled: bad argument type at index {}", i);
                 return Scheme->F;
             }

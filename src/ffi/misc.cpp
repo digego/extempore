@@ -35,7 +35,6 @@
 
 #include "SchemeFFIRegistry.h"
 
-#include "BranchPrediction.h"
 // for string_hash
 #include "EXTRuntime.h"
 #include "SchemeProcess.h"
@@ -190,7 +189,7 @@ static pointer CNameDecode(scheme* Scheme, pointer Args) {
 
 static pointer stringJoin(scheme* Scheme, pointer Args) {
     pointer array = argAt(Scheme, Args, 1);
-    if (unlikely(!is_pair(array))) {
+    if (!is_pair(array)) [[unlikely]] {
         return mk_string(Scheme, "");
     }
     const char* joinstr = argString(Scheme, Args, 2);
@@ -212,7 +211,7 @@ static pointer stringJoin(scheme* Scheme, pointer Args) {
 }
 
 static pointer callCPPAtTime(scheme* Scheme, pointer Args) {
-    if (unlikely(!is_cptr(argAt(Scheme, Args, 3)))) {
+    if (!is_cptr(argAt(Scheme, Args, 3))) [[unlikely]] {
         log::error("task needs a valid CM pointer");
         return Scheme->F;
     }

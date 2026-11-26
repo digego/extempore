@@ -46,7 +46,6 @@
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
 #include "SchemeProcess.h"
-#include "BranchPrediction.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -148,7 +147,10 @@ static inline void flush_denormals_to_zero() {}
 // check runs first so NaN/inf never reach std::clamp; on x86 and ARM, compilers
 // lower the clamp to min/max instructions, so no hand-written intrinsics needed.
 static inline float audio_sanity(float x) {
-    return likely(std::isfinite(x)) ? std::clamp(x, -0.99f, 0.99f) : 0.0f;
+    if (std::isfinite(x)) [[likely]] {
+        return std::clamp(x, -0.99f, 0.99f);
+    }
+    return 0.0f;
 }
 
 // double audio_sanity_d(double x)
@@ -252,11 +254,11 @@ void* audioCallbackMT(void* Args) {
     while (true) {
         sMtWorkers[idx].work.acquire();
         SAMPLE* outbuf = outbufs[toggle];
-        if (unlikely(!zerolatency)) {
+        if (!zerolatency) [[unlikely]] {
             toggle = !toggle;
         }
         auto getter(device->getDspState()->mtClosures[idx]);
-        if (unlikely(!getter)) {
+        if (!getter) [[unlikely]] {
             // no closure installed for this worker yet: emit silence
             std::fill_n(outbuf, blockSamples, 0.0f);
             sMtWorkComplete.release(1);
@@ -300,10 +302,10 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
                                 uint64_t FramesPerBuffer, void* UserData) {
     auto sched(reinterpret_cast<TaskScheduler*>(UserData));
     UNIV::DEVICE_TIME += FramesPerBuffer;
-    if (likely(UNIV::TIME_DIVISION == 1)) {
+    if (UNIV::TIME_DIVISION == 1) [[likely]] {
         UNIV::TIME.store(UNIV::DEVICE_TIME.load());
     }
-    if (unlikely(AudioDevice::CLOCKBASE < 1.0)) {
+    if (AudioDevice::CLOCKBASE < 1.0) [[unlikely]] {
         AudioDevice::CLOCKBASE = getRealTime();
         UNIV::AUDIO_CLOCK_BASE.store(AudioDevice::CLOCKBASE.load());
     }
@@ -321,19 +323,19 @@ void AudioDevice::renderFrames(const float* InputBuffer, float* OutputBuffer,
     // so a dsp:set! landing mid-callback is either wholly visible or not at
     // all -- there is no ordering contract between the setters to get wrong.
     const DspState* state = getDspState();
-    if (unlikely(!state->closure)) {
+    if (!state->closure) [[unlikely]] {
         memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
         return;
     }
     auto cache_closure(state->closure());
-    if (likely(state->wrapper && !state->sumWrapper)) {  // sample by sample
+    if (state->wrapper && !state->sumWrapper) [[likely]] {  // sample by sample
         auto cache_wrapper(state->wrapper);
         auto closure = *((SAMPLE(**)(SAMPLE, uint64_t, uint64_t, SAMPLE*))cache_closure);
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
         auto dat(OutputBuffer);
         auto in(InputBuffer);
         uint64_t time(UNIV::DEVICE_TIME);
-        if (likely(!UNIV::IN_CHANNELS)) {
+        if (!UNIV::IN_CHANNELS) [[likely]] {
             const float dummy(0.0);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
@@ -376,7 +378,7 @@ void AudioDevice::renderFrames(const float* InputBuffer, float* OutputBuffer,
     if (state->sumWrapper && state->mtReady) {  // multi-threaded sample-by-sample
         // The worker slices are sized from UNIV::NUM_FRAMES, so a host buffer
         // of a different size would read past them.
-        if (unlikely(FramesPerBuffer != UNIV::NUM_FRAMES)) {
+        if (FramesPerBuffer != UNIV::NUM_FRAMES) [[unlikely]] {
             memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
             return;
         }
@@ -696,7 +698,7 @@ static int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned l
                          PaStreamCallbackFlags StatusFlags, void* UserData) {
     // every call: PortAudio may call from a new thread after a restart
     log::mark_realtime_thread();
-    if (unlikely(StatusFlags & (paOutputUnderflow | paOutputOverflow))) {
+    if (StatusFlags & (paOutputUnderflow | paOutputOverflow)) [[unlikely]] {
         // Nothing may block or allocate on the audio thread: count the xruns
         // and let the Scheme side read them back with (sys:audio-xruns).
         if (StatusFlags & paOutputUnderflow) {
