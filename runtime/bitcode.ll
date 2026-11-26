@@ -92,8 +92,8 @@ declare i8* @strstr(i8*, i8*) nounwind
 ; Extempore runtime functions (implemented in C++)
 declare i1 @rmatch(i8*, i8*) nounwind
 declare i64 @rmatches(i8*, i8*, i8**, i64) nounwind
-declare i8** @rsplit(i8*, i8*, i8**, i64) nounwind
-declare i8* @rreplace(i8*, i8*, i8*) nounwind
+declare i1 @rsplit(i8*, i8*, i8*, i8*, i64) nounwind
+declare i8* @rreplace(i8*, i8*, i8*, i8*, i64) nounwind
 
 ; Random number generators (implemented in C++)
 declare double @xtc_randd() nounwind

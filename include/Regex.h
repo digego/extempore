@@ -64,9 +64,11 @@ std::string replaceFirst(const PatternPtr& Re, std::string_view Data, const char
 // matches nothing, and says why in a warning.
 //
 // rmatches gives each match as a malloc'd string. rsplit writes what lies
-// either side of the first match into a and b, which the caller makes 2048
-// bytes each, and rreplace writes its result into a 4096-byte buffer.
+// either side of the first match into a and b, of size bytes each, and fails
+// if either wouldn't fit. rreplace writes its result into result, of size
+// bytes, or str itself if the result wouldn't fit.
 EXPORT bool rmatch(const char* regex, const char* str);
 EXPORT int64_t rmatches(const char* regex, const char* str, char** results, int64_t maxnum);
-EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b);
-EXPORT char* rreplace(const char* regex, const char* str, const char* replacement, char* result);
+EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b, int64_t size);
+EXPORT char* rreplace(const char* regex, const char* str, const char* replacement, char* result,
+                      int64_t size);

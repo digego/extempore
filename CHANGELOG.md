@@ -186,7 +186,8 @@ options now take PCRE patterns, as the Scheme `regex:` functions always have;
 they took `std::regex`'s ECMAScript ones. Ordinary patterns mean the same in
 both. In a replacement string `$1` is still the first group, but `$&` and `$$`
 are no longer special. A pattern which doesn't compile still matches nothing,
-and now a warning says why.
+and now a warning says why. `rsplit` and `rreplace`, which those functions call,
+take the size of their buffers as a last argument.
 
 ## v0.11.2
 

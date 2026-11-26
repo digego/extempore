@@ -162,10 +162,9 @@ EXPORT int64_t rmatches(const char* regex, const char* str, char** results, int6
     return num;
 }
 
-EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b) {
-    constexpr size_t BUFFER_SIZE = 2048;
+EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b, int64_t size) {
     const auto re = extemp::regex::xtlangPattern("rsplit", regex);
-    if (!re) {
+    if (!re || size < 1) {
         return false;
     }
     const auto matchData(matchDataFor(re));
@@ -176,7 +175,7 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b) {
     const PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(matchData.get());
     const size_t before = ovector[0];
     const size_t after = strlen(str) - ovector[1];
-    if (before >= BUFFER_SIZE || after >= BUFFER_SIZE) {
+    if (before >= size_t(size) || after >= size_t(size)) {
         return false;
     }
     memcpy(a, str, before);
@@ -186,19 +185,22 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b) {
     return true;
 }
 
-// Always writes a NUL-terminated string, and the original when the result
-// wouldn't fit or the pattern is invalid.
-EXPORT char* rreplace(const char* regex, const char* str, const char* replacement, char* result) {
-    constexpr size_t BUFFER_SIZE = 4096;
+// Always writes a NUL-terminated string: the original (as much of it as fits)
+// when the result wouldn't fit or the pattern is invalid.
+EXPORT char* rreplace(const char* regex, const char* str, const char* replacement, char* result,
+                      int64_t size) {
+    if (size < 1) {
+        return result;
+    }
     const char* out = str;
     std::string replaced;
     if (const auto re = extemp::regex::xtlangPattern("rreplace", regex)) {
         replaced = extemp::regex::replaceFirst(re, str, replacement);
-        if (replaced.length() < BUFFER_SIZE) {
+        if (replaced.length() < size_t(size)) {
             out = replaced.c_str();
         }
     }
-    const size_t n = strnlen(out, BUFFER_SIZE - 1);
+    const size_t n = strnlen(out, size_t(size) - 1);
     memcpy(result, out, n);
     result[n] = '\0';
     return result;
