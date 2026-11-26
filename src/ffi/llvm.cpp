@@ -992,6 +992,14 @@ static std::string functionDeclaration(const llvm::Function& func) {
     } else if (func.getCallingConv() == llvm::CallingConv::C) {
         ss << "ccc ";
     }
+    // zeroext and signext are part of the ABI: a caller which doesn't see
+    // them leaves the bits above a narrow integer undefined.
+    const auto attrs = func.getAttributes();
+    if (attrs.hasRetAttr(llvm::Attribute::ZExt)) {
+        ss << "zeroext ";
+    } else if (attrs.hasRetAttr(llvm::Attribute::SExt)) {
+        ss << "signext ";
+    }
     auto* funcType = func.getFunctionType();
     funcType->getReturnType()->print(ss, false, true);
     ss << " @" << func.getName() << "(";
@@ -1001,6 +1009,11 @@ static std::string functionDeclaration(const llvm::Function& func) {
             ss << ", ";
         first = false;
         funcType->getParamType(i)->print(ss, false, true);
+        if (attrs.hasParamAttr(i, llvm::Attribute::ZExt)) {
+            ss << " zeroext";
+        } else if (attrs.hasParamAttr(i, llvm::Attribute::SExt)) {
+            ss << " signext";
+        }
     }
     if (funcType->isVarArg()) {
         if (!first)

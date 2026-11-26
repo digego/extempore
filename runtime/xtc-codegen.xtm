@@ -1578,7 +1578,10 @@
 
       ;; first we make the function code
       ;; define fastcc function with return type
-      (emit  "define dllexport ccc " (xtc:codegen:get-type-str rettype) " @" name "(" os)
+      ;; zeroext: a C caller reads a returned bool as a whole byte
+      (emit  "define dllexport ccc "
+             (if (string=? (xtc:codegen:get-type-str rettype) "i1") "zeroext " "")
+             (xtc:codegen:get-type-str rettype) " @" name "(" os)
       (if (not (null? args)) (emit (xtc:codegen:make-arglist-str args #t) os))
       ;; close off function opening
       (emit ") nounwind inlinehint {\n" os)

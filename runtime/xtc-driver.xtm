@@ -149,7 +149,8 @@
            (argnames (make-list-with-proc (length argtypes)
                                           (lambda (i) (string-append "%arg_" (atom->string i)))))
            (ftype (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")))
-      (string-append "define dllexport " cc " " rettype " @" symname-string suffix "("
+      ;; zeroext: a C caller reads a returned bool as a whole byte
+      (string-append "define dllexport " cc " " (if (string=? rettype "i1") "zeroext " "") rettype " @" symname-string suffix "("
                      (string-join (map (lambda (t n) (string-append (xtc:codegen:get-type-str t) " " n))
                                        argtypes argnames)
                                   ",")

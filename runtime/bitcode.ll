@@ -29,11 +29,13 @@ declare i1 @llvm_ptr_in_current_zone(i8*) nounwind
 declare void @llvm_destroy_zone_after_delay(%mzone*, i64)
 
 ; Scheme value constructor functions (implemented in C++)
+; The narrow integers carry the C ABI's extension: without it the bits above
+; the value are undefined, and C++ reads a true i1 as whatever byte it gets.
 declare i8* @mk_i64(i8*, i64)
 declare i8* @mk_i32(i8*, i32)
-declare i8* @mk_i16(i8*, i16)
-declare i8* @mk_i8(i8*, i8)
-declare i8* @mk_i1(i8*, i1)
+declare i8* @mk_i16(i8*, i16 signext)
+declare i8* @mk_i8(i8*, i8 signext)
+declare i8* @mk_i1(i8*, i1 zeroext)
 declare i8* @mk_double(i8*, double)
 declare i8* @mk_float(i8*, float)
 declare i8* @mk_string(i8*, i8*)

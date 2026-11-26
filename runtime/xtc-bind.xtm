@@ -1080,6 +1080,14 @@ e.g.
  "bind a C function from a shared library"
  '(libname function-name type optional-docstring))
 
+;; An argument's type in the declaration of a C function. C expects a bool
+;; zero-extended to a byte, and LLVM leaves the bits above an i1 undefined
+;; unless the declaration says zeroext.
+(define xtc:bind:c-arg-type-str
+  (lambda (type)
+    (let ((str (xtc:codegen:get-type-str type)))
+      (if (string=? str "i1") "i1 zeroext" str))))
+
 ;; this was previously called __dynamic-bind
 (define xtc:bind:bind-lib
   (lambda (library symname type calling-convention docstring)
@@ -1101,11 +1109,7 @@ e.g.
                                              "("
                                              (if (null? (cdr ctype))
                                                  ""
-                                                 (apply string-append
-                                                        (xtc:codegen:get-type-str (cadr ctype))
-                                                        (map (lambda (v)
-                                                               (string-append "," (xtc:codegen:get-type-str v)))
-                                                             (cddr ctype))))
+                                                 (string-join (map xtc:bind:c-arg-type-str (cdr ctype)) ","))
                                              ") nounwind")))
               (if (and (llvm:compile-ir ir-string)
                        (llvm:bind-symbol (eval library) (symbol->string symname)))
