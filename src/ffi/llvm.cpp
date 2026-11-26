@@ -598,31 +598,37 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
     return result;
 }
 
-static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args) {
-    const char* floatin = argString(Scheme, Args, 1);
-    if (floatin[0] && floatin[1] == 'x') {
-        return argAt(Scheme, Args, 1);
-    }
-    const llvm::APFloat apf(llvm::APFloat::IEEEsingle(), llvm::StringRef(floatin));
+// A floating-point constant as a C99 hex literal (0x1.8p+1), which is exact and
+// which IR takes at float and at double: the compiler can spell a literal
+// before it knows which of the two it will be used as. `In` is a decimal
+// number or one of these literals, and is rounded to `Semantics` first.
+static std::string floatConstant(const char* In, const llvm::fltSemantics& Semantics) {
     // TODO: if necessary, checks for inf/nan can be done here
-    const auto ival(llvm::APInt::doubleToBits(apf.convertToFloat()));
-    return mk_string(Scheme,
-                     (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
+    llvm::APFloat value(Semantics, llvm::StringRef(In));
+    bool losesInfo = false;
+    value.convert(llvm::APFloat::IEEEdouble(), llvm::APFloat::rmNearestTiesToEven, &losesInfo);
+    const uint64_t bits = value.bitcastToAPInt().getZExtValue();
+    const char* sign = (bits >> 63) ? "-" : "";
+    const auto exponent = int((bits >> 52) & 0x7ff);
+    const uint64_t mantissa = bits & ((uint64_t(1) << 52) - 1);
+    if (exponent == 0x7ff) {
+        // IR wants the sign on these, and has no hex literal for them
+        return std::string((bits >> 63) ? "-" : "+") + (mantissa ? "qnan" : "inf");
+    }
+    if (exponent == 0) {  // zero or subnormal
+        return std::format("{}0x0.{:013x}p{:+d}", sign, mantissa, mantissa ? -1022 : 0);
+    }
+    return std::format("{}0x1.{:013x}p{:+d}", sign, mantissa, exponent - 1023);
+}
+
+static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args) {
+    return mk_string(
+        Scheme, floatConstant(argString(Scheme, Args, 1), llvm::APFloat::IEEEsingle()).c_str());
 }
 
 static pointer llvm_convert_double_constant(scheme* Scheme, pointer Args) {
-    static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) must be 8 bytes");
-    const char* floatin = argString(Scheme, Args, 1);
-    if (floatin[0] && floatin[1] == 'x') {
-        return argAt(Scheme, Args, 1);
-    }
-    const llvm::APFloat apf(llvm::APFloat::IEEEdouble(), llvm::StringRef(floatin));
-    // TODO: if necessary, checks for inf/nan can be done here
-    // convertToDouble, not convertToFloat: this APFloat is an IEEEdouble, and
-    // asking for the float value of one is a hard error in LLVM
-    const auto ival(llvm::APInt::doubleToBits(apf.convertToDouble()));
-    return mk_string(Scheme,
-                     (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
+    return mk_string(
+        Scheme, floatConstant(argString(Scheme, Args, 1), llvm::APFloat::IEEEdouble()).c_str());
 }
 
 static pointer llvm_count(scheme* Scheme, pointer Args) {
