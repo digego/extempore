@@ -149,7 +149,6 @@ inline bool failed() {
 // rather than from the system's entropy.
 extern bool SEEDED;
 extern uint64_t SEED;
-bool is_terminal(FILE* Stream);
 // The running extempore's own path, or "" if the platform won't say.
 std::string executable_file();
 extern double CLOCK_OFFSET;

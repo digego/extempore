@@ -184,6 +184,8 @@ void trace(Component C, std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Trace, C.name, Fmt, std::forward<Args>(A)...);
 }
 
+// Whether Stream is a terminal.
+bool is_terminal(std::FILE* Stream);
 // Escape sequences for colouring text on stdout or stderr: "" when that stream
 // isn't coloured. Foreground and background are ANSI colour numbers 0-7, 9 for
 // the terminal's default.

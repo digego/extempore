@@ -153,14 +153,6 @@ std::string time_string(std::int64_t Millis) {
                        int(Millis % 1000));
 }
 
-bool is_terminal(std::FILE* Stream) {
-#ifdef _WIN32
-    return _isatty(_fileno(Stream)) != 0;
-#else
-    return isatty(fileno(Stream)) != 0;
-#endif
-}
-
 std::string strip_escapes(std::string_view Text) {
     std::string out;
     out.reserve(Text.size());
@@ -210,6 +202,14 @@ void drain() {
 }
 
 }  // namespace
+
+bool is_terminal(std::FILE* Stream) {
+#ifdef _WIN32
+    return _isatty(_fileno(Stream)) != 0;
+#else
+    return isatty(fileno(Stream)) != 0;
+#endif
+}
 
 std::optional<Level> parse_level(std::string_view Name) {
     if (Name == "off") {

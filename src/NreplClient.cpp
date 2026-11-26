@@ -335,7 +335,7 @@ int send(const Target& To, const SendOptions& Options) {
     } else if (Options.code) {
         msg["code"] = Value(*Options.code);
     } else {
-        if (UNIV::is_terminal(stdin)) {
+        if (log::is_terminal(stdin)) {
             std::cerr << "extempore: nothing to send: give the code as an argument, on stdin, "
                          "or with --file (see extempore send --help)"
                       << std::endl;
@@ -483,7 +483,7 @@ int repl(const Target& To, bool WaitForServer) {
         s_waiting.store(true);
         const int status = printResponses(conn, id, session, true);
         s_waiting.store(false);
-        if (status != 0 && !UNIV::is_terminal(stdin)) {
+        if (status != 0 && !log::is_terminal(stdin)) {
             result = 1;  // piped input: the exit status says whether it all worked
         }
     }

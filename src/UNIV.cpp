@@ -34,11 +34,6 @@
  */
 
 #include "UNIV.h"
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
@@ -480,13 +475,6 @@ bool LEGACY_SERVER = true;
 std::atomic<bool> FAILED{false};
 bool SEEDED = false;
 uint64_t SEED = 0;
-bool is_terminal(FILE* Stream) {
-#ifdef _WIN32
-    return _isatty(_fileno(Stream)) != 0;
-#else
-    return isatty(fileno(Stream)) != 0;
-#endif
-}
 double CLOCK_OFFSET = 0.0;
 std::unordered_map<std::string, std::string> CMDPARAMS;
 std::string ARCH;

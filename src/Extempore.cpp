@@ -293,7 +293,7 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
 // draws.
 void print_greeting() {
     using namespace extemp;
-    if (!UNIV::is_terminal(stderr) || !log::enabled(log::Level::Info)) {
+    if (!log::is_terminal(stderr) || !log::enabled(log::Level::Info)) {
         return;
     }
     const std::string text = log::dim("   .-.     .-.     .-.\n"
@@ -325,7 +325,7 @@ void configure_logging(const extemp::cli::Invocation& Inv) {
         std::size_t(logging.filter.base) + more, std::size_t(log::Level::Trace)));
     const std::string_view when = Inv.get("timestamps").value_or("auto");
     logging.timestamps =
-        when == "always" || (when == "auto" && session && !UNIV::is_terminal(stderr));
+        when == "always" || (when == "auto" && session && !log::is_terminal(stderr));
     log::configure(logging);
     log::start();
 }

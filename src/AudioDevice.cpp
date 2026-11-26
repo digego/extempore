@@ -593,7 +593,7 @@ void FileAudioDriver::clearProgress() {
 void FileAudioDriver::start() {
     if (!m_file || m_running.load())
         return;
-    m_progress = UNIV::is_terminal(stderr);
+    m_progress = log::is_terminal(stderr);
     m_stop.store(false);
     m_running.store(true, std::memory_order_release);
     m_thread = std::thread([this] { this->run(); });
