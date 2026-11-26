@@ -21,8 +21,16 @@ Scan scan(std::string_view Text) {
     std::size_t start = 0;
     std::size_t startLine = 1;
     std::size_t line = 1;
+    // a top-level datum after #; is commented out, so it isn't a form
+    bool commentNext = false;
+    bool startCommented = false;
     for (std::size_t i = 0; i < n; ++i) {
         const char c = Text[i];
+        const char next = i + 1 < n ? Text[i + 1] : '\0';
+        if (depth == 0 && commentNext &&
+            std::string_view(" \t\r\n;#('`,@").find(c) == std::string_view::npos) {
+            commentNext = false;  // the commented datum is an atom
+        }
         if (c == '\n') {
             ++line;
         } else if (c == ';') {
@@ -45,7 +53,10 @@ Scan scan(std::string_view Text) {
                 result.insideAtom = true;
                 result.problems.push_back({opened, "this string never ends"});
             }
-        } else if (c == '#' && i + 1 < n && Text[i + 1] == '|') {
+        } else if (c == '#' && next == ';') {
+            commentNext = depth == 0;
+            ++i;
+        } else if (c == '#' && next == '|') {
             const std::size_t opened = i;
             const auto close = Text.find("|#", i + 2);
             const auto end = close == std::string_view::npos ? n : close + 2;
@@ -56,7 +67,8 @@ Scan scan(std::string_view Text) {
                 break;
             }
             i = close + 1;
-        } else if (c == '#' && i + 1 < n && Text[i + 1] == '\\') {
+        } else if (c == '#' && next == '\\') {
+            commentNext = false;
             i += 2;  // the character after #\ is never a delimiter
             if (i < n && Text[i] == '\n') {
                 ++line;
@@ -65,19 +77,24 @@ Scan scan(std::string_view Text) {
             if (depth == 0) {
                 start = i;
                 startLine = line;
+                startCommented = commentNext;
+                commentNext = false;
             }
             ++depth;
         } else if (c == ')') {
             if (depth == 0) {
                 result.problems.push_back({i, "this closing parenthesis has nothing to close"});
-            } else if (--depth == 0) {
+            } else if (--depth == 0 && !startCommented) {
                 result.forms.push_back({start, i + 1, startLine, true});
             }
         }
     }
     if (depth > 0) {
-        result.forms.push_back({start, n, startLine, false});
-        result.problems.push_back({start, "this form never ends: a closing parenthesis is missing"});
+        if (!startCommented) {
+            result.forms.push_back({start, n, startLine, false});
+        }
+        result.problems.push_back(
+            {start, "this form never ends: a closing parenthesis is missing"});
     }
     return result;
 }

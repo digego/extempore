@@ -46,10 +46,13 @@ TEST(Formatter, ACallAlignsWithItsFirstArgument) {
                     "    (loop (- a 1)))\n");
 }
 
-TEST(Formatter, AHeadAloneOnItsLineAlignsWithTheHead) {
+TEST(Formatter, AHeadAloneOnItsLineIndentsTwo) {
     expectFormatted("(cond\n"
-                    " ((> x 0) 'positive)\n"
-                    " (else 'other))\n");
+                    "  ((> x 0) 'positive)\n"
+                    "  (else\n"
+                    "    'other))\n");
+    expectFormatted("(xtc:aot:suppress-aot-do\n"
+                    "  (sys:load \"libs/core/rational.xtm\"))\n");
 }
 
 TEST(Formatter, AListHeadedByAListAlignsWithItsFirstElement) {
@@ -98,11 +101,20 @@ TEST(Formatter, DefinitionsIndentTheirBody) {
                     "  `(begin ,e ,e))\n");
 }
 
-TEST(Formatter, OnlyDefineIsADefinitionPrefix) {
+TEST(Formatter, DefinitionAndWithPrefixesIndentTheirBody) {
+    expectFormatted("(def-instrument beep\n"
+                    "  \"a sine wave\"\n"
+                    "  (params\n"
+                    "    (level 0.25 \"output level\")))\n");
+    expectFormatted("(define* (f a (b 2))\n"
+                    "  (+ a b))\n");
+    expectFormatted("(studio:with-number n\n"
+                    "  (println n))\n");
     expectFormatted("(default-value x\n"
                     "               y)\n");
     expectFormatted("(defined? 'x\n"
-                    "          env)\n");    expectFormatted("(#_format #f \"~A\"\n"
+                    "          env)\n");
+    expectFormatted("(#_format #f \"~A\"\n"
                     "          x)\n");
 }
 
@@ -151,6 +163,13 @@ TEST(Formatter, StringsAndBlockCommentsKeepTheirLines) {
     EXPECT_EQ(format(block).value(), block);
 }
 
+TEST(Formatter, ADatumCommentIsNotAnElement) {
+    expectFormatted("(f #;(g h)\n"
+                    "  x)\n");
+    expectFormatted("(+ 1 #;(* 2 3) 4\n"
+                    "   5)\n");
+}
+
 TEST(Formatter, DelimitersInStringsCommentsAndCharactersDontCount) {
     expectFormatted("(list \"(\" #\\( ; (\n"
                     "      #\\) x)\n");
@@ -160,7 +179,7 @@ TEST(Formatter, WhitespaceAtTheEnds) {
     EXPECT_EQ(format("(f)   \n\n\n(g)\t\n\n\n").value(), "(f)\n\n\n(g)\n");
     EXPECT_EQ(format("(f)").value(), "(f)\n");
     EXPECT_EQ(format("").value(), "");
-    EXPECT_EQ(format("(f\r\n\tx)\r\n").value(), "(f\r\n x)\r\n");
+    EXPECT_EQ(format("(f\r\n\tx)\r\n").value(), "(f\r\n  x)\r\n");
 }
 
 TEST(Formatter, OnlyWhitespaceChanges) {
@@ -168,12 +187,13 @@ TEST(Formatter, OnlyWhitespaceChanges) {
     const std::string text = "(bind-func osc:[double,double]*\n"
                              "        (lambda (freq) (* 0.1 (sin freq))))\n";
     EXPECT_EQ(format(text).value(), "(bind-func osc:[double,double]*\n"
-                                 "  (lambda (freq) (* 0.1 (sin freq))))\n");
+                                    "  (lambda (freq) (* 0.1 (sin freq))))\n");
 }
 
 TEST(Formatter, TextWhichDoesntReadIsNotFormatted) {
     const auto unclosed = format("(define x 1)\n(define (f y)\n  (+ y 1\n");
     ASSERT_FALSE(unclosed.has_value());
-    EXPECT_EQ(unclosed.error(), "line 2, column 1: this form never ends: a closing parenthesis is missing");
+    EXPECT_EQ(unclosed.error(),
+              "line 2, column 1: this form never ends: a closing parenthesis is missing");
     EXPECT_FALSE(format("(f))\n").has_value());
 }

@@ -59,6 +59,15 @@ TEST(FormFinder, TypesWithBrackets) {
     EXPECT_TRUE(formAt(kSong, 10, 5).ends_with("(sin freq))))"));
 }
 
+TEST(FormFinder, ADatumCommentHidesTheNextDatum) {
+    const std::string_view text = "#;(old version)\n(f #;(g) 1)\n#; x (h)\n#;'(i)\n";
+    const auto forms = topLevel(text);
+    ASSERT_EQ(forms.size(), 2u);
+    EXPECT_EQ(text.substr(forms[0].begin, forms[0].end - forms[0].begin), "(f #;(g) 1)");
+    EXPECT_EQ(text.substr(forms[1].begin, forms[1].end - forms[1].begin), "(h)");
+    EXPECT_TRUE(problems(text).empty());
+}
+
 TEST(FormFinder, BetweenFormsTakesTheOneBefore) {
     EXPECT_EQ(formAt(kSong, 3, 1), "(define tempo 120)");
     EXPECT_TRUE(formAt(kSong, 8, 3).starts_with("(define (play beat)"));
@@ -89,7 +98,7 @@ TEST(FormFinder, NoForms) {
 
 TEST(FormFinder, ColumnsCountCharactersNotBytes) {
     const std::string_view text = "(a \"\xC3\xA9\xC3\xA9\") (b)";  // (a "éé") (b)
-    EXPECT_EQ(formAt(text, 1, 10), "(b)");  // the tenth character opens (b)
+    EXPECT_EQ(formAt(text, 1, 10), "(b)");                         // the tenth character opens (b)
     EXPECT_EQ(formAt(text, 1, 8), "(a \"\xC3\xA9\xC3\xA9\")");
 }
 
@@ -138,4 +147,3 @@ TEST(FormFinder, DefinitionsAreNamed) {
     }
     EXPECT_EQ(defs[2].form.line, 4u);
 }
-

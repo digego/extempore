@@ -14,7 +14,7 @@ namespace extemp::format {
 namespace {
 
 // How a list headed by a symbol indents the lines after its first.
-constexpr int kCall = -1;        // align with the first argument, or with the head
+constexpr int kCall = -1;        // align with the first argument, or indent two columns
 constexpr int kDefinition = -2;  // the body indents two columns
 
 struct Special {
@@ -22,20 +22,24 @@ struct Special {
     int distinguished;  // arguments before the body: on their own lines they indent four
 };
 
-// extempore-emacs-mode's `put` list and tree-sitter-extempore's indents.scm
-// keep copies of this table.
+// A form which distinguishes no arguments (begin) indents as a call does, so
+// it needs no entry. extempore-emacs-mode and tree-sitter-extempore's
+// indents.scm keep copies of this table.
 constexpr auto kSpecial = std::to_array<Special>({
-    {"begin", 0},
-    {"beginz", 0},
-    {"delay", 0},
     {"lambda", 1},
+    {"lambda*", 1},
     {"lambdaz", 1},
     {"lambdas", 1},
     {"lambdah", 1},
     {"let", 1},  // a named let distinguishes two
     {"let*", 1},
     {"letrec", 1},
+    {"letrec*", 1},
     {"letz", 1},
+    {"let-values", 1},
+    {"let*-values", 1},
+    {"parameterize", 1},
+    {"guard", 1},
     {"case", 1},
     {"when", 1},
     {"unless", 1},
@@ -54,6 +58,7 @@ constexpr auto kSpecial = std::to_array<Special>({
     {"with-output-to-port", 1},
     {"call-with-values", 1},
     {"do", 2},
+    {"receive", 2},
     {"syntax-case", 2},
     {"dynamic-wind", 3},
     {"bind-func", kDefinition},
@@ -78,9 +83,14 @@ int indentKind(std::string_view Head) {
             return special.distinguished;
         }
     }
-    // define, define-macro, define-syntax, definec, definec:dsp, ... (but not
-    // defined? or default)
-    if (Head == "define" || Head.starts_with("define-") || Head.starts_with("definec")) {
+    // define, define*, define-macro, definec, def-instrument, with-..., and
+    // the same after a namespace (studio:with-number), but not defined? or
+    // default
+    if (const auto colon = Head.rfind(':'); colon != std::string_view::npos) {
+        Head.remove_prefix(colon + 1);
+    }
+    if (Head == "define" || Head == "define*" || Head.starts_with("define-") ||
+        Head.starts_with("definec") || Head.starts_with("def-") || Head.starts_with("with-")) {
         return kDefinition;
     }
     return kCall;
@@ -158,7 +168,7 @@ std::size_t indentation(const std::vector<Open>& Stack, std::string_view First) 
         if (elements.size() > 1 && elements[1].line == head.line) {
             return elements[1].column;
         }
-        return head.column;
+        return paren + 2;
     }
     if (isLet(head.text) && elements.size() > 1 && elements[1].kind == Kind::Symbol) {
         kind = 2;
@@ -171,8 +181,8 @@ std::size_t indentation(const std::vector<Open>& Stack, std::string_view First) 
     if (onHeadLine > distinguished) {
         return elements[distinguished + 1].column;
     }
-    const bool startsElement = First.front() != ')' && First.front() != ';' &&
-                               !First.starts_with("#|");
+    const bool startsElement =
+        First.front() != ')' && First.front() != ';' && !First.starts_with("#|");
     if (startsElement && elements.size() <= distinguished) {
         return paren + 4;
     }
@@ -231,6 +241,7 @@ std::expected<std::string, std::string> format(std::string_view Text) {
     std::vector<Open> stack;
     Prefix prefix = Prefix::None;
     std::size_t prefixColumn = 0;
+    bool commented = false;  // after #;, which comments out the next datum
     std::vector<std::string> out;
     out.reserve(lines.size());
 
@@ -257,11 +268,12 @@ std::expected<std::string, std::string> format(std::string_view Text) {
             return std::size_t(std::ptrdiff_t(characters(line.substr(0, At))) + shift);
         };
         const auto add = [&](Kind K, std::size_t Column, std::string_view Atom) {
-            if (!stack.empty()) {
+            if (!stack.empty() && !commented) {
                 stack.back().elements.push_back(
                     {number, prefix == Prefix::None ? Column : prefixColumn, K, Atom});
             }
             prefix = Prefix::None;
+            commented = false;
         };
 
         while (pos < line.size()) {
@@ -298,6 +310,9 @@ std::expected<std::string, std::string> format(std::string_view Text) {
             } else if (c == '#' && next == '|') {
                 inside = Inside::BlockComment;
                 pos += 2;
+            } else if (c == '#' && next == ';') {
+                commented = true;
+                pos += 2;
             } else if (c == '#' && next == '(') {
                 add(Kind::List, column(pos), {});
                 stack.push_back({column(pos + 1), true, {}});
@@ -332,10 +347,11 @@ std::expected<std::string, std::string> format(std::string_view Text) {
                 while (pos < line.size() && !isDelimiter(line[pos])) {
                     ++pos;
                 }
-                const std::string_view atom = line.substr(begin, std::min(pos, line.size()) - begin);
+                const std::string_view atom =
+                    line.substr(begin, std::min(pos, line.size()) - begin);
                 // #_name is s7's builtin reference, called like any other symbol
-                const bool symbol = prefix != Prefix::Quote && (c != '#' || next == '_') &&
-                                    !looksNumeric(atom);
+                const bool symbol =
+                    prefix != Prefix::Quote && (c != '#' || next == '_') && !looksNumeric(atom);
                 add(symbol ? Kind::Symbol : Kind::Literal, column(begin), atom);
             }
         }

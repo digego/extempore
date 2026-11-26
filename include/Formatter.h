@@ -6,11 +6,12 @@
 // they are, as does every line which begins inside a string or a block
 // comment.
 //
-// The indentation follows the Lisp convention (Emacs's lisp-indent): a call's
-// arguments align with the first one, a special form's body indents two
-// columns, and data aligns with its first element. Which symbols are special
-// forms is the table in Formatter.cpp; extempore-emacs-mode and
-// tree-sitter-extempore's indents.scm keep copies of it.
+// A call's arguments align with the first one when it shares the head's line,
+// and indent two columns when it doesn't. A special form's body indents two
+// columns, and data (a quoted list, a vector, a list not headed by a symbol)
+// aligns with its first element. Which symbols are special forms is the table
+// and the name prefixes in Formatter.cpp; extempore-emacs-mode and
+// tree-sitter-extempore's indents.scm follow them.
 
 #include <expected>
 #include <string>

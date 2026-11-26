@@ -180,8 +180,8 @@ leave a process waiting on stdin. They return through a continuation which had
 the interpreter read from stdin on the way: harmless when stdin was closed, and
 a hang when it was open with nothing to read.
 
-`extempore fmt` formats `.xtm` files, changing only whitespace: indentation by
-the Lisp convention, and whitespace at the ends of lines. The language server
+`extempore fmt` formats `.xtm` files, changing only whitespace: indentation, and
+whitespace at the ends of lines. The language server
 formats too (`textDocument/formatting`), so an editor with a language client can
 format on save, and extempore-mode has `extempore-format-buffer`. The source
 tree has been formatted with it, and CI checks it stays formatted; the commit

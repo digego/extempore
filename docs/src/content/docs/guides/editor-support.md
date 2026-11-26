@@ -82,9 +82,10 @@ as `extempore send` does (`.nrepl-port`, or 7888); the `initializationOptions`
 
 Without a running extempore it reports unbalanced parentheses (when a file is
 opened or saved), gives an outline of the definitions in a file and folding
-ranges, and [formats](#formatting) a document or a range of its lines. With one, it completes names (Scheme's and xtlang's), shows a
-function's arguments, type and docstring on hover, and adds three commands,
-which are also offered as code actions:
+ranges, and [formats](#formatting) a document or a range of its lines. With
+one, it completes names (Scheme's and xtlang's), shows a function's arguments,
+type and docstring on hover, and adds three commands, which are also offered as
+code actions:
 
 | command                | argument       | what it does                                                         |
 | ---------------------- | -------------- | -------------------------------------------------------------------- |
@@ -105,9 +106,11 @@ it, or give it `--file` and `--line`.
 `extempore fmt` formats `.xtm` files: `extempore fmt FILE` or `extempore fmt DIR`
 rewrites them in place, `--check` lists the ones which aren't formatted (and
 exits 1 if there are any), and with no files it formats stdin to stdout. It
-changes whitespace only. Each line is indented by the Lisp convention: a call's
-arguments align with the first one, a special form's body indents two columns,
-and data aligns with its first element. Whitespace at the ends of lines and of
+changes whitespace only. A call's arguments align with the first one when it's
+on the head's line, and indent two columns when it isn't; a special form's body
+(`lambda`, `let`, `when`, a `bind-func`, and anything named `define…`, `def-…`
+or `with-…`) indents two columns; data (a quoted list, a vector, a list not
+headed by a symbol) aligns with its first element. Whitespace at the ends of lines and of
 the file goes. Line breaks stay where they are, and so do the lines of a string
 or a block comment. The Extempore source tree is formatted this way, and CI
 checks that it stays so.
