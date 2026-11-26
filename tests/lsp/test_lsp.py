@@ -23,7 +23,9 @@ class Editor:
 
     def __init__(self, *args: str, options: dict | None = None, utf8: bool = False):
         self.proc = subprocess.Popen(
-            [str(BIN), "lsp", *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            [str(BIN), "lsp", *args],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
         self.inbox: queue.Queue[dict] = queue.Queue()
@@ -31,11 +33,17 @@ class Editor:
         self.ids = 0
         self.reader = threading.Thread(target=self._read, daemon=True)
         self.reader.start()
-        capabilities = {"general": {"positionEncodings": ["utf-8", "utf-16"]}} if utf8 else {}
+        capabilities = (
+            {"general": {"positionEncodings": ["utf-8", "utf-16"]}} if utf8 else {}
+        )
         self.capabilities = self.request(
             "initialize",
-            {"processId": None, "rootUri": None, "capabilities": capabilities,
-             "initializationOptions": options or {}},
+            {
+                "processId": None,
+                "rootUri": None,
+                "capabilities": capabilities,
+                "initializationOptions": options or {},
+            },
         )["capabilities"]
         self.notify("initialized", {})
 
@@ -85,7 +93,9 @@ class Editor:
         self.ids += 1
         ident = self.ids
         self._send({"id": ident, "method": method, "params": params})
-        reply = self._next(lambda m: m.get("id") == ident and "method" not in m, timeout)
+        reply = self._next(
+            lambda m: m.get("id") == ident and "method" not in m, timeout
+        )
         if "error" in reply:
             raise RuntimeError(reply["error"])
         return reply["result"]
@@ -104,28 +114,59 @@ class Editor:
 
     def open(self, text: str, uri: str = URI) -> None:
         self.version = 1
-        self.notify("textDocument/didOpen", {"textDocument": {
-            "uri": uri, "languageId": "extempore", "version": 1, "text": text}})
+        self.notify(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": uri,
+                    "languageId": "extempore",
+                    "version": 1,
+                    "text": text,
+                }
+            },
+        )
 
     def change(self, text: str, uri: str = URI) -> None:
         self.version += 1
-        self.notify("textDocument/didChange", {
-            "textDocument": {"uri": uri, "version": self.version},
-            "contentChanges": [{"text": text}]})
+        self.notify(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": uri, "version": self.version},
+                "contentChanges": [{"text": text}],
+            },
+        )
 
     def save(self, uri: str = URI) -> None:
         self.notify("textDocument/didSave", {"textDocument": {"uri": uri}})
 
     def diagnostics(self, timeout: float = 30) -> list[dict]:
-        return self.notification("textDocument/publishDiagnostics", timeout)["diagnostics"]
+        return self.notification("textDocument/publishDiagnostics", timeout)[
+            "diagnostics"
+        ]
 
-    def eval_at(self, line: int, character: int = 0, end: tuple[int, int] | None = None,
-                uri: str = URI) -> None:
+    def eval_at(
+        self,
+        line: int,
+        character: int = 0,
+        end: tuple[int, int] | None = None,
+        uri: str = URI,
+    ) -> None:
         stop = end or (line, character)
-        self.request("workspace/executeCommand", {"command": "extempore.eval", "arguments": [{
-            "uri": uri,
-            "range": {"start": {"line": line, "character": character},
-                      "end": {"line": stop[0], "character": stop[1]}}}]})
+        self.request(
+            "workspace/executeCommand",
+            {
+                "command": "extempore.eval",
+                "arguments": [
+                    {
+                        "uri": uri,
+                        "range": {
+                            "start": {"line": line, "character": character},
+                            "end": {"line": stop[0], "character": stop[1]},
+                        },
+                    }
+                ],
+            },
+        )
 
     def message(self, timeout: float = 60) -> tuple[int, str]:
         shown = self.notification("window/showMessage", timeout)
@@ -171,8 +212,10 @@ class WithoutExtempore(unittest.TestCase):
     def test_capabilities(self) -> None:
         caps = self.editor.capabilities
         self.assertEqual(caps["positionEncoding"], "utf-16")
-        self.assertEqual(set(caps["executeCommandProvider"]["commands"]),
-                         {"extempore.eval", "extempore.evalBuffer", "extempore.interrupt"})
+        self.assertEqual(
+            set(caps["executeCommandProvider"]["commands"]),
+            {"extempore.eval", "extempore.evalBuffer", "extempore.interrupt"},
+        )
         self.assertTrue(caps["documentSymbolProvider"])
         self.assertTrue(caps["codeActionProvider"])
         self.assertTrue(caps["hoverProvider"])
@@ -207,37 +250,68 @@ class WithoutExtempore(unittest.TestCase):
 
     def test_outline_and_folding(self) -> None:
         self.editor.open(SONG)
-        symbols = self.editor.request("textDocument/documentSymbol",
-                                      {"textDocument": {"uri": URI}})
-        self.assertEqual([(s["name"], s["detail"], s["kind"]) for s in symbols],
-                         [("tempo", "define", 13), ("play", "define", 12),
-                          ("osc", "bind-func", 12)])
-        self.assertEqual(symbols[2]["selectionRange"],
-                         {"start": {"line": 7, "character": 11},
-                          "end": {"line": 7, "character": 14}})
-        folds = self.editor.request("textDocument/foldingRange", {"textDocument": {"uri": URI}})
-        self.assertEqual(folds, [{"startLine": 3, "endLine": 5}, {"startLine": 7, "endLine": 9}])
+        symbols = self.editor.request(
+            "textDocument/documentSymbol", {"textDocument": {"uri": URI}}
+        )
+        self.assertEqual(
+            [(s["name"], s["detail"], s["kind"]) for s in symbols],
+            [("tempo", "define", 13), ("play", "define", 12), ("osc", "bind-func", 12)],
+        )
+        self.assertEqual(
+            symbols[2]["selectionRange"],
+            {
+                "start": {"line": 7, "character": 11},
+                "end": {"line": 7, "character": 14},
+            },
+        )
+        folds = self.editor.request(
+            "textDocument/foldingRange", {"textDocument": {"uri": URI}}
+        )
+        self.assertEqual(
+            folds, [{"startLine": 3, "endLine": 5}, {"startLine": 7, "endLine": 9}]
+        )
 
     def test_formatting(self) -> None:
         messy = "(define (f x)\n        (+ x 1))\n(define (g y)\n(* y 2))   \n"
 
         def edits(method: str, **params) -> list[dict]:
-            return self.editor.request(method, {"textDocument": {"uri": URI},
-                                                "options": {"tabSize": 2, "insertSpaces": True},
-                                                **params})
+            return self.editor.request(
+                method,
+                {
+                    "textDocument": {"uri": URI},
+                    "options": {"tabSize": 2, "insertSpaces": True},
+                    **params,
+                },
+            )
 
         self.editor.open(messy)
         whole = edits("textDocument/formatting")
         self.assertEqual(len(whole), 1)
-        self.assertEqual(whole[0]["newText"],
-                         "(define (f x)\n  (+ x 1))\n(define (g y)\n  (* y 2))\n")
+        self.assertEqual(
+            whole[0]["newText"],
+            "(define (f x)\n  (+ x 1))\n(define (g y)\n  (* y 2))\n",
+        )
         self.assertEqual(whole[0]["range"]["start"], {"line": 0, "character": 0})
         # a range reformats only its own lines
-        some = edits("textDocument/rangeFormatting",
-                     range={"start": {"line": 3, "character": 0}, "end": {"line": 3, "character": 2}})
-        self.assertEqual(some, [{"range": {"start": {"line": 3, "character": 0},
-                                           "end": {"line": 3, "character": 11}},
-                                 "newText": "  (* y 2))"}])
+        some = edits(
+            "textDocument/rangeFormatting",
+            range={
+                "start": {"line": 3, "character": 0},
+                "end": {"line": 3, "character": 2},
+            },
+        )
+        self.assertEqual(
+            some,
+            [
+                {
+                    "range": {
+                        "start": {"line": 3, "character": 0},
+                        "end": {"line": 3, "character": 11},
+                    },
+                    "newText": "  (* y 2))",
+                }
+            ],
+        )
         # a formatted document, or one which doesn't read, has nothing to change
         self.editor.change(whole[0]["newText"])
         self.assertEqual(edits("textDocument/formatting"), [])
@@ -248,14 +322,23 @@ class WithoutExtempore(unittest.TestCase):
         self.editor.open(SONG)
 
         def actions(start: tuple[int, int], end: tuple[int, int]) -> list[dict]:
-            return self.editor.request("textDocument/codeAction", {
-                "textDocument": {"uri": URI}, "context": {"diagnostics": []},
-                "range": {"start": {"line": start[0], "character": start[1]},
-                          "end": {"line": end[0], "character": end[1]}}})
+            return self.editor.request(
+                "textDocument/codeAction",
+                {
+                    "textDocument": {"uri": URI},
+                    "context": {"diagnostics": []},
+                    "range": {
+                        "start": {"line": start[0], "character": start[1]},
+                        "end": {"line": end[0], "character": end[1]},
+                    },
+                },
+            )
 
         at_cursor = actions((4, 3), (4, 3))
-        self.assertEqual([a["title"] for a in at_cursor],
-                         ["Evaluate top-level form", "Evaluate buffer"])
+        self.assertEqual(
+            [a["title"] for a in at_cursor],
+            ["Evaluate top-level form", "Evaluate buffer"],
+        )
         self.assertEqual(at_cursor[0]["command"]["command"], "extempore.eval")
         self.assertEqual(at_cursor[0]["command"]["arguments"][0]["uri"], URI)
         self.assertEqual(actions((4, 2), (4, 23))[0]["title"], "Evaluate selection")
@@ -311,8 +394,9 @@ class WithExtempore(unittest.TestCase):
         self.open('(begin (println "one") (println "two") (+ 40 2))\n')
         self.editor.eval_at(0, 0)
         self.assertEqual(self.editor.message(), (INFO, '"one"  => 42'))
-        self.assertEqual(self.editor.notification("window/logMessage")["message"],
-                         '"one"\n"two"\n')
+        self.assertEqual(
+            self.editor.notification("window/logMessage")["message"], '"one"\n"two"\n'
+        )
 
     def test_the_buffer_is_evaluated_as_it_stands_unsaved(self) -> None:
         self.open("(+ 1 2)\n")
@@ -351,8 +435,10 @@ class WithExtempore(unittest.TestCase):
         self.assertEqual(kind, ERROR)
         self.assertIn("car argument, 5, is an integer", shown)
         (found,) = self.editor.diagnostics()
-        self.assertEqual(found["range"], {"start": {"line": 4, "character": 0},
-                                          "end": {"line": 4, "character": 8}})
+        self.assertEqual(
+            found["range"],
+            {"start": {"line": 4, "character": 0}, "end": {"line": 4, "character": 8}},
+        )
         self.assertIn("car argument, 5, is an integer", found["message"])
         self.assertEqual(found["source"], "extempore")
 
@@ -364,7 +450,9 @@ class WithExtempore(unittest.TestCase):
         # the cause is fixed and the form evaluated again: the mark goes
         fixed = (";; a comment\n" + text).replace("(car 5)", "(car '(5))")
         self.editor.change(fixed)
-        self.assertEqual(len(self.editor.diagnostics()), 1)  # (broken) itself is unchanged
+        self.assertEqual(
+            len(self.editor.diagnostics()), 1
+        )  # (broken) itself is unchanged
         self.editor.eval_at(4, 3)
         self.editor.message()
         self.editor.diagnostics()
@@ -391,15 +479,19 @@ class WithExtempore(unittest.TestCase):
 
     def test_eval_buffer(self) -> None:
         self.open('(define lsp-a 20)\n(println "loading")\n(+ lsp-a 22)\n')
-        self.editor.request("workspace/executeCommand", {
-            "command": "extempore.evalBuffer", "arguments": [{"uri": URI}]})
+        self.editor.request(
+            "workspace/executeCommand",
+            {"command": "extempore.evalBuffer", "arguments": [{"uri": URI}]},
+        )
         self.assertEqual(self.editor.message(), (INFO, '"loading"  => 42'))
         self.assertEqual(self.editor.diagnostics(), [])
         # a form which fails is marked, wherever the cursor was
         self.editor.change("(define lsp-a 20)\n\n(car lsp-a)\n(+ 1 2)\n")
         self.editor.diagnostics()
-        self.editor.request("workspace/executeCommand", {
-            "command": "extempore.evalBuffer", "arguments": [{"uri": URI}]})
+        self.editor.request(
+            "workspace/executeCommand",
+            {"command": "extempore.evalBuffer", "arguments": [{"uri": URI}]},
+        )
         self.assertEqual(self.editor.message()[0], ERROR)
         (found,) = self.editor.diagnostics()
         self.assertEqual(found["range"]["start"], {"line": 2, "character": 0})
@@ -408,58 +500,89 @@ class WithExtempore(unittest.TestCase):
         self.open("(let loop ((i 0)) (set! i (+ i 1)) (loop i))\n")
         self.editor.eval_at(0, 0)
         time.sleep(0.5)
-        self.editor.request("workspace/executeCommand",
-                            {"command": "extempore.interrupt", "arguments": []})
+        self.editor.request(
+            "workspace/executeCommand",
+            {"command": "extempore.interrupt", "arguments": []},
+        )
         self.assertEqual(self.editor.message(), (WARNING, "interrupted"))
         # and with nothing running it says so
-        self.editor.request("workspace/executeCommand",
-                            {"command": "extempore.interrupt", "arguments": []})
+        self.editor.request(
+            "workspace/executeCommand",
+            {"command": "extempore.interrupt", "arguments": []},
+        )
         self.assertEqual(self.editor.message(), (INFO, "nothing is being evaluated"))
 
     def test_completion(self) -> None:
         self.open("(define lsp-complete-one 1)\n(define (lsp-complete-two x) x)\n")
-        self.editor.request("workspace/executeCommand", {
-            "command": "extempore.evalBuffer", "arguments": [{"uri": URI}]})
+        self.editor.request(
+            "workspace/executeCommand",
+            {"command": "extempore.evalBuffer", "arguments": [{"uri": URI}]},
+        )
         self.editor.message()
         self.editor.change("(define lsp-complete-one 1)\n(+ 1 lsp-compl\n")
-        items = self.editor.request("textDocument/completion", {
-            "textDocument": {"uri": URI}, "position": {"line": 1, "character": 14}})
-        self.assertEqual([(i["label"], i["kind"]) for i in items],
-                         [("lsp-complete-one", 6), ("lsp-complete-two", 3)])
+        items = self.editor.request(
+            "textDocument/completion",
+            {"textDocument": {"uri": URI}, "position": {"line": 1, "character": 14}},
+        )
+        self.assertEqual(
+            [(i["label"], i["kind"]) for i in items],
+            [("lsp-complete-one", 6), ("lsp-complete-two", 3)],
+        )
         # the edit replaces the whole of what was typed, hyphens and all
-        self.assertEqual(items[0]["textEdit"], {
-            "newText": "lsp-complete-one",
-            "range": {"start": {"line": 1, "character": 5},
-                      "end": {"line": 1, "character": 14}}})
+        self.assertEqual(
+            items[0]["textEdit"],
+            {
+                "newText": "lsp-complete-one",
+                "range": {
+                    "start": {"line": 1, "character": 5},
+                    "end": {"line": 1, "character": 14},
+                },
+            },
+        )
         # xtlang's own names complete too
         self.editor.change("(bind-fu\n")
-        items = self.editor.request("textDocument/completion", {
-            "textDocument": {"uri": URI}, "position": {"line": 0, "character": 8}})
+        items = self.editor.request(
+            "textDocument/completion",
+            {"textDocument": {"uri": URI}, "position": {"line": 0, "character": 8}},
+        )
         self.assertIn(("bind-func", 14), [(i["label"], i["kind"]) for i in items])
 
     def test_hover(self) -> None:
-        self.open('(bind-func lsp_hover_fn "halves its argument"\n'
-                  "  (lambda (x:double) (/ x 2.0)))\n(lsp_hover_fn 3.0)\n"
-                  "(bind-func lsp_hover_typed:[i64,i64]* (lambda (n) (+ n 1)))\n")
-        self.editor.request("workspace/executeCommand", {
-            "command": "extempore.evalBuffer", "arguments": [{"uri": URI}]})
+        self.open(
+            '(bind-func lsp_hover_fn "halves its argument"\n'
+            "  (lambda (x:double) (/ x 2.0)))\n(lsp_hover_fn 3.0)\n"
+            "(bind-func lsp_hover_typed:[i64,i64]* (lambda (n) (+ n 1)))\n"
+        )
+        self.editor.request(
+            "workspace/executeCommand",
+            {"command": "extempore.evalBuffer", "arguments": [{"uri": URI}]},
+        )
         self.assertEqual(self.editor.message(timeout=120)[0], INFO)
 
         def hover(line: int, character: int):
-            return self.editor.request("textDocument/hover", {
-                "textDocument": {"uri": URI}, "position": {"line": line, "character": character}})
+            return self.editor.request(
+                "textDocument/hover",
+                {
+                    "textDocument": {"uri": URI},
+                    "position": {"line": line, "character": character},
+                },
+            )
 
         shown = hover(2, 5)
-        self.assertEqual(shown["range"], {"start": {"line": 2, "character": 1},
-                                          "end": {"line": 2, "character": 13}})
+        self.assertEqual(
+            shown["range"],
+            {"start": {"line": 2, "character": 1}, "end": {"line": 2, "character": 13}},
+        )
         self.assertEqual(shown["contents"]["kind"], "markdown")
         text = shown["contents"]["value"]
         self.assertIn("(lsp_hover_fn x)  ; [double,double]*", text)
         self.assertIn("halves its argument", text)
         # a name with its type annotation is looked up by the name
-        self.assertIn("(lsp_hover_typed n)  ; [i64,i64]*", hover(3, 15)["contents"]["value"])
+        self.assertIn(
+            "(lsp_hover_typed n)  ; [i64,i64]*", hover(3, 15)["contents"]["value"]
+        )
         # a name with a colon of its own is looked up whole
-        self.editor.change("(sys:load \"x\")\n")
+        self.editor.change('(sys:load "x")\n')
         self.assertIn("sys:load", hover(0, 4)["contents"]["value"])
         self.assertIsNone(hover(0, 12))  # a string is nothing
 

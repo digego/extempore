@@ -392,10 +392,9 @@ class Server {
             {"capabilities",
              json::Object{
                  {"positionEncoding", m_utf8 ? "utf-8" : "utf-16"},
-                 {"textDocumentSync",
-                  json::Object{{"openClose", true},
-                               {"change", 1},  // the whole document each time
-                               {"save", json::Object{{"includeText", false}}}}},
+                 {"textDocumentSync", json::Object{{"openClose", true},
+                                                   {"change", 1},  // the whole document each time
+                                                   {"save", json::Object{{"includeText", false}}}}},
                  {"documentSymbolProvider", true},
                  {"foldingRangeProvider", true},
                  {"documentFormattingProvider", true},
@@ -449,8 +448,8 @@ class Server {
                 {"detail", std::string(definition.head)},
                 {"kind", kind},
                 {"range", range(doc, definition.form.begin, definition.form.end)},
-                {"selectionRange", range(doc, definition.nameOffset,
-                                         definition.nameOffset + definition.name.size())},
+                {"selectionRange",
+                 range(doc, definition.nameOffset, definition.nameOffset + definition.name.size())},
             });
         }
         return result;
@@ -489,12 +488,14 @@ class Server {
         }
         const json::Object* where = InRange ? Params.getObject("range") : nullptr;
         if (!where) {
-            edits.push_back(json::Object{{"range", range(doc, 0, doc.text.size())},
-                                         {"newText", *result}});
+            edits.push_back(
+                json::Object{{"range", range(doc, 0, doc.text.size())}, {"newText", *result}});
             return edits;
         }
-        const std::size_t first = positionAt(doc.text, offsetIn(doc, where->getObject("start")), m_utf8).line;
-        const std::size_t last = positionAt(doc.text, offsetIn(doc, where->getObject("end")), m_utf8).line;
+        const std::size_t first =
+            positionAt(doc.text, offsetIn(doc, where->getObject("start")), m_utf8).line;
+        const std::size_t last =
+            positionAt(doc.text, offsetIn(doc, where->getObject("end")), m_utf8).line;
         const auto lineStarts = [](std::string_view Text) {
             std::vector<std::size_t> starts{0};
             for (std::size_t i = 0; i < Text.size(); ++i) {
@@ -512,9 +513,8 @@ class Server {
         };
         const auto docStarts = lineStarts(doc.text);
         const auto newStarts = lineStarts(*result);
-        for (std::size_t line = first; line <= last && line < docStarts.size() &&
-                                       line < newStarts.size();
-             ++line) {
+        for (std::size_t line = first;
+             line <= last && line < docStarts.size() && line < newStarts.size(); ++line) {
             const auto [begin, end] = lineOf(doc.text, docStarts, line);
             const auto [newBegin, newEnd] = lineOf(*result, newStarts, line);
             const std::string_view now = std::string_view(doc.text).substr(begin, end - begin);
@@ -622,9 +622,10 @@ class Server {
         if (prefix.empty()) {
             return items;
         }
-        const auto reply = ask(
-            uri, bencode::Dict{{"op", bencode::Value("completions")}, {"prefix", bencode::Value(prefix)}},
-            Lock);
+        const auto reply = ask(uri,
+                               bencode::Dict{{"op", bencode::Value("completions")},
+                                             {"prefix", bencode::Value(prefix)}},
+                               Lock);
         const bencode::Value* candidates = reply ? bencode::find(*reply, "completions") : nullptr;
         if (!candidates || !candidates->isList()) {
             return items;
@@ -636,15 +637,15 @@ class Server {
             const std::string name(bencode::findString(candidate.dict, "candidate"));
             const auto type = bencode::findString(candidate.dict, "type");
             // 3 function, 14 keyword, 7 class, 6 variable
-            const int kind = type == "function" ? 3
+            const int kind = type == "function"                            ? 3
                              : (type == "macro" || type == "special-form") ? 14
-                             : type == "class" ? 7
-                                               : 6;
+                             : type == "class"                             ? 7
+                                                                           : 6;
             items.push_back(json::Object{
                 {"label", json::fixUTF8(name)},
                 {"kind", kind},
-                {"textEdit", json::Object{{"range", json::Object(replaced)},
-                                          {"newText", json::fixUTF8(name)}}},
+                {"textEdit",
+                 json::Object{{"range", json::Object(replaced)}, {"newText", json::fixUTF8(name)}}},
             });
         }
         return items;
@@ -694,7 +695,8 @@ class Server {
                     text += "\n\n" + doc;
                 }
                 return json::Object{
-                    {"contents", json::Object{{"kind", "markdown"}, {"value", json::fixUTF8(text)}}},
+                    {"contents",
+                     json::Object{{"kind", "markdown"}, {"value", json::fixUTF8(text)}}},
                     {"range", json::Object(where)},
                 };
             }
@@ -773,8 +775,9 @@ class Server {
             arguments && !arguments->empty() ? arguments->front().getAsObject() : nullptr;
         if (command == "extempore.interrupt") {
             if (m_link && m_link->alive && !m_link->pending.empty()) {
-                m_link->connection.send(bencode::Dict{{"op", bencode::Value("interrupt")},
-                                                      {"session", bencode::Value(m_link->session)}});
+                m_link->connection.send(
+                    bencode::Dict{{"op", bencode::Value("interrupt")},
+                                  {"session", bencode::Value(m_link->session)}});
             } else {
                 showMessage(Info, "nothing is being evaluated");
             }
@@ -787,8 +790,8 @@ class Server {
         const std::string uri(argument ? argument->getString("uri").value_or("") : "");
         const auto found = m_documents.find(uri);
         if (found == m_documents.end()) {
-            showMessage(Error, std::string(command) +
-                                   " takes {uri, range} for a document which is open");
+            showMessage(Error,
+                        std::string(command) + " takes {uri, range} for a document which is open");
             return;
         }
         const Document& doc = found->second;
@@ -863,8 +866,8 @@ class Server {
             m_link.reset();
             m_lastFailure = now;
             if (!Quiet) {
-                showMessage(Error, "no extempore to talk to: no nREPL server at " + where +
-                                       " (" + why + ")");
+                showMessage(Error, "no extempore to talk to: no nREPL server at " + where + " (" +
+                                       why + ")");
             }
             return false;
         }
