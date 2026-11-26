@@ -189,6 +189,11 @@ are no longer special. A pattern which doesn't compile still matches nothing,
 and now a warning says why. `rsplit` and `rreplace`, which those functions call,
 take the size of their buffers as a last argument.
 
+`regex_split` splits as `regex:split` does. A pattern with a group in it used
+not to split at all, and a separator at the start of the string gave the whole
+string as the first piece, where it now gives an empty one. A pattern which can
+match nothing (`x*`) splits between every character.
+
 ## v0.11.2
 
 A one-bug patch release, for a bug that made v0.11.0 and v0.11.1 close to

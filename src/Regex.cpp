@@ -168,19 +168,28 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b, int64_t
         return false;
     }
     const auto matchData(matchDataFor(re));
-    // a pattern with groups in it has never split anything
-    if (search(re, matchData, str) != 1) {
+    if (search(re, matchData, str) < 1) {
         return false;
     }
     const PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(matchData.get());
-    const size_t before = ovector[0];
-    const size_t after = strlen(str) - ovector[1];
+    size_t before = ovector[0];
+    size_t rest = ovector[1];
+    if (rest == 0) {
+        // An empty match at the start: split off one character, as regex:split
+        // does, so a caller which splits what's left makes progress.
+        if (str[0] == '\0') {
+            return false;
+        }
+        before = 1;
+        rest = 1;
+    }
+    const size_t after = strlen(str) - rest;
     if (before >= size_t(size) || after >= size_t(size)) {
         return false;
     }
     memcpy(a, str, before);
     a[before] = '\0';
-    memcpy(b, str + ovector[1], after);
+    memcpy(b, str + rest, after);
     b[after] = '\0';
     return true;
 }

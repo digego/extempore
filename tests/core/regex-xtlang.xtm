@@ -75,6 +75,16 @@
 (xtmtest-result (rxtest_split "[0-9]+" "one1two22three" 3 "onetwothree") 1)
 ;; no separator in the string: the one piece is the string
 (xtmtest-result (rxtest_split "x" "abc" 1 "abc") 1)
+;; as regex:split has it: a separator at the start gives an empty first piece,
+;; two together an empty piece between them, and one at the end nothing more
+(xtmtest-result (rxtest_split "," ",a,b" 3 "ab") 1)
+(xtmtest-result (rxtest_split "," "a,,b" 3 "ab") 1)
+(xtmtest-result (rxtest_split "," "a,b," 2 "ab") 1)
+;; a pattern with a group in it splits like any other
+(xtmtest-result (rxtest_split "(,)|(;)" "a,b;c" 3 "abc") 1)
+;; a pattern which matches nothing at all splits between every character
+(xtmtest-result (rxtest_split "x*" "abc" 3 "abc") 1)
+(xtmtest-result (rxtest_split ",*" "a,b" 3 "ab") 1)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; regex_matches: every match, up to a maximum
