@@ -6,7 +6,7 @@
 namespace extemp::bencode {
 
 const Value* find(const Dict& D, std::string_view Key) {
-    auto it = D.find(Key);
+    const auto it = D.find(Key);
     return it == D.end() ? nullptr : &it->second;
 }
 

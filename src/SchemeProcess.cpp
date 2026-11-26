@@ -159,7 +159,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
 
 std::vector<std::string> SchemeProcess::liveNames() {
     std::vector<std::string> names;
-    for (auto& slot : sm_live) {
+    for (const auto& slot : sm_live) {
         if (SchemeProcess* process = slot.load()) {
             names.push_back(process->m_name);
         }
@@ -168,7 +168,7 @@ std::vector<std::string> SchemeProcess::liveNames() {
 }
 
 SchemeProcess* SchemeProcess::find(const std::string& Name) {
-    for (auto& slot : sm_live) {
+    for (const auto& slot : sm_live) {
         SchemeProcess* process = slot.load();
         if (process && process->m_name == Name) {
             return process;
@@ -308,7 +308,7 @@ bool SchemeProcess::waitAll(const std::atomic<bool>& Cancel, bool SchedulerToo) 
         bool idle = true;
         {
             const std::lock_guard<std::mutex> live(sm_liveMutex);
-            for (auto& slot : sm_live) {
+            for (const auto& slot : sm_live) {
                 SchemeProcess* process = slot.load();
                 if (!process) {
                     continue;
@@ -476,17 +476,17 @@ void* SchemeProcess::taskImpl() {
                     } else {
                         if (m_banner) {
                             uint64_t time(UNIV::TIME);
-                            auto hours(time / UNIV::HOUR());
+                            const auto hours(time / UNIV::HOUR());
                             time -= hours * UNIV::HOUR();
-                            auto minutes(time / UNIV::MINUTE());
+                            const auto minutes(time / UNIV::MINUTE());
                             time -= minutes * UNIV::MINUTE();
-                            auto seconds(time / UNIV::SECOND());
+                            const auto seconds(time / UNIV::SECOND());
                             ss << std::format("\n[extempore {:02}:{:02}:{:02}]: ", hours % 100,
                                               minutes % 60, seconds % 60);
                         }
                         UNIV::printSchemeCell(m_scheme, ss, m_scheme->value);
                         if (write_reply) {
-                            auto res(ss.str());
+                            const auto res(ss.str());
                             send(returnSocket, res.c_str(), int(res.length() + 1), 0);
                         }
                     }
@@ -565,7 +565,7 @@ void SchemeProcess::writeHangReports() {
     static const char* const typeNames[] = {
         "REPL", "SCHEME_CALLBACK",      "DESTROY_ENV",        "CALLBACK_SYMBOL",
         "?",    "LOCAL_PROCESS_STRING", "EXTEMPORE_CALLBACK", "NREPL"};
-    for (auto& slot : sm_live) {
+    for (const auto& slot : sm_live) {
         SchemeProcess* process = slot.load();
         if (!process) {
             continue;
@@ -637,8 +637,8 @@ void* SchemeProcess::serverImpl() {
         if (fds[0].revents & POLLIN) [[unlikely]] {  // new connection on the server socket
             sockaddr_in client_address;
             socklen_t clientAddressSize(sizeof(client_address));
-            auto sock(accept(m_serverSocket, reinterpret_cast<sockaddr*>(&client_address),
-                             &clientAddressSize));
+            const auto sock(accept(m_serverSocket, reinterpret_cast<sockaddr*>(&client_address),
+                                   &clientAddressSize));
             if (sock == INVALID_SOCKET) [[unlikely]] {
                 log::error(log::server, "could not accept a connection to the {} process: {}",
                            m_name, strerror(errno));
@@ -649,11 +649,11 @@ void* SchemeProcess::serverImpl() {
                 if (m_banner) {
                     outString += sm_banner;
                     uint64_t time(UNIV::TIME);
-                    auto hours(time / UNIV::HOUR());
+                    const auto hours(time / UNIV::HOUR());
                     time -= hours * UNIV::HOUR();
-                    auto minutes(time / UNIV::MINUTE());
+                    const auto minutes(time / UNIV::MINUTE());
                     time -= minutes * UNIV::MINUTE();
-                    auto seconds(time / UNIV::SECOND());
+                    const auto seconds(time / UNIV::SECOND());
                     outString += std::format("[extempore {:02}:{:02}:{:02}]: ", hours % 100,
                                              minutes % 60, seconds % 60);
                 } else {
@@ -672,7 +672,7 @@ void* SchemeProcess::serverImpl() {
             auto& client = clients[i];
             bool disconnected = (revents & POLLNVAL) != 0;
             if (!disconnected) {
-                auto n = recv(client.fd, buf, BUFLEN, 0);
+                const auto n = recv(client.fd, buf, BUFLEN, 0);
                 if (n == 0) {
                     disconnected = true;
                 } else if (n < 0) {

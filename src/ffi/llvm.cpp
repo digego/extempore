@@ -114,7 +114,7 @@ static std::string formatLLVMType(llvm::Type* Type) {
     if (auto* ST = llvm::dyn_cast<llvm::StructType>(Type)) {
         if (ST->hasName()) {
             const llvm::StringRef name = ST->getName();
-            auto dotPos = name.rfind('.');
+            const auto dotPos = name.rfind('.');
             if (dotPos != llvm::StringRef::npos) {
                 const llvm::StringRef suffix = name.substr(dotPos + 1);
                 const bool isNumericSuffix =
@@ -342,7 +342,7 @@ static pointer get_global_variable_type(scheme* Scheme, pointer Args) {
 
 static pointer get_function_pointer(scheme* Scheme, pointer Args) {
     auto name(argString(Scheme, Args, 1));
-    auto addr = EXTLLVM::getFunctionAddress(name);
+    const auto addr = EXTLLVM::getFunctionAddress(name);
     if (!addr) {
         return Scheme->F;
     }
@@ -549,7 +549,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
     }
 
     pointer result = Scheme->F;
-    auto stubAddr = EXTLLVM::getFunctionAddress(stubName);
+    const auto stubAddr = EXTLLVM::getFunctionAddress(stubName);
     if (!stubAddr) {
         log::error(log::jit, "failed to resolve call stub");
     } else {
@@ -605,7 +605,7 @@ static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args) {
     }
     const llvm::APFloat apf(llvm::APFloat::IEEEsingle(), llvm::StringRef(floatin));
     // TODO: if necessary, checks for inf/nan can be done here
-    auto ival(llvm::APInt::doubleToBits(apf.convertToFloat()));
+    const auto ival(llvm::APInt::doubleToBits(apf.convertToFloat()));
     return mk_string(Scheme,
                      (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
 }
@@ -620,7 +620,7 @@ static pointer llvm_convert_double_constant(scheme* Scheme, pointer Args) {
     // TODO: if necessary, checks for inf/nan can be done here
     // convertToDouble, not convertToFloat: this APFloat is an IEEEdouble, and
     // asking for the float value of one is a hard error in LLVM
-    auto ival(llvm::APInt::doubleToBits(apf.convertToDouble()));
+    const auto ival(llvm::APInt::doubleToBits(apf.convertToDouble()));
     return mk_string(Scheme,
                      (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
 }
@@ -804,7 +804,7 @@ static pointer get_llvm_alias(scheme* Scheme, pointer Args) {
     std::string target;
     {
         const std::lock_guard<std::mutex> lock(LLVM_ALIAS_TABLE_MUTEX);
-        auto iter(LLVM_ALIAS_TABLE.find(alias));
+        const auto iter(LLVM_ALIAS_TABLE.find(alias));
         if (iter == LLVM_ALIAS_TABLE.end()) {
             return Scheme->F;
         }
@@ -926,7 +926,7 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args) {
     auto hostFeatures = llvm::sys::getHostCPUFeatures();
     for (auto& feature : hostFeatures) {
         if (!features.empty())
-            features += ",";
+            features += ',';
         features += (feature.getValue() ? "+" : "-");
         features += feature.getKey().str();
     }
@@ -1123,7 +1123,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
 
         // Add function/global declarations for previously compiled symbols.
         // This allows the current module to reference symbols from earlier compiles.
-        for (auto& func : mod->functions()) {
+        for (const auto& func : mod->functions()) {
             if (!func.isDeclaration())
                 continue;
             if (func.isIntrinsic())
@@ -1206,7 +1206,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
         // Work out what the module exports and imports, clone it for
         // the metadata view, and hand both to the JIT under one tracker.
         auto symbols = EXTLLVM::collectModuleSymbols(*mod);
-        auto exportedNames = symbols.exports;
+        const auto exportedNames = symbols.exports;
         auto metadataModule = CloneModule(*mod);
         llvm::Module* metadata = metadataModule.get();
 

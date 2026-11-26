@@ -169,7 +169,7 @@ EXPORT char* cname_decode(char* data, size_t input_length, size_t* output_length
     }
     decoded_data[*output_length] = 0;
 
-    auto fetch = [&](unsigned& i) -> uint32_t {
+    const auto fetch = [&](unsigned& i) -> uint32_t {
         const unsigned char c = static_cast<unsigned char>(data[i++]);
         return c == '$' ? 0u : base64_codesafe_decoding_table[c];
     };
@@ -241,7 +241,7 @@ EXPORT unsigned char* base64_decode(const char* data, size_t input_length, size_
     if (decoded_data == nullptr)
         return nullptr;
 
-    auto fetch = [&](unsigned& i) -> uint32_t {
+    const auto fetch = [&](unsigned& i) -> uint32_t {
         const unsigned char c = static_cast<unsigned char>(data[i++]);
         return c == '=' ? 0u : base64_std_decoding_table[c];
     };
@@ -326,7 +326,7 @@ std::filesystem::path executable_path() {
     }
 #endif
     std::error_code ec;
-    auto resolved = std::filesystem::canonical(raw, ec);
+    const auto resolved = std::filesystem::canonical(raw, ec);
     return ec ? raw : resolved;
 }
 
@@ -341,12 +341,12 @@ std::string executable_file() {
 }
 
 std::string resolve_share_dir(std::string_view explicit_dir) {
-    auto exe = executable_path();
+    const auto exe = executable_path();
     return share_dir::pick(explicit_dir, exe.empty() ? exe : exe.parent_path(), EXT_SHARE_DIR);
 }
 
 std::string resolve_build_dir(std::string_view share_dir) {
-    auto exe = executable_path();
+    const auto exe = executable_path();
     return share_dir::pick_build_dir(exe.empty() ? exe : exe.parent_path(), share_dir);
 }
 
@@ -357,7 +357,7 @@ std::string find_file(const std::string& path) {
         return path;
     }
     for (const std::string* root : {&BUILD_DIR, &SHARE_DIR}) {
-        auto candidate = std::filesystem::path(*root) / p;
+        const auto candidate = std::filesystem::path(*root) / p;
         if (std::filesystem::exists(candidate, ec)) {
             return candidate.string();
         }

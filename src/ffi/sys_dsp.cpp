@@ -89,7 +89,7 @@ static pointer getAudioLoad(scheme* Scheme, pointer Args) {
 
 // (underflows . overflows) since startup, as counted by the audio callback
 static pointer getAudioXruns(scheme* Scheme, pointer Args) {
-    auto counts = AudioDevice::I()->getXrunCounts();
+    const auto counts = AudioDevice::I()->getXrunCounts();
     return cons(Scheme, mk_integer(Scheme, int64_t(counts.first)),
                 mk_integer(Scheme, int64_t(counts.second)));
 }

@@ -127,7 +127,7 @@ std::mutex OSC::SCHEME_MAP_MUTEX;
 
 OSC* OSC::I(scheme* _sc) {
     const std::lock_guard<std::mutex> lock(SCHEME_MAP_MUTEX);
-    auto entry = SCHEME_MAP.find(_sc);
+    const auto entry = SCHEME_MAP.find(_sc);
     return entry == SCHEME_MAP.end() ? nullptr : entry->second;
 }
 
@@ -178,14 +178,14 @@ static void osc_emit_scheme_message(SchemeProcess* proc, const char* fname, doub
     }
     std::string form("(");
     form += fname;
-    form += " ";
+    form += ' ';
     form += osc_text::scheme_real_literal(t);
-    form += " ";
+    form += ' ';
     form += osc_text::scheme_string_literal(address);
     if (include_netaddr) {
-        form += " ";
+        form += ' ';
         form += osc_text::scheme_string_literal(netaddy);
-        form += " ";
+        form += ' ';
         form += std::to_string(netport);
     }
     auto streams = argv.state();
@@ -220,7 +220,7 @@ static void osc_emit_scheme_message(SchemeProcess* proc, const char* fname, doub
             if (--depth < 0) {
                 return;  // unbalanced array tags: drop the message
             }
-            form += ")";
+            form += ')';
             break;
         default:
             return;  // unsupported type tag: drop the message
@@ -229,7 +229,7 @@ static void osc_emit_scheme_message(SchemeProcess* proc, const char* fname, doub
     if (depth != 0) {
         return;  // unterminated array: drop rather than emit a broken form
     }
-    form += ")";
+    form += ')';
     if (proc != nullptr) {
         proc->createSchemeTask(new std::string(std::move(form)), "OSC TASK",
                                SchemeTask::Type::LOCAL_PROCESS_STRING);
@@ -266,11 +266,11 @@ static void osc_dispatch_packet(OSC* osc, SchemeProcess* proc, char* buf, int le
     try {
         const OSCPP::Server::Packet packet(buf, static_cast<size_t>(len));
         if (packet.isBundle()) {
-            auto bundle = static_cast<OSCPP::Server::Bundle>(packet);
+            const auto bundle = static_cast<OSCPP::Server::Bundle>(packet);
             const double t = osc_ntp_to_seconds(bundle.time());
             auto stream = bundle.packets();
             while (!stream.atEnd()) {
-                auto element = stream.next();  // bundle element size is bounds-checked
+                const auto element = stream.next();  // bundle element size is bounds-checked
                 if (element.isMessage())
                     osc_handle_message(osc, proc, t, static_cast<OSCPP::Server::Message>(element),
                                        include_netaddr, netaddy, netport);
@@ -571,24 +571,24 @@ void OSC::processArgs(pointer arg, osc::Writer& out, std::string& typetags, sche
     for (int i = 0; i < items; ++i) {
         if (is_string(pair_car(arg))) {
             out.string(string_value(pair_car(arg)));
-            typetags += "s";
+            typetags += 's';
         } else if (is_pair(pair_car(arg))) {
-            typetags += "[";
+            typetags += '[';
             processArgs(pair_car(arg), out, typetags, _sc, realType);
-            typetags += "]";
+            typetags += ']';
         } else if (is_vector(pair_car(arg)) || is_symbol(pair_car(arg))) {
             arg = pair_cdr(arg);
             continue;
         } else if (is_integer(pair_car(arg))) {
             out.int32(static_cast<int32_t>(ivalue(pair_car(arg))));
-            typetags += "i";
+            typetags += 'i';
         } else if (is_real(pair_car(arg))) {
             if (realType == 'f') {
                 out.float32(static_cast<float>(rvalue(pair_car(arg))));
-                typetags += "f";
+                typetags += 'f';
             } else {
                 out.float64(rvalue(pair_car(arg)));
-                typetags += "d";
+                typetags += 'd';
             }
         }
         arg = pair_cdr(arg);

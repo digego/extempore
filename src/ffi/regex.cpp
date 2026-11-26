@@ -67,15 +67,15 @@ static int regexExec(const regex::PatternPtr& Re, const regex::MatchDataPtr& Mat
 
 static pointer regex_match(scheme* Scheme, pointer Args) {
     const std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
-    auto matchData(matchDataFor(re));
+    const auto re(cachedPattern(argString(Scheme, Args, 2), Args));
+    const auto matchData(matchDataFor(re));
     return (regexExec(re, matchData, data) > 0) ? Scheme->T : Scheme->F;
 }
 
 static pointer regex_matched(scheme* Scheme, pointer Args) {
     const std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
-    auto matchData(matchDataFor(re));
+    const auto re(cachedPattern(argString(Scheme, Args, 2), Args));
+    const auto matchData(matchDataFor(re));
     const int rc = regexExec(re, matchData, data);
     pointer list = Scheme->NIL;
     if (rc < 1) {
@@ -100,8 +100,8 @@ static pointer regex_matched(scheme* Scheme, pointer Args) {
 
 static pointer regex_match_all(scheme* Scheme, pointer Args) {
     std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
-    auto matchData(matchDataFor(re));
+    const auto re(cachedPattern(argString(Scheme, Args, 2), Args));
+    const auto matchData(matchDataFor(re));
     pointer list = Scheme->NIL;
     while (!data.empty()) {
         if (regexExec(re, matchData, data) < 1) {
@@ -126,8 +126,8 @@ static pointer regex_match_all(scheme* Scheme, pointer Args) {
 
 static pointer regex_split(scheme* Scheme, pointer Args) {
     std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
-    auto matchData(matchDataFor(re));
+    const auto re(cachedPattern(argString(Scheme, Args, 2), Args));
+    const auto matchData(matchDataFor(re));
     pointer list = Scheme->NIL;
     while (true) {
         if (data.empty() || regexExec(re, matchData, data) < 1) {
@@ -167,7 +167,7 @@ static pointer regex_split(scheme* Scheme, pointer Args) {
 
 static pointer regex_replace(scheme* Scheme, pointer Args) {
     const std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
+    const auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     const std::string result = regex::replaceFirst(re, data, argString(Scheme, Args, 3));
     return mk_counted_string(Scheme, result.data(), int(result.size()));
 }

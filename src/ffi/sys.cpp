@@ -98,7 +98,7 @@ static pointer logUncaughtError(scheme* Scheme, pointer Args) {
 }
 
 static pointer cmdarg(scheme* Scheme, pointer Args) {
-    auto iter(UNIV::CMDPARAMS.find(argString(Scheme, Args, 1)));
+    const auto iter(UNIV::CMDPARAMS.find(argString(Scheme, Args, 1)));
     if (iter == UNIV::CMDPARAMS.end()) {
         return Scheme->F;
     }
@@ -155,7 +155,7 @@ static pointer symbol_pointer(scheme* Scheme, pointer Args) {
 }
 
 static pointer makeCptr(scheme* Scheme, pointer Args) {
-    auto num_bytes(argInt(Scheme, Args, 1));
+    const auto num_bytes(argInt(Scheme, Args, 1));
     if (num_bytes <= 0) {
         return Scheme->F;
     }

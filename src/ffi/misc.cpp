@@ -215,7 +215,7 @@ static pointer callCPPAtTime(scheme* Scheme, pointer Args) {
         log::error("task needs a valid CM pointer");
         return Scheme->F;
     }
-    auto task_type = argInt(Scheme, Args, 2);
+    const auto task_type = argInt(Scheme, Args, 2);
     // is_render_thread_type are for tasks that must be called in the render thread
     // primarily for midi calls to an AU that must occur on the audio thread
     if (task_type == 1) {
@@ -242,7 +242,7 @@ static std::string extractCell(scheme* Scheme, pointer Args, bool Full = false,
                                bool StringQuotes = true) {
     std::stringstream ss;
     UNIV::printSchemeCell(Scheme, ss, Args, Full, StringQuotes);
-    auto s(ss.str());
+    const auto s(ss.str());
     return s.substr(1, s.length() - 2);
 }
 

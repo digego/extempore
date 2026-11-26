@@ -435,7 +435,7 @@ static std::unordered_map<std::string, std::string> sAdhocAliases;
 static std::shared_mutex sAdhocAliasesMutex;
 
 static std::string stripAdhocCounter(std::string_view name) {
-    auto pos = name.find("_adhoc_");
+    const auto pos = name.find("_adhoc_");
     if (pos == std::string_view::npos)
         return "";
     const size_t afterAdhoc = pos + 7;
@@ -450,7 +450,7 @@ static std::string stripAdhocCounter(std::string_view name) {
 }
 
 void registerAdhocAlias(std::string_view fullName) {
-    auto alias = stripAdhocCounter(fullName);
+    const auto alias = stripAdhocCounter(fullName);
     if (!alias.empty()) {
         const std::unique_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
         sAdhocAliases[alias] = std::string(fullName);
@@ -460,7 +460,7 @@ void registerAdhocAlias(std::string_view fullName) {
 // Full name registered for a counter-less adhoc alias, or empty.
 static std::string lookupAdhocAlias(std::string_view name) {
     const std::shared_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
-    auto it = sAdhocAliases.find(std::string(name));
+    const auto it = sAdhocAliases.find(std::string(name));
     return it == sAdhocAliases.end() ? std::string() : it->second;
 }
 
@@ -474,7 +474,7 @@ uint64_t getFunctionAddress(std::string_view name) {
     if (!sym) {
         llvm::consumeError(sym.takeError());
         // Fall back to counter-less adhoc alias lookup
-        auto full = lookupAdhocAlias(name);
+        const auto full = lookupAdhocAlias(name);
         if (!full.empty()) {
             auto sym2 = JIT->lookup(full);
             if (sym2)
@@ -624,7 +624,7 @@ class GraceMemoryMapper final : public llvm::SectionMemoryManager::MemoryMapper,
             const std::lock_guard<std::mutex> lock(m_mutex);
             const auto now = clock::now();
             std::vector<Entry> kept;
-            for (auto& entry : m_graveyard) {
+            for (const auto& entry : m_graveyard) {
                 if (!All && now - entry.first < kCodeGracePeriod) {
                     kept.push_back(entry);
                 } else {
@@ -634,7 +634,7 @@ class GraceMemoryMapper final : public llvm::SectionMemoryManager::MemoryMapper,
             m_graveyard = std::move(kept);
         }
         for (auto& block : expired) {
-            if (auto ec = llvm::sys::Memory::releaseMappedMemory(block)) {
+            if (const auto ec = llvm::sys::Memory::releaseMappedMemory(block)) {
                 log::error(log::jit, "error releasing JIT memory: {}", ec.message());
             }
         }
@@ -698,12 +698,12 @@ void removeModule(TrackedModule* M) {
         log::error(log::jit, "could not remove module: {}", llvm::toString(std::move(err)));
     }
     for (const auto& name : M->imports) {
-        auto it = sImportRefs.find(name);
+        const auto it = sImportRefs.find(name);
         if (it == sImportRefs.end() || --it->second > 0) {
             continue;
         }
         sImportRefs.erase(it);
-        auto owner = sSymbolOwner.find(name);
+        const auto owner = sSymbolOwner.find(name);
         if (owner == sSymbolOwner.end()) {
             continue;
         }
@@ -713,7 +713,7 @@ void removeModule(TrackedModule* M) {
         }
     }
     for (const auto& name : M->exports) {
-        auto it = sSymbolOwner.find(name);
+        const auto it = sSymbolOwner.find(name);
         if (it != sSymbolOwner.end() && it->second == M) {
             sSymbolOwner.erase(it);
         }
@@ -734,7 +734,7 @@ void removeModule(TrackedModule* M) {
 void flushPendingErasures() {
     std::vector<TrackedModule*> touched;
     for (const auto& name : sPendingErase) {
-        auto it = sSymbolOwner.find(name);
+        const auto it = sSymbolOwner.find(name);
         if (it == sSymbolOwner.end()) {
             continue;
         }
@@ -765,7 +765,7 @@ void flushPendingErasures() {
 void releaseOrphans(const std::vector<std::string>& NewExports) {
     for (bool changed = true; changed;) {
         changed = false;
-        for (auto& p : sModules) {
+        for (const auto& p : sModules) {
             auto* M = p.get();
             if (M->orphanedBy.empty()) {
                 continue;
@@ -785,7 +785,7 @@ void releaseOrphans(const std::vector<std::string>& NewExports) {
 
 ModuleSymbols collectModuleSymbols(const llvm::Module& M) {
     ModuleSymbols syms;
-    auto consider = [&](const llvm::GlobalValue& GV, bool IsVariable) {
+    const auto consider = [&](const llvm::GlobalValue& GV, bool IsVariable) {
         if (GV.hasLocalLinkage()) {
             return;  // not a JIT symbol
         }
@@ -841,7 +841,7 @@ llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, ModuleSymbols Symb
     }
     for (const auto& name : M->imports) {
         ++sImportRefs[name];
-        auto owner = sSymbolOwner.find(name);
+        const auto owner = sSymbolOwner.find(name);
         if (owner != sSymbolOwner.end()) {
             owner->second->everReferenced = true;
         }
@@ -910,7 +910,7 @@ void removeFromGlobalMap(const std::string& name) {
 }
 
 const llvm::GlobalValue* getGlobalValue(const char* Name) {
-    auto iter(sGlobalMap.find(Name));
+    const auto iter(sGlobalMap.find(Name));
     if (iter != sGlobalMap.end()) [[likely]] {
         return iter->second;
     }
@@ -1209,7 +1209,7 @@ llvm::Error defineAbsoluteSymbol(std::string_view Name, void* Addr) {
     }
     auto& JD = JIT->getMainJITDylib();
     auto sym = JIT->mangleAndIntern(name);
-    auto define = [&]() {
+    const auto define = [&]() {
         llvm::orc::SymbolMap symbols;
         symbols[sym] = {llvm::orc::ExecutorAddr::fromPtr(Addr), llvm::JITSymbolFlags::Exported};
         return JD.define(llvm::orc::absoluteSymbols(std::move(symbols)));
@@ -1249,7 +1249,7 @@ void initLLVM() {
     // "multiple definition of local value". -1 is no limit.
     {
         auto& opts = llvm::cl::getRegisteredOptions();
-        auto it = opts.find("non-global-value-max-name-size");
+        const auto it = opts.find("non-global-value-max-name-size");
         if (it != opts.end()) {
             static_cast<llvm::cl::opt<int>*>(it->second)->setValue(-1);
         }
@@ -1276,7 +1276,7 @@ void initLLVM() {
         featureStr += feature.getKey().str();
         featureVec.push_back(featureStr);
         if (!featureString.empty())
-            featureString += ",";
+            featureString += ',';
         featureString += featureStr;
     }
 

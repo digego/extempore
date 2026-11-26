@@ -12,7 +12,7 @@ static std::unordered_map<s7_scheme*, scheme*> s_wrapperMap;
 
 scheme* scheme_wrapper_from_s7(s7_scheme* raw_sc) {
     const std::lock_guard<std::mutex> lock(s_wrapperMapMutex);
-    auto it = s_wrapperMap.find(raw_sc);
+    const auto it = s_wrapperMap.find(raw_sc);
     if (it != s_wrapperMap.end())
         return it->second;
     return nullptr;
@@ -610,7 +610,7 @@ static pointer makeFFIFunction(scheme* sc, foreign_func f, const std::string& ke
     int slot = -1;
     {
         const std::lock_guard<std::mutex> lock(s_ffiSlotMutex);
-        auto res = s_ffiSlots.emplace(key, 0);
+        const auto res = s_ffiSlots.emplace(key, 0);
         if (!res.second) {
             slot = res.first->second;
         } else {
@@ -646,7 +646,7 @@ pointer mk_foreign_func(scheme* sc, foreign_func f) {
     FFIDef def{nullptr, 0, 0, true};
     {
         const std::lock_guard<std::mutex> lock(ffiDefMutex());
-        auto it = ffiDefTable().find(reinterpret_cast<void*>(f));
+        const auto it = ffiDefTable().find(reinterpret_cast<void*>(f));
         if (it != ffiDefTable().end()) {
             def = it->second;
         }

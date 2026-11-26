@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <exception>
 #include <string>
 #include <utility>
 
@@ -161,9 +162,12 @@ enum scheme_types {
 // Thrown from an FFI primitive body; the trampoline in SchemeS7.cpp turns it
 // into a Scheme error.  The message is owned so it can be built at the throw
 // site (e.g. by the argument accessors, which name the primitive).
-class ScmRuntimeError {
+class ScmRuntimeError : public std::exception {
   public:
     ScmRuntimeError(std::string _msg, pointer _p) : msg(std::move(_msg)), p(_p) {}
+    const char* what() const noexcept override {
+        return msg.c_str();
+    }
     std::string msg;
     pointer p;
 };

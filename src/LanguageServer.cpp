@@ -333,7 +333,7 @@ class Server {
             publishDiagnostics(uri);
         } else if (Method == "textDocument/didChange") {
             const json::Array* changes = Params.getArray("contentChanges");
-            auto found = m_documents.find(uri);
+            const auto found = m_documents.find(uri);
             if (!changes || changes->empty() || found == m_documents.end()) {
                 return;
             }
@@ -343,7 +343,7 @@ class Server {
             }
             changed(uri, found->second, false);
         } else if (Method == "textDocument/didSave") {
-            auto found = m_documents.find(uri);
+            const auto found = m_documents.find(uri);
             if (found != m_documents.end()) {
                 if (const auto text = Params.getString("text")) {
                     found->second.text = std::string(*text);
@@ -855,7 +855,7 @@ class Server {
         if (m_link) {
             m_link->connection.shutdown();  // its reader thread ends
         }
-        auto link = std::make_shared<Link>();
+        const auto link = std::make_shared<Link>();
         link->host = m_target.host;
         link->port = port;
         const std::string where = link->host + ":" + std::to_string(port);

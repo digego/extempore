@@ -253,7 +253,7 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
         for (auto it = fs::recursive_directory_iterator(name, ec); it != fs::end(it);
              it.increment(ec)) {
             const auto leaf = it->path().filename().string();
-            if (it->is_directory(ec) && (leaf.starts_with(".") || leaf == "aot-cache")) {
+            if (it->is_directory(ec) && (leaf.starts_with('.') || leaf == "aot-cache")) {
                 it.disable_recursion_pending();
             } else if (it->is_regular_file(ec) && it->path().extension() == ".xtm") {
                 files.push_back(it->path());

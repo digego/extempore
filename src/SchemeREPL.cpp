@@ -59,7 +59,7 @@ SchemeREPL::SchemeREPL(const std::string& Title)
 SchemeREPL::~SchemeREPL() {
     closeREPL();
     const std::lock_guard<std::mutex> lock(sm_replsMutex);
-    auto iter(sm_repls.find(m_title));
+    const auto iter(sm_repls.find(m_title));
     if (iter != sm_repls.end() && iter->second == this) {
         sm_repls.erase(iter);
     }
@@ -67,7 +67,7 @@ SchemeREPL::~SchemeREPL() {
 
 SchemeREPL* SchemeREPL::I(const std::string& name) {
     const std::lock_guard<std::mutex> lock(sm_replsMutex);
-    auto iter(sm_repls.find(name));
+    const auto iter(sm_repls.find(name));
     if (iter == sm_repls.end()) {
         return nullptr;
     }

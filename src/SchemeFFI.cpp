@@ -46,7 +46,7 @@ namespace extemp {
 namespace SchemeFFI {
 
 void initSchemeFFI(scheme* sc) {
-    static struct {
+    static const struct {
         const char* name;
         uint32_t value;
     } integerTable[] = {
@@ -55,7 +55,7 @@ void initSchemeFFI(scheme* sc) {
         {"*au:channels*", UNIV::CHANNELS},
         {"*au:in-channels*", UNIV::IN_CHANNELS},
     };
-    for (auto& elem : integerTable) {
+    for (const auto& elem : integerTable) {
         scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_integer(sc, elem.value));
     }
     // One group per src/ffi/*.cpp. Order is immaterial --- no name is defined

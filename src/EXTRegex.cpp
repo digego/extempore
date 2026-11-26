@@ -57,7 +57,7 @@ std::expected<PatternPtr, CompileError> compile(const char* Pattern) {
     std::string key(Pattern);
     {
         const std::lock_guard<std::mutex> lock(sPatternCacheMutex);
-        auto it = sPatternCache.find(key);
+        const auto it = sPatternCache.find(key);
         if (it != sPatternCache.end()) {
             return it->second;
         }
@@ -89,7 +89,7 @@ int search(const PatternPtr& Re, const MatchDataPtr& MatchData, std::string_view
 // the pattern doesn't have, a $N the match didn't fill, and a '$' that isn't a
 // group reference at all.
 std::string replaceFirst(const PatternPtr& Re, std::string_view Data, const char* Replacement) {
-    auto matchData(matchDataFor(Re));
+    const auto matchData(matchDataFor(Re));
     const int rc = search(Re, matchData, Data);
     if (rc < 1) {
         return std::string(Data);

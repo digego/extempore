@@ -436,7 +436,7 @@ Invocation parseCurrent(std::span<const std::string_view> Args) {
             }
             break;
         }
-        if (!arg.starts_with("-") || arg == "-") {
+        if (!arg.starts_with('-') || arg == "-") {
             inv.files.emplace_back(arg);
             continue;
         }

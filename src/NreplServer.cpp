@@ -384,7 +384,7 @@ class Server {
             }
             for (std::size_t i = 0; i < polled; ++i) {
                 const short revents = fds[i + 1].revents;
-                auto& conn = conns[i];
+                const auto& conn = conns[i];
                 if (revents & POLLOUT) {
                     conn->drain();
                 }
@@ -478,7 +478,7 @@ class Server {
         {
             const std::lock_guard<std::mutex> lock(m_mutex);
             std::erase_if(m_sessions, [&](const auto& entry) {
-                auto owner = entry.second.owner.lock();
+                const auto owner = entry.second.owner.lock();
                 return !owner || owner == Conn;
             });
         }
@@ -534,7 +534,7 @@ class Server {
     }
 
     static Dict describe() {
-        auto op = [](const char* Doc) { return Value(Dict{{"doc", Value(Doc)}}); };
+        const auto op = [](const char* Doc) { return Value(Dict{{"doc", Value(Doc)}}); };
         Dict ops{
             {"clone", op("Creates a session on a process: extempore/process names it (default "
                          "\"primary\"), or the cloned session's process.")},
@@ -576,7 +576,7 @@ class Server {
         std::string process(bencode::findString(Msg, "extempore/process"));
         const std::lock_guard<std::mutex> lock(m_mutex);
         if (process.empty()) {
-            auto it = m_sessions.find(Session);
+            const auto it = m_sessions.find(Session);
             process = (it != m_sessions.end()) ? it->second.process : "primary";
         }
         if (!SchemeProcess::find(process)) {
@@ -599,7 +599,7 @@ class Server {
     void interrupt(const std::shared_ptr<Connection>& Conn, const Dict& Msg,
                    const std::string& Session) {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        auto session = m_sessions.find(Session);
+        const auto session = m_sessions.find(Session);
         if (session == m_sessions.end()) {
             replyStatus(Conn, Msg, {"error", "unknown-session", "done"}, Session);
             return;
@@ -612,7 +612,7 @@ class Server {
                 stopped = true;
             }
         }
-        auto running = m_running.find(session->second.process);
+        const auto running = m_running.find(session->second.process);
         const bool ours = running != m_running.end() && running->second.session == Session;
         if (ours && (wanted.empty() || wanted == running->second.id)) {
             running->second.sc->interrupt_serial.store(running->second.serial,
@@ -645,7 +645,7 @@ class Server {
             Session = newSessionId();  // ephemeral, never in the table
         } else {
             const std::lock_guard<std::mutex> lock(m_mutex);
-            auto it = m_sessions.find(Session);
+            const auto it = m_sessions.find(Session);
             if (it == m_sessions.end()) {
                 replyStatus(Conn, Msg, {"error", "unknown-session", "done"}, Session);
                 return;
