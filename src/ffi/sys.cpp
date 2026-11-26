@@ -61,10 +61,6 @@ static pointer pointerSize(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, 8 * sizeof(uintptr_t));
 }
 
-static pointer mcjitEnabled(scheme* Scheme, pointer Args) {
-    return Scheme->T;
-}
-
 static pointer platform(scheme* Scheme, pointer Args) {
 #ifdef __APPLE__
     return mk_string(Scheme, "OSX");
@@ -326,7 +322,6 @@ static pointer getDefaultTimeout(scheme* Scheme, pointer Args) {
 std::span<const FFIEntry> sysDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("sys:pointer-size", pointerSize, 0, 0, false),
-        FFI_DEF("sys:mcjit-enabled", mcjitEnabled, 0, 0, false),
         FFI_DEF("sys:platform", platform, 0, 0, false),
         FFI_DEF("sys:share-dir", getShareDir, 0, 0, false),
         FFI_DEF("sys:build-dir", getBuildDir, 0, 0, false),

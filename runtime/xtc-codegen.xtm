@@ -1271,9 +1271,7 @@
            (strsym '()))
       (if (not (llvm:get-llvm-alias ast))
           (let ((compile-str (string-append strname
-                                            (if (sys:mcjit-enabled)
-                                                (string-append " = hidden constant [" lgth " x i8] c\"")
-                                                (string-append " = private unnamed_addr constant [" lgth " x i8] c\""))
+                                            " = hidden constant [" lgth " x i8] c\""
                                             ast "\\00\"")))
             (llvm:compile-ir compile-str)
             (set! strsym strname)
@@ -1315,7 +1313,7 @@
       (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
              (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call i8* @malloc("
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size closure-struct-str)) ")\n" os2))
-            ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+            ((eq? (ast:closure-tag ast) '__make-closure-s)
              (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = alloca i8, "
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size closure-struct-str))
                    ", align 16\n" os2))
@@ -1333,7 +1331,7 @@
       (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
              (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call i8* @malloc("
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2))
-            ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+            ((eq? (ast:closure-tag ast) '__make-closure-s)
              (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = alloca i8, "
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size estruct))
                    ", align 16\n" os2))
@@ -1372,7 +1370,7 @@
                 "i32 " (number->string ptridx) ", "
                 (cadr type) " " (car type) ", "
                 (cond ((eq? (ast:closure-tag ast) '__make-closure-h) "i32 1, ")
-                      ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*)) "i32 2, ")
+                      ((eq? (ast:closure-tag ast) '__make-closure-s) "i32 2, ")
                       (else "i32 3, "))
                 "%clsvar* " (car table) ")\n"
                 os2)
@@ -1425,7 +1423,7 @@
       (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
              (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call i8* @malloc(" *xtc:codegen:size_t_str* " "
                    *xtc:codegen:pointer_size_bytes_str* ")\n" os2))
-            ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+            ((eq? (ast:closure-tag ast) '__make-closure-s)
              (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = alloca i8, "
                    " i32 " *xtc:codegen:pointer_size_bytes_str*
                    ", align 16\n" os2))
@@ -1515,7 +1513,7 @@
                 (cond ((= allocate-mem? 1)
                        (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))
-                      ((and (= allocate-mem? 2) (not *WINDOWS_ALLOC_BUG*))
+                      ((= allocate-mem? 2)
                        (emit "%dat_" (symbol->string (car a)) " = alloca i8, "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ", align 16\n" os))
                       (else
@@ -1539,13 +1537,7 @@
                        (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
                        os)
                  (map (lambda (v)
-                        (if *WINDOWS_ALLOC_BUG*
-                            (begin
-                              (emit (xtc:codegen:ssa-temp "lspvar" "i8*") " = call i8* @llvm_zone_malloc("
-                                    "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
-                                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr v))) ")\n" os)
-                              (emit (car v) " = bitcast " (cadr (xtc:codegen:ssa-temp "lspvar")) " " (car (xtc:codegen:ssa-temp "lspvar")) " to " (xtc:codegen:get-type-str (cdr v)) "*\n" os))
-                            (begin (emit (car v) " = alloca " (cdr v) "\n" os))))
+                        (emit (car v) " = alloca " (cdr v) "\n" os))
                       (car *xtc:codegen:ls_var*))))
       (set! *xtc:codegen:ls_var* (cdr *xtc:codegen:ls_var*))
       (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length args)))
@@ -1609,7 +1601,7 @@
                 (cond ((= allocate-mem? 1)
                        (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))
-                      ((and (= allocate-mem? 2) (not *WINDOWS_ALLOC_BUG*))
+                      ((= allocate-mem? 2)
                        (emit "%dat_" (symbol->string (car a)) " = alloca i8, "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ", align 16\n" os))
                       (else
@@ -1633,13 +1625,7 @@
                        (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
                        os)
                  (map (lambda (v)
-                        (if *WINDOWS_ALLOC_BUG*
-                            (begin
-                              (emit (xtc:codegen:ssa-temp "lspvar" "i8*") " = call i8* @llvm_zone_malloc("
-                                    "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
-                                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr v))) ")\n" os)
-                              (emit (car v) " = bitcast " (cadr (xtc:codegen:ssa-temp "lspvar")) " " (car (xtc:codegen:ssa-temp "lspvar")) " to " (xtc:codegen:get-type-str (cdr v)) "*\n" os))
-                            (begin (emit (car v) " = alloca " (cdr v) "\n" os))))
+                        (emit (car v) " = alloca " (cdr v) "\n" os))
                       (car *xtc:codegen:ls_var*))))
       (set! *xtc:codegen:ls_var* (cdr *xtc:codegen:ls_var*))
       (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length args)))
@@ -1694,8 +1680,7 @@
                      (emit  "\n; let assign value to symbol " symstr "\n" os)
                      ;; (emit "call ccc void @llvm_print_i32(i32 222)\n" os)
 
-                     (if (or (= (ast:env-alloc ast) 3)
-                             *WINDOWS_ALLOC_BUG*)
+                     (if (= (ast:env-alloc ast) 3)
                          (begin
                            ;(emit "call ccc void @llvm_print_i32(i32 2222)\n" os)
                            (emit "%dat_" symstr " = call i8* @llvm_zone_malloc("
@@ -1771,13 +1756,7 @@
                        (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
                        os)
                  (map (lambda (v)
-                        (if *WINDOWS_ALLOC_BUG*
-                            (begin
-                              (emit (xtc:codegen:ssa-temp "lspvar" "i8*") " = call i8* @llvm_zone_malloc("
-                                    "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
-                                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr v))) ")\n" os)
-                              (emit (car v) " = bitcast " (cadr (xtc:codegen:ssa-temp "lspvar")) " " (car (xtc:codegen:ssa-temp "lspvar")) " to " (xtc:codegen:get-type-str (cdr v)) "*\n" os))
-                            (begin (emit (car v) " = alloca " (cdr v) "\n" os))))
+                        (emit (car v) " = alloca " (cdr v) "\n" os))
                       (car *xtc:codegen:ls_var*))))
       (set! *xtc:codegen:ls_var* (cdr *xtc:codegen:ls_var*))
       (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length (ast:env-bindings ast))))
@@ -2036,16 +2015,8 @@
            (val-str (xtc:codegen:compiler (cadr ast) types))
            (val (xtc:codegen:ssa-temp)))
       (emit val-str os)
-      (if *WINDOWS_ALLOC_BUG*
-          (begin
-            (emit (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
-                  *xtc:codegen:pointer_size_bytes_str* ")\n" os)
-            (emit (xtc:codegen:ssa-temp "val" (string-append (cadr val) "*"))
-                  " = bitcast i8* " (car (xtc:codegen:ssa-temp "dat"))
-                  " to " (cadr val) "*\n" os))
-          (begin
-            (emit (xtc:codegen:ssa-temp "val" (string-append (cadr val) "*"))
-                  " = alloca " (cadr val) "\n" os)))
+      (emit (xtc:codegen:ssa-temp "val" (string-append (cadr val) "*"))
+            " = alloca " (cadr val) "\n" os)
       (emit "store " (cadr val) " " (car val) ", " (cadr val) "* " (car (xtc:codegen:ssa-temp)))
       (xtc:codegen:strip-space os))))
 
@@ -3002,13 +2973,9 @@
 
 (define xtc:codegen:compiler:stack-alloc
   (lambda (ast types hint?)
-    (if *WINDOWS_ALLOC_BUG*
-        (if (= (length ast) 1)
-            (xtc:codegen:compiler:zone-alloc-without-size ast types hint?)
-            (xtc:codegen:compiler:zone-alloc-with-size ast types hint?))
-        (if (= (length ast) 1)
-            (xtc:codegen:compiler:stack-alloc-without-size ast types hint?)
-            (xtc:codegen:compiler:stack-alloc-with-size ast types hint?)))))
+    (if (= (length ast) 1)
+        (xtc:codegen:compiler:stack-alloc-without-size ast types hint?)
+        (xtc:codegen:compiler:stack-alloc-with-size ast types hint?))))
 
 
 
