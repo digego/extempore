@@ -107,7 +107,8 @@ class Extempore:
         assert self.proc.stdout
         for raw in self.proc.stdout:
             with self._lines:
-                self.console.append(raw.decode(errors="replace"))
+                # Windows ends a line with \r\n; the tests' patterns say \n
+                self.console.append(raw.decode(errors="replace").replace("\r\n", "\n"))
                 self._lines.notify_all()
         with self._lines:
             self._exited.set()
