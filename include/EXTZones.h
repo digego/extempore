@@ -44,6 +44,10 @@ static_assert((LLVM_ZONE_ALIGN & LLVM_ZONE_ALIGNPAD) == 0, "LLVM_ZONE_ALIGN must
 
 namespace extemp {
 namespace EXTZones {
+// Memory aligned to Align (a power of 2), or nullptr. It must be released with
+// aligned_free: plain free() is undefined for it on Windows.
+void* aligned_malloc(size_t Size, size_t Align);
+void aligned_free(void* Ptr);
 llvm_zone_t* llvm_zone_create(uint64_t size);
 EXPORT void llvm_zone_destroy(llvm_zone_t* Zone);
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone);

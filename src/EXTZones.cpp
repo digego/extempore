@@ -31,29 +31,20 @@ thread_local llvm_zone_stack* tls_llvm_zone_stack = nullptr;
 namespace extemp {
 namespace EXTZones {
 
-// Zone memory is allocated aligned to LLVM_ZONE_ALIGN and must be released with
-// the matching free. The old Windows path used plain malloc (only 16-byte
-// aligned, not the 32 the zones promise) because _aligned_malloc "crashed" --
-// the real cause was llvm_zone_destroy below freeing with plain free(), which
-// is undefined for _aligned_malloc. Pairing _aligned_malloc with _aligned_free
-// fixes both the under-alignment and the crash.
-static void* zone_aligned_alloc(size_t size) {
+void* aligned_malloc(size_t Size, size_t Align) {
 #ifdef _WIN32
-    return _aligned_malloc(size, LLVM_ZONE_ALIGN);
+    return _aligned_malloc(Size, Align);
 #else
-    void* ptr = nullptr;
-    if (posix_memalign(&ptr, LLVM_ZONE_ALIGN, size) != 0) {
-        ptr = nullptr;
-    }
-    return ptr;
+    // aligned_alloc wants a size which is a multiple of the alignment
+    return std::aligned_alloc(Align, (Size + Align - 1) & ~(Align - 1));
 #endif
 }
 
-static void zone_aligned_free(void* ptr) {
+void aligned_free(void* Ptr) {
 #ifdef _WIN32
-    _aligned_free(ptr);
+    _aligned_free(Ptr);
 #else
-    free(ptr);
+    std::free(Ptr);
 #endif
 }
 
@@ -62,7 +53,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size) {
     if (!zone) [[unlikely]] {
         abort();  // in case a leak can be analyzed post-mortem
     }
-    zone->memory = size ? zone_aligned_alloc(size_t(size)) : nullptr;
+    zone->memory = size ? aligned_malloc(size_t(size), LLVM_ZONE_ALIGN) : nullptr;
     zone->mark = 0;
     zone->offset = 0;
     if (!zone->memory) [[unlikely]] {
@@ -89,7 +80,7 @@ EXPORT void llvm_zone_destroy(llvm_zone_t* Zone) {
     if (Zone->memory) {
         ZONE_UNPOISON(Zone->memory, size_t(Zone->size));
     }
-    zone_aligned_free(Zone->memory);
+    aligned_free(Zone->memory);
     free(Zone);
 }
 
