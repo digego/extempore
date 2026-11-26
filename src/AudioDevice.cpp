@@ -63,13 +63,9 @@
 
 #ifdef __APPLE__
 #include <CoreAudio/HostTime.h>
-#include <mach/mach_init.h>
-#include <mach/task_policy.h>
 #include <mach/thread_act.h>
 #include <mach/thread_policy.h>
-#include <sys/sysctl.h>
-#include <time.h>
-#include <libkern/OSAtomic.h>
+#include <pthread.h>
 #endif
 
 #include <cstdlib>

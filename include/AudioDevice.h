@@ -36,10 +36,6 @@
 #ifndef _AUDIO_DEVICE_H
 #define _AUDIO_DEVICE_H
 
-#if defined(__APPLE__)
-#include <CoreAudio/AudioHardware.h>
-#endif
-
 #include <portaudio.h>
 
 #include <cstdint>
