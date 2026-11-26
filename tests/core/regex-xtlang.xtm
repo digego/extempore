@@ -1,0 +1,85 @@
+;;; tests/core/regex-xtlang.xtm -- the xtlang regex functions
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for regex_match, regex_replace, regex_replace_all, regex_split and
+;; regex_matches in libs/core/adt.xtm, which call rmatch, rreplace, rsplit and
+;; rmatches in the runtime. The Scheme-level regex: functions have their own
+;; tests in tests/core/regex.xtm.
+
+;;; Code:
+
+(sys:load "libs/core/adt.xtm")
+
+(bind-func rxtest_match
+  (lambda (regex:i8* str:i8*)
+    (regex_match regex (Str str))))
+
+(bind-func rxtest_replace
+  (lambda (regex:i8* str:i8* replace:i8* expected:i8*)
+    (= (strcmp (cstring (regex_replace regex (Str str) replace)) expected) 0)))
+
+(bind-func rxtest_replace_all
+  (lambda (regex:i8* str:i8* replace:i8* expected:i8*)
+    (= (strcmp (cstring (regex_replace_all regex (Str str) replace)) expected) 0)))
+
+;; the pieces, counted and then joined end to end
+(bind-func rxtest_pieces
+  (lambda (pieces:List{String*}* count:i64 joined:i8*)
+    (and (= (length pieces) count)
+         (or (= count 0)
+             (= (strcmp (cstring (concat pieces)) joined) 0)))))
+
+(bind-func rxtest_split
+  (lambda (regex:i8* str:i8* count:i64 joined:i8*)
+    (rxtest_pieces (regex_split regex (Str str)) count joined)))
+
+(bind-func rxtest_matches
+  (lambda (regex:i8* str:i8* max:i64 count:i64 joined:i8*)
+    (rxtest_pieces (regex_matches regex (Str str) max) count joined)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex_match
+
+(xtmtest-result (rxtest_match "b+c" "aabbbc") 1)
+;; a match anywhere in the string counts, and an anchor holds it to the start
+(xtmtest-result (rxtest_match "^b" "aabbbc") 0)
+(xtmtest-result (rxtest_match "^a+b" "aabbbc") 1)
+(xtmtest-result (rxtest_match "[0-9]{3}$" "ab123") 1)
+(xtmtest-result (rxtest_match "\\d+\\s\\w" "a 12 b") 1)
+;; a pattern which doesn't compile matches nothing
+(xtmtest-result (rxtest_match "(" "ab(123") 0)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex_replace: the first match only, with $N for a group
+
+(xtmtest-result (rxtest_replace "b+" "aabbbcbb" "X" "aaXcbb") 1)
+(xtmtest-result (rxtest_replace "(a+)(b+)" "aabbbc" "$2-$1" "bbb-aac") 1)
+(xtmtest-result (rxtest_replace "z" "aabbbc" "X" "aabbbc") 1)
+(xtmtest-result (rxtest_replace "b" "abc" "" "ac") 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex_replace_all
+
+(xtmtest-result (rxtest_replace_all "b" "abcabc" "X" "aXcaXc") 1)
+(xtmtest-result (rxtest_replace_all "z" "abcabc" "X" "abcabc") 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex_split
+
+(xtmtest-result (rxtest_split ", *" "a, b,c" 3 "abc") 1)
+(xtmtest-result (rxtest_split "[0-9]+" "one1two22three" 3 "onetwothree") 1)
+;; no separator in the string: the one piece is the string
+(xtmtest-result (rxtest_split "x" "abc" 1 "abc") 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex_matches: every match, up to a maximum
+
+(xtmtest-result (rxtest_matches "[0-9]+" "a1 b22 c333" 50 3 "122333") 1)
+(xtmtest-result (rxtest_matches "[0-9]+" "a1 b22 c333" 2 2 "122") 1)
+(xtmtest-result (rxtest_matches "[a-c]" "abc" 50 3 "abc") 1)
+(xtmtest-result (rxtest_matches "z" "abc" 50 0 "") 1)
