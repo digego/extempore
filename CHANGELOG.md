@@ -178,6 +178,9 @@ format on save, and extempore-mode has `extempore-format-buffer`. The source
 tree has been formatted with it, and CI checks it stays formatted; the commit
 which reformatted it is in `.git-blame-ignore-revs`.
 
+`sys:mcjit-enabled` is gone. It has returned `#t` for as long as MCJIT, and then
+ORC, was the only JIT.
+
 ## v0.11.2
 
 A one-bug patch release, for a bug that made v0.11.0 and v0.11.1 close to
