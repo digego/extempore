@@ -112,11 +112,11 @@
 (define (tree-member mem tree)
   (if (member #t
               (flatten
-               (let loop ((tree tree))
-                 (if (pair? tree)
-                     (cons (loop (car tree)) (loop (cdr tree)))
-                     (if (null? tree) '()
-                         (if (equal? tree mem) #t #f))))))
+                (let loop ((tree tree))
+                  (if (pair? tree)
+                      (cons (loop (car tree)) (loop (cdr tree)))
+                      (if (null? tree) '()
+                          (if (equal? tree mem) #t #f))))))
       #t #f))
 
 (define remove-first
@@ -1017,7 +1017,7 @@
                       (write-char #\~ buffer)
                       (loop (cddr format-list) objects))
                      (else
-                      (error 'format "Unrecognized escape sequence")))))
+                       (error 'format "Unrecognized escape sequence")))))
               (else (write-char (car format-list) buffer)
                     (loop (cdr format-list) objects)))))))
 
@@ -1213,10 +1213,10 @@
 ;@
 (define cl:union
   (letrec ((onion
-            (lambda (lst1 lst2)
-              (if (null? lst1)
-                  lst2
-                  (onion (cdr lst1) (cl:adjoin (car lst1) lst2))))))
+             (lambda (lst1 lst2)
+               (if (null? lst1)
+                   lst2
+                   (onion (cdr lst1) (cl:adjoin (car lst1) lst2))))))
     (lambda (lst1 lst2)
       (cond ((null? lst1) lst2)
             ((null? lst2) lst1)
@@ -1313,8 +1313,8 @@
     (cond ((null? lst))
           ((eqv? obj (car lst)) (remove (cdr lst) tail))
           (else
-           (set-cdr! tail (list (car lst)))
-           (remove (cdr lst) (cdr tail)))))
+            (set-cdr! tail (list (car lst)))
+            (remove (cdr lst) (cdr tail)))))
   (cdr head))
 ;@
 (define (cl:remove-if pred? lst)
@@ -1337,9 +1337,9 @@
           ((null? (cdr args)) (car args))
           ((null? (car args)) (apply cl:nconc (cdr args)))
           (else
-           (set-cdr! (last-pair (car args))
-                     (apply cl:nconc (cdr args)))
-           (car args)))))
+            (set-cdr! (last-pair (car args))
+                      (apply cl:nconc (cdr args)))
+            (car args)))))
 
 ;;;@ From: hugh@ear.mit.edu (Hugh Secker-Walker)
 (define (cl:nreverse rev-it)
@@ -1431,24 +1431,24 @@
     (cond ((null? lst) '())
           ((equal? obj (car lst)) (delete (cdr lst)))
           (else
-           (set-cdr! lst (delete (cdr lst)))
-           lst))))
+            (set-cdr! lst (delete (cdr lst)))
+            lst))))
 ;@
 (define (cl:delete-if pred lst)
   (let delete-if ((lst lst))
     (cond ((null? lst) '())
           ((pred (car lst)) (delete-if (cdr lst)))
           (else
-           (set-cdr! lst (delete-if (cdr lst)))
-           lst))))
+            (set-cdr! lst (delete-if (cdr lst)))
+            lst))))
 ;@
 (define (cl:delete-if-not pred lst)
   (let delete-if ((lst lst))
     (cond ((null? lst) '())
           ((not (pred (car lst))) (delete-if (cdr lst)))
           (else
-           (set-cdr! lst (delete-if (cdr lst)))
-           lst))))
+            (set-cdr! lst (delete-if (cdr lst)))
+            lst))))
 
 ;;;;;;;;;;;;;;
 ;; sort.xtm ;;
@@ -1626,9 +1626,9 @@
               #f)
           (let ((input (open-input-string file-string))
                 (msg (call/cc
-                      (lambda (k)
-                        (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
-                        ""))))
+                       (lambda (k)
+                         (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
+                         ""))))
             (if (string=? msg "")
                 ;; Each top-level form is evaluated inside its own catch: an
                 ;; error is reported (with the file's path, which the string
@@ -1651,21 +1651,21 @@
                         (set! *global-sysload-evals* (cons sexpr *global-sysload-evals*))
                         (set! *global-sysload-evals* (list-head *global-sysload-evals* 10))
                         (let ((form-ok
-                               (*s7-catch* #t
-                                           (lambda ()
-                                             (eval (car *global-sysload-evals*) (interaction-environment))
-                                             #t)
-                                           (lambda (tag info)
-                                             (log:emit 'error #f
-                                                       (sys:error-report-string
-                                                        tag (copy info)
-                                                        (string-append path ":" (number->string line))))
-                                             (if (and (defined? 'xtc:aot:currently-compiling?)
-                                                      (xtc:aot:currently-compiling?))
-                                                 (begin
-                                                   (log:error "AOT compilation failed while loading" path)
-                                                   (xtc:aot:abort-compilation)))
-                                             #f))))
+                                (*s7-catch* #t
+                                            (lambda ()
+                                              (eval (car *global-sysload-evals*) (interaction-environment))
+                                              #t)
+                                            (lambda (tag info)
+                                              (log:emit 'error #f
+                                                        (sys:error-report-string
+                                                          tag (copy info)
+                                                          (string-append path ":" (number->string line))))
+                                              (if (and (defined? 'xtc:aot:currently-compiling?)
+                                                       (xtc:aot:currently-compiling?))
+                                                  (begin
+                                                    (log:error "AOT compilation failed while loading" path)
+                                                    (xtc:aot:abort-compilation)))
+                                              #f))))
                           (loop (read input) (and form-ok ok))))))
                 (begin
                   (if (or (null? quiet?) (not (car quiet?)))

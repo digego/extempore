@@ -97,15 +97,15 @@
                (if (null? ast)
                    '()
                    (scheme-compat-make-if
-                    (caar ast)
-                    (if (null? (cdar ast)) (error 'bad) (scheme-compat-make-begin (cdar ast)))
-                    (if (and (not (null? (cdr ast))) (eq? (caadr ast) 'else))
-                        (scheme-compat-make-begin (cdadr ast))
-                        (if (not (null? (cdr ast))) (scheme-compat-deep3 (cdr ast)))))))))
+                     (caar ast)
+                     (if (null? (cdar ast)) (error 'bad) (scheme-compat-make-begin (cdar ast)))
+                     (if (and (not (null? (cdr ast))) (eq? (caadr ast) 'else))
+                         (scheme-compat-make-begin (cdadr ast))
+                         (if (not (null? (cdr ast))) (scheme-compat-deep3 (cdr ast)))))))))
 
 (xtmtest-result (let loop ((node (scheme-compat-deep3
-                                  (let build ((i 0) (acc '((else last))))
-                                    (if (= i 20000) acc (build (+ i 1) (cons (list i 'b) acc))))))
+                                   (let build ((i 0) (acc '((else last))))
+                                     (if (= i 20000) acc (build (+ i 1) (cons (list i 'b) acc))))))
                            (depth 0))
                   (if (and (pair? node) (eq? (car node) 'if))
                       (loop (cadddr node) (+ depth 1))

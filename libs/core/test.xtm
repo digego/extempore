@@ -162,10 +162,10 @@
        (eval `(begin
                 (define-macro (is? call expected-result . args)
                   (xtmtest-result-body
-                   call expected-result
-                   (list (if (not (null? args))
-                             (format "~a.~a" ',suite-name (car args))
-                             (format "~a.is?" ',suite-name))))))
+                    call expected-result
+                    (list (if (not (null? args))
+                              (format "~a.~a" ',suite-name (car args))
+                              (format "~a.is?" ',suite-name))))))
              fixture-environment)
        (catch (xtmtest-record suite-name 'fixture-error ',fixture #f #f)
               (eval ',fixture fixture-environment)
@@ -184,25 +184,25 @@
   (print-with-colors 'black 'blue #t (print " Test results "))
   (print "\n\n")
   (for-each
-   (lambda (outcome)
-     (let ((records (cl:remove-if-not (lambda (r) (eq? (cadr r) outcome))
-                                      (reverse *xtmtest-results*))))
-       (if (not (null? records))
-           (begin
-             (print-with-colors 'blue 'default #t (print outcome "\n\n"))
-             (for-each
-              (lambda (r)
-                (print "  name: ")
-                (print-with-colors (xtmtest:outcome-colour outcome) 'default #f
-                                   (print (car r)))
-                (print " call: ")
-                (print-with-colors 'blue 'default #f (print (caddr r)))
-                (if (not (xtmtest:pass? outcome))
-                    (print " expected: " (cadddr r) " got: " (list-ref r 4)))
-                (println))
-              records)
-             (println)))))
-   '(fail compile-error runtime-error fixture-error pass compile-ok)))
+    (lambda (outcome)
+      (let ((records (cl:remove-if-not (lambda (r) (eq? (cadr r) outcome))
+                                       (reverse *xtmtest-results*))))
+        (if (not (null? records))
+            (begin
+              (print-with-colors 'blue 'default #t (print outcome "\n\n"))
+              (for-each
+                (lambda (r)
+                  (print "  name: ")
+                  (print-with-colors (xtmtest:outcome-colour outcome) 'default #f
+                                     (print (car r)))
+                  (print " call: ")
+                  (print-with-colors 'blue 'default #f (print (caddr r)))
+                  (if (not (xtmtest:pass? outcome))
+                      (print " expected: " (cadddr r) " got: " (list-ref r 4)))
+                  (println))
+                records)
+              (println)))))
+    '(fail compile-error runtime-error fixture-error pass compile-ok)))
 
 (define (xtmtest:print-summary start)
   (print "\nCompleted ")
@@ -242,27 +242,27 @@
   (let ((failures (cl:remove-if (lambda (r) (xtmtest:pass? (cadr r)))
                                 *xtmtest-results*)))
     (sys:dump-string-to-file
-     path
-     (apply string-append
-            (append
-             (list "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                   (format "<testsuite name=\"xtmtest\" tests=\"~a\" failures=\"~a\">\n"
-                           (length *xtmtest-results*) (length failures)))
-             (map (lambda (r)
-                    (let ((name (xtmtest:xml-escape (car r)))
-                          (outcome (cadr r)))
-                      (if (xtmtest:pass? outcome)
-                          (format "  <testcase name=\"~a\" classname=\"xtmtest\"/>\n" name)
-                          (string-append
-                           (format "  <testcase name=\"~a\" classname=\"xtmtest\">\n" name)
-                           (format "    <failure type=\"~a\">call ~a expected ~a got ~a</failure>\n"
-                                   outcome
-                                   (xtmtest:xml-escape (caddr r))
-                                   (xtmtest:xml-escape (cadddr r))
-                                   (xtmtest:xml-escape (list-ref r 4)))
-                           "  </testcase>\n"))))
-                  (reverse *xtmtest-results*))
-             (list "</testsuite>\n"))))))
+      path
+      (apply string-append
+             (append
+               (list "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                     (format "<testsuite name=\"xtmtest\" tests=\"~a\" failures=\"~a\">\n"
+                             (length *xtmtest-results*) (length failures)))
+               (map (lambda (r)
+                      (let ((name (xtmtest:xml-escape (car r)))
+                            (outcome (cadr r)))
+                        (if (xtmtest:pass? outcome)
+                            (format "  <testcase name=\"~a\" classname=\"xtmtest\"/>\n" name)
+                            (string-append
+                              (format "  <testcase name=\"~a\" classname=\"xtmtest\">\n" name)
+                              (format "    <failure type=\"~a\">call ~a expected ~a got ~a</failure>\n"
+                                      outcome
+                                      (xtmtest:xml-escape (caddr r))
+                                      (xtmtest:xml-escape (cadddr r))
+                                      (xtmtest:xml-escape (list-ref r 4)))
+                              "  </testcase>\n"))))
+                    (reverse *xtmtest-results*))
+               (list "</testsuite>\n"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; runner              ;;

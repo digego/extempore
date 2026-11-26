@@ -33,20 +33,20 @@
 
 ;; def-instrument with the 128 controllers written out for it
 (eval
- `(def-instrument midiout
-                  "plays a MIDI output port: an external synth"
-                  (params
-                   (port -1 "which MIDI port: a slot in the studio's table of them (midi-track sets it)")
-                   (channel 1 "MIDI channel, 1 to 16")
-                   (offset 0.0 "seconds to hold every message back by")
-                   (bend 0.0 "pitch bend, -1.0 to 1.0")
-                   (program -1 "program number, 0 to 127 (-1: don't send one)")
-                   ,@(map (lambda (n)
-                            (list (string->symbol (string-append "cc" (number->string n)))
-                                  -1
-                                  (string-append "controller " (number->string n) ", 0.0 to 1.0 (-1: not sent)")))
-                          (range 128))))
- (interaction-environment))
+  `(def-instrument midiout
+     "plays a MIDI output port: an external synth"
+     (params
+       (port -1 "which MIDI port: a slot in the studio's table of them (midi-track sets it)")
+       (channel 1 "MIDI channel, 1 to 16")
+       (offset 0.0 "seconds to hold every message back by")
+       (bend 0.0 "pitch bend, -1.0 to 1.0")
+       (program -1 "program number, 0 to 127 (-1: don't send one)")
+       ,@(map (lambda (n)
+                (list (string->symbol (string-append "cc" (number->string n)))
+                      -1
+                      (string-append "controller " (number->string n) ", 0.0 to 1.0 (-1: not sent)")))
+              (range 128))))
+  (interaction-environment))
 
 (bind-val MIDIOUT_VOICES i64 16)
 (bind-val MIDIOUT_CC0 i64 5) ;; the index of cc0: the controllers follow in order
@@ -140,10 +140,10 @@
                                          (convert (+ value 0.5) i32) 0)
                              void)
                             (else
-                             (midi_queue port (midiout_frame (midiout_offset p))
-                                         (+ MIDI_CONTROL_CHANGE channel)
-                                         (convert k i32) (midiout_byte value))
-                             void)))))
+                              (midi_queue port (midiout_frame (midiout_offset p))
+                                          (+ MIDI_CONTROL_CHANGE channel)
+                                          (convert k i32) (midiout_byte value))
+                              void)))))
               (set! next (% (+ next 8) 130))))
         void))))
 

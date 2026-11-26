@@ -155,7 +155,7 @@
                           (if (char=? (peek) c)
                               (next!)
                               (xtc:diagnostics:print-compiler-error
-                               (string-append "malformed type (expected " (string c) ")") t))))
+                                (string-append "malformed type (expected " (string c) ")") t))))
                (word (lambda ()
                        (let ((start i))
                          (let loop ()
@@ -307,8 +307,8 @@
         (xtc:diagnostics:print-bad-type-error string-type "tuple type should start with '<'")
         (let* ((s1 (regex:replace string-type "\\<(.*)\\>?.*" "$1"))
                (t1 (xtc:codegen:get-type-joiner
-                    (cl:remove-if (lambda (x) (string=? x ""))
-                                  (regex:match-all s1 xtc:codegen:regex-tc-or-a)))))
+                     (cl:remove-if (lambda (x) (string=? x ""))
+                                   (regex:match-all s1 xtc:codegen:regex-tc-or-a)))))
           t1))))
 
 (define xtc:codegen:get-type-from-pretty-tuple
@@ -317,8 +317,8 @@
         (xtc:diagnostics:print-bad-type-error string-type "tuple type should start with '<'")
         (let* ((s1 (regex:replace string-type "\\<(.*)\\>?.*" "$1"))
                (t1 (xtc:codegen:get-type-joiner
-                    (cl:remove-if (lambda (x) (string=? x ""))
-                                  (regex:match-all s1 xtc:codegen:regex-tc-or-a))))
+                     (cl:remove-if (lambda (x) (string=? x ""))
+                                   (regex:match-all s1 xtc:codegen:regex-tc-or-a))))
                (t2 (map (lambda (x) (apply xtc:codegen:get-type-from-pretty-str x args)) t1)))
           t2))))
 
@@ -328,9 +328,9 @@
         (xtc:diagnostics:print-bad-type-error string-type "closure type should start with '['")
         (let* ((s1 (regex:replace string-type "\\[(.*)\\]?.*" "$1"))
                (t1 (xtc:codegen:get-type-joiner
-                    (cl:remove-if (lambda (x)
-                                    (string=? x ""))
-                                  (regex:match-all s1 xtc:codegen:regex-tc-or-a)))))
+                     (cl:remove-if (lambda (x)
+                                     (string=? x ""))
+                                   (regex:match-all s1 xtc:codegen:regex-tc-or-a)))))
           t1))))
 
 (define xtc:codegen:get-arity-from-pretty-closure
@@ -344,9 +344,9 @@
   (lambda (string-type . args)
     (let* ((s1 (regex:replace string-type "\\[(.*)\\]?.*" "$1"))
            (t1 (xtc:codegen:get-type-joiner
-                (cl:remove-if (lambda (x)
-                                (string=? x ""))
-                              (regex:match-all s1 xtc:codegen:regex-tc-or-a))))
+                 (cl:remove-if (lambda (x)
+                                 (string=? x ""))
+                               (regex:match-all s1 xtc:codegen:regex-tc-or-a))))
            (t2 (map (lambda (x) (apply xtc:codegen:get-type-from-pretty-str x args)) t1)))
       t2)))
 
@@ -359,8 +359,8 @@
                    (p (regex:split base "_poly_"))
                    (name (substring (car p) 1 (string-length (car p))))
                    (l1 (cl:remove-duplicates (regex:match-all
-                                              (symbol->string (xtc:cache:get-generictype-candidate-types name))
-                                              "![A-Za-z_0-9]*")))
+                                               (symbol->string (xtc:cache:get-generictype-candidate-types name))
+                                               "![A-Za-z_0-9]*")))
                    ;; (l1 (cl:remove-duplicates
                    ;;      (cl:remove-if (lambda (x)
                    ;;                      (and (not (regex:match? x "^!"))            ;; typevar
@@ -520,12 +520,12 @@
                                    (or res name)))
                                ags))
                     (anypolys (cl:find-if
-                               (lambda (x) (not (equal? x #f)))
-                               (map (lambda (k)
-                                      (if (equal? (xtc:codegen:get-base-type k) (car p)) ;; strip recursives
-                                          #f
-                                          (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
-                                    ags2))))
+                                (lambda (x) (not (equal? x #f)))
+                                (map (lambda (k)
+                                       (if (equal? (xtc:codegen:get-base-type k) (car p)) ;; strip recursives
+                                           #f
+                                           (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
+                                     ags2))))
                ;; (println 'prealias-p: p)
                ;; set p in case we have aliased types in args that need unaliasing!
                (set! p (list (car p) (string-append "<" (string-join ags2 ",") ">")))
@@ -576,18 +576,18 @@
                          (apply xtc:codegen:get-type-from-pretty-str-rec
                                 (xtc:codegen:add-ptr-depth (car p) ptr-depth)
                                 (list (car p) (cons
-                                               (cons (car p) base)
-                                               (map (lambda (a b)
-                                                      ;; (println 'a a 'b b)
-                                                      (let ((aa (apply xtc:codegen:get-type-from-pretty-str-rec a args))
-                                                            (bb (apply xtc:codegen:get-type-from-pretty-str-rec b args)))
-                                                        ;; (println 'a a 'b b)
-                                                        ;; (println 'aa aa 'bb bb)
-                                                        ;; (println (xtc:codegen:type? aa) '- (xtc:codegen:type? bb))
-                                                        (if (xtc:codegen:type? aa) (set! a aa))
-                                                        (if (xtc:codegen:type? bb) (set! b bb))
-                                                        (cons a b)))
-                                                    gtype-all type-all))))))
+                                                (cons (car p) base)
+                                                (map (lambda (a b)
+                                                       ;; (println 'a a 'b b)
+                                                       (let ((aa (apply xtc:codegen:get-type-from-pretty-str-rec a args))
+                                                             (bb (apply xtc:codegen:get-type-from-pretty-str-rec b args)))
+                                                         ;; (println 'a a 'b b)
+                                                         ;; (println 'aa aa 'bb bb)
+                                                         ;; (println (xtc:codegen:type? aa) '- (xtc:codegen:type? bb))
+                                                         (if (xtc:codegen:type? aa) (set! a aa))
+                                                         (if (xtc:codegen:type? bb) (set! b bb))
+                                                         (cons a b)))
+                                                     gtype-all type-all))))))
                    ;; (string-append "%" (car p) "_poly_"
                    ;;                       (if (xtc:cache:generictype-exists? (car p))
                    ;;                           (xtc:desugar:generate-generic-type-cname
@@ -603,8 +603,8 @@
                           (string-append "%" (car p) "_poly_"
                                          (if (xtc:cache:generictype-exists? (car p))
                                              (xtc:desugar:generate-generic-type-cname
-                                              (cadr p)
-                                              (symbol->string (xtc:cache:get-generictype-candidate-types (car p))))
+                                               (cadr p)
+                                               (symbol->string (xtc:cache:get-generictype-candidate-types (car p))))
                                              (if (= (length p) 2)
                                                  (cname-encode (cadr p))
                                                  (cname-encode (apply string-append (cadr p)
@@ -661,20 +661,20 @@
                     (encoding (cadr p1))
                     (t1aa (cname-decode encoding))
                     (t1a (string-append
-                          "<" (string-join
-                               (map (lambda (x)
-                                      ;; (println 'testx: x (string-append "^" (car p1) "\\{"))
-                                      (if (regex:match? x (string-append "^" (car p1) "\\{"))
-                                          (xtc:codegen:get-type-from-pretty-str x)
-                                          x))
-                                    (xtc:codegen:get-pretty-tuple-arg-strings t1aa))
-                               ",")
-                          ">"))
+                           "<" (string-join
+                                 (map (lambda (x)
+                                        ;; (println 'testx: x (string-append "^" (car p1) "\\{"))
+                                        (if (regex:match? x (string-append "^" (car p1) "\\{"))
+                                            (xtc:codegen:get-type-from-pretty-str x)
+                                            x))
+                                      (xtc:codegen:get-pretty-tuple-arg-strings t1aa))
+                                 ",")
+                           ">"))
                     ;; (ll (println 't1aa: t1aa))
                     (t1b (if (xtc:cache:generictype-exists? name)
                              (cadr (xtc:desugar:split-namedtype
-                                    (xtc:desugar:maximize-generic-type
-                                     (string-append name "{" (substring t1a 1 (- (string-length t1a) 1)) "}"))))
+                                     (xtc:desugar:maximize-generic-type
+                                       (string-append name "{" (substring t1a 1 (- (string-length t1a) 1)) "}"))))
                              t1a))
                     ;; (t1 (regex:replace-all t1b (string-append name "(?!_)") base))
                     (t1 (regex:replace-all t1b (string-append name "([*\\]>,])") (string-append base "$1")))
@@ -764,22 +764,22 @@
                            ;; (println 'bases bases 'ptrs ptrs)
                            ;; (println 'typea type)
                            (let ((replacements
-                                  (map (lambda (x)
-                                         (let* ((a (car x))
-                                                (b (cdr x))
-                                                (ap (if (not (string? a)) (list a)
-                                                        (regex:type-split a ":")))
-                                                (bp (if (not (string? b)) (list b)
-                                                        (regex:type-split b ":")))
-                                                ;; (lll (println 'ap ap 'bp bp))
-                                                (aa (if (= (length ap) 1)
-                                                        (car ap)
-                                                        (xtc:codegen:get-type-from-pretty-str-rec (cadr ap))))
-                                                (bb (if (= (length bp) 1)
-                                                        (car bp)
-                                                        (xtc:codegen:get-type-from-pretty-str-rec (cadr bp)))))
-                                           (cons aa bb)))
-                                       (if type-pairs type-pairs '())))) ;(cdr args)))) ;(cdr args))))
+                                   (map (lambda (x)
+                                          (let* ((a (car x))
+                                                 (b (cdr x))
+                                                 (ap (if (not (string? a)) (list a)
+                                                         (regex:type-split a ":")))
+                                                 (bp (if (not (string? b)) (list b)
+                                                         (regex:type-split b ":")))
+                                                 ;; (lll (println 'ap ap 'bp bp))
+                                                 (aa (if (= (length ap) 1)
+                                                         (car ap)
+                                                         (xtc:codegen:get-type-from-pretty-str-rec (cadr ap))))
+                                                 (bb (if (= (length bp) 1)
+                                                         (car bp)
+                                                         (xtc:codegen:get-type-from-pretty-str-rec (cadr bp)))))
+                                            (cons aa bb)))
+                                        (if type-pairs type-pairs '())))) ;(cdr args)))) ;(cdr args))))
                              ;(cadar args))))
                              (set! type (replace-all bases replacements))) ;;(cadar args)))
                            ;; (set! type (replace-all bases (cadar args)))
@@ -839,13 +839,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define xtc:codegen:regex-structs-or-atoms (string-append
-                                            ;;"(\\<?\\{(?<struct>[^{}]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
-                                            "(\\<?\\{(?<struct>(?!\\{|\\}|\\<\\{|\\}\\>).|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
-                                            ;;"|(\\[(?<array>[^\\[\\]]|\\[\\g<array>*\\]\\**)*\\]\\**)"
-                                            "|(\\[(?<array>(?!\\[|\\]).|\\[\\g<array>*\\]\\**)*\\]\\**)"
-                                            ;;"|(\\<(?<vector>[^<>]|\\<\\g<vector>*\\>\\**)*\\>\\**)"
-                                            "|(\\<(?<vector>(?!\\<|\\>).|\\<\\g<vector>*\\>\\**)*\\>\\**)"
-                                            "|(?:([%#0-9a-zA-Z_-]\\**)+)"))
+                                             ;;"(\\<?\\{(?<struct>[^{}]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
+                                             "(\\<?\\{(?<struct>(?!\\{|\\}|\\<\\{|\\}\\>).|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
+                                             ;;"|(\\[(?<array>[^\\[\\]]|\\[\\g<array>*\\]\\**)*\\]\\**)"
+                                             "|(\\[(?<array>(?!\\[|\\]).|\\[\\g<array>*\\]\\**)*\\]\\**)"
+                                             ;;"|(\\<(?<vector>[^<>]|\\<\\g<vector>*\\>\\**)*\\>\\**)"
+                                             "|(\\<(?<vector>(?!\\<|\\>).|\\<\\g<vector>*\\>\\**)*\\>\\**)"
+                                             "|(?:([%#0-9a-zA-Z_-]\\**)+)"))
 
 
 (define xtc:codegen:get-tuple-type-from-str
@@ -976,31 +976,31 @@
                      (ptr-depth (real->integer (floor (/ type (* -1 *xtc:codegen:pointer*))))))
                  (string-append "\\" (number->string base) (make-string ptr-depth #\*))))
               (else
-               (let ((cached (hashtable-ref *xtc:codegen:type-str-cache* type)))
-                 (if cached
-                     cached
-                     (let* ((base (modulo type *xtc:codegen:pointer*))
-                            (ptr-depth (real->integer (floor (/ type *xtc:codegen:pointer*))))
-                            (scalar (cond ((= base *xtc:codegen:fp64*) "double")
-                                          ((= base *xtc:codegen:fp32*) "float")
-                                          ((member base (list *xtc:codegen:si64* *xtc:codegen:ui64*)) "i64")
-                                          ((member base (list *xtc:codegen:si32* *xtc:codegen:ui32*)) "i32")
-                                          ((member base (list *xtc:codegen:si16* *xtc:codegen:ui16*)) "i16")
-                                          ((member base (list *xtc:codegen:si8* *xtc:codegen:ui8* *xtc:codegen:char*)) "i8")
-                                          ((= base *xtc:codegen:i1*) "i1")
-                                          (else #f))))
-                       (if scalar
-                           ;; pure function of the int-code: cache by `type'
-                           (let ((s (string-append scalar (make-string ptr-depth #\*))))
-                             (hashtable-set! *xtc:codegen:type-str-cache* type s)
-                             s)
-                           ;; a %named type --- the rendering needs the name from
-                           ;; `args', so it is not a function of `type' alone and
-                           ;; must not be cached
-                           (string-append (if (string? (car args))
-                                              (string-append "%" (car args))
-                                              (xtc:diagnostics:print-bad-type-error (if (null? args) type (car args))))
-                                          (make-string ptr-depth #\*)))))))))))
+                (let ((cached (hashtable-ref *xtc:codegen:type-str-cache* type)))
+                  (if cached
+                      cached
+                      (let* ((base (modulo type *xtc:codegen:pointer*))
+                             (ptr-depth (real->integer (floor (/ type *xtc:codegen:pointer*))))
+                             (scalar (cond ((= base *xtc:codegen:fp64*) "double")
+                                           ((= base *xtc:codegen:fp32*) "float")
+                                           ((member base (list *xtc:codegen:si64* *xtc:codegen:ui64*)) "i64")
+                                           ((member base (list *xtc:codegen:si32* *xtc:codegen:ui32*)) "i32")
+                                           ((member base (list *xtc:codegen:si16* *xtc:codegen:ui16*)) "i16")
+                                           ((member base (list *xtc:codegen:si8* *xtc:codegen:ui8* *xtc:codegen:char*)) "i8")
+                                           ((= base *xtc:codegen:i1*) "i1")
+                                           (else #f))))
+                        (if scalar
+                            ;; pure function of the int-code: cache by `type'
+                            (let ((s (string-append scalar (make-string ptr-depth #\*))))
+                              (hashtable-set! *xtc:codegen:type-str-cache* type s)
+                              s)
+                            ;; a %named type --- the rendering needs the name from
+                            ;; `args', so it is not a function of `type' alone and
+                            ;; must not be cached
+                            (string-append (if (string? (car args))
+                                               (string-append "%" (car args))
+                                               (xtc:diagnostics:print-bad-type-error (if (null? args) type (car args))))
+                                           (make-string ptr-depth #\*)))))))))))
 
 
 ;; The base LLVM type strings ("double", "i64", ...) mapped back to their
@@ -1066,13 +1066,13 @@
                  ((xtc:cache:namedtype-exists? type)
                   (xtc:codegen:layout-type-str (xtc:cache:get-namedtype-type type)))
                  (else
-                  ;; get-type-from-str hands a %name that is not a registered
-                  ;; named type straight back, so recursing on it would spin
-                  ;; forever: it is an error instead
-                  (let ((t (xtc:codegen:get-type-from-str type)))
-                    (if (equal? t type)
-                        (xtc:diagnostics:print-compiler-error "get-type-size: unresolved named type" type)
-                        (xtc:codegen:layout-type-str t))))))
+                   ;; get-type-from-str hands a %name that is not a registered
+                   ;; named type straight back, so recursing on it would spin
+                   ;; forever: it is an error instead
+                   (let ((t (xtc:codegen:get-type-from-str type)))
+                     (if (equal? t type)
+                         (xtc:diagnostics:print-compiler-error "get-type-size: unresolved named type" type)
+                         (xtc:codegen:layout-type-str t))))))
           ((list? type)
            (let ((t (car type))
                  (elts (lambda (ts) (string-join (map xtc:codegen:layout-type-str ts) ","))))
@@ -1147,8 +1147,8 @@
     (if (string? type)
         (if (and (char=? (string-ref type 0) #\%)
                  (xtc:cache:namedtype-exists?
-                  (substring (xtc:codegen:get-base-type type) 1
-                             (string-length (xtc:codegen:get-base-type type)))))
+                   (substring (xtc:codegen:get-base-type type) 1
+                              (string-length (xtc:codegen:get-base-type type)))))
             #t
             (xtc:codegen:type? (xtc:codegen:get-type-from-str type)))
         (cond ((null? type) #f)
@@ -1429,9 +1429,9 @@
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size closure-struct-str))
                    ", align 16\n" os2))
             (else
-             (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call ptr @llvm_zone_malloc("
-                   "ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
-                   (number->string (xtc:codegen:get-type-size closure-struct-str)) ")\n" os2)))
+              (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call ptr @llvm_zone_malloc("
+                    "ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
+                    (number->string (xtc:codegen:get-type-size closure-struct-str)) ")\n" os2)))
 
       (xtc:codegen:ssa-temp "closure" (car (xtc:codegen:ssa-temp "clsptr")) (string-append closure-struct-str "*"))
       ;; malloc evironment structure
@@ -1445,8 +1445,8 @@
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size estruct))
                    ", align 16\n" os2))
             (else
-             (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call ptr @llvm_zone_malloc("
-                   "ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2)))
+              (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call ptr @llvm_zone_malloc("
+                    "ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2)))
       ;; Every field of the environment is a pointer, so it is addressed as an
       ;; array of pointers: a getelementptr through the struct type would spell
       ;; out the whole struct (every captured variable's type) once per
@@ -1534,8 +1534,8 @@
                    " i32 " *xtc:codegen:pointer_size_bytes_str*
                    ", align 16\n" os2))
             (else
-             (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call ptr @llvm_zone_malloc(ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
-                   *xtc:codegen:pointer_size_bytes_str* ")\n" os2)))
+              (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call ptr @llvm_zone_malloc(ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
+                    *xtc:codegen:pointer_size_bytes_str* ")\n" os2)))
       (xtc:codegen:ssa-temp "closure_wrapper" (car (xtc:codegen:ssa-temp "wrapper_ptr")) (string-append (cadr (xtc:codegen:ssa-temp "closure")) "*"))
       (emit "store ptr " (car (xtc:codegen:ssa-temp "closure")) ", "
             "ptr " (car (xtc:codegen:ssa-temp "closure_wrapper")) "\n" os2)
@@ -1608,9 +1608,9 @@
                        (emit "%" (symbol->string (car a)) "Ptr = alloca i8, "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ", align 16\n" os))
                       (else
-                       (emit "%" (symbol->string (car a)) "Ptr = call ptr @llvm_zone_malloc("
-                             "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
-                             *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))))
+                        (emit "%" (symbol->string (car a)) "Ptr = call ptr @llvm_zone_malloc("
+                              "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
+                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))))
               (emit  "%" (symbol->string (car a)) "Ptr = alloca " (xtc:codegen:get-ir-type (cdr a)) "\n" os))
           (emit (string-append "store " (xtc:codegen:get-ir-type (cdr a)) " %" (symbol->string (car a))
                                ", ptr %" (symbol->string (car a)) "Ptr\n") os)))
@@ -1695,9 +1695,9 @@
                        (emit "%" (symbol->string (car a)) "Ptr = alloca i8, "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ", align 16\n" os))
                       (else
-                       (emit "%" (symbol->string (car a)) "Ptr = call ptr @llvm_zone_malloc("
-                             "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
-                             *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))))
+                        (emit "%" (symbol->string (car a)) "Ptr = call ptr @llvm_zone_malloc("
+                              "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
+                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))))
               (emit  "%" (symbol->string (car a)) "Ptr = alloca " (xtc:codegen:get-ir-type (cdr a)) "\n" os))
           (emit (string-append "store " (xtc:codegen:get-ir-type (cdr a)) " %" (symbol->string (car a))
                                ", ptr %" (symbol->string (car a)) "Ptr\n") os)))
@@ -1734,49 +1734,49 @@
            (result '())
            (env-zone-tmp '())
            (res
-            (map (lambda (p)
-                   (set! *xtc:codegen:sym-name-stack* (cons (car (ast:binding-var p)) *xtc:codegen:sym-name-stack*))
-                   ;;(println '__envin: *xtc:codegen:sym-name-stack*)
-                   ;; (println 'p2: (ast:binding-expr p))
-                   (let* ((symstr (symbol->string (car (ast:binding-var p))))
-                          (symtype (cdr (assq (car (ast:binding-var p)) types)))
-                          (value (xtc:codegen:compiler (ast:binding-expr p) types symtype))
-                          (typestr (cadr (xtc:codegen:ssa-temp)))
-                          (e (xtc:codegen:ssa-temp)))
-                     ;; (println 'symstr: symstr 'symtype: symtype)
-                     ;; (println 'typestr: typestr)
-                     (if (and (number? (ast:binding-expr p)) ;; if numeric constant force to type of symbol
-                              (xtc:codegen:number? (cdr (assq (car (ast:binding-var p)) types)))
-                              (xtc:codegen:number? (xtc:codegen:get-type-from-str typestr)))
-                         (set! typestr (xtc:codegen:get-type-str (cdr (assq (car (ast:binding-var p)) types)))))
-                     ;; type check
-                     ;; (println 'tt1: (xtc:codegen:get-type-from-str typestr) 'tt2: (cdr (assq (car (ast:binding-var p)) types)))
-                     (if (not (equal? (xtc:codegen:get-type-from-str typestr) ;; check to see if the two types are equal?
-                                      (cdr (assq (car (ast:binding-var p)) types))))
-                         (xtc:diagnostics:print-type-mismatch-error
-                          (xtc:codegen:pretty-print-type typestr)
-                          (xtc:codegen:pretty-print-type (cdr (assq (car (ast:binding-var p)) types)))
-                          (car (ast:binding-var p))))
-                     ;(println 'value: value 'typestr: typestr) ;'cadrp (ast:binding-expr p))
-                     (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = load ptr, ptr %_zonei8Ptr\n"
-                           os)
-                     (emit  "\n; let assign value to symbol " symstr "\n" os)
+             (map (lambda (p)
+                    (set! *xtc:codegen:sym-name-stack* (cons (car (ast:binding-var p)) *xtc:codegen:sym-name-stack*))
+                    ;;(println '__envin: *xtc:codegen:sym-name-stack*)
+                    ;; (println 'p2: (ast:binding-expr p))
+                    (let* ((symstr (symbol->string (car (ast:binding-var p))))
+                           (symtype (cdr (assq (car (ast:binding-var p)) types)))
+                           (value (xtc:codegen:compiler (ast:binding-expr p) types symtype))
+                           (typestr (cadr (xtc:codegen:ssa-temp)))
+                           (e (xtc:codegen:ssa-temp)))
+                      ;; (println 'symstr: symstr 'symtype: symtype)
+                      ;; (println 'typestr: typestr)
+                      (if (and (number? (ast:binding-expr p)) ;; if numeric constant force to type of symbol
+                               (xtc:codegen:number? (cdr (assq (car (ast:binding-var p)) types)))
+                               (xtc:codegen:number? (xtc:codegen:get-type-from-str typestr)))
+                          (set! typestr (xtc:codegen:get-type-str (cdr (assq (car (ast:binding-var p)) types)))))
+                      ;; type check
+                      ;; (println 'tt1: (xtc:codegen:get-type-from-str typestr) 'tt2: (cdr (assq (car (ast:binding-var p)) types)))
+                      (if (not (equal? (xtc:codegen:get-type-from-str typestr) ;; check to see if the two types are equal?
+                                       (cdr (assq (car (ast:binding-var p)) types))))
+                          (xtc:diagnostics:print-type-mismatch-error
+                            (xtc:codegen:pretty-print-type typestr)
+                            (xtc:codegen:pretty-print-type (cdr (assq (car (ast:binding-var p)) types)))
+                            (car (ast:binding-var p))))
+                      ;(println 'value: value 'typestr: typestr) ;'cadrp (ast:binding-expr p))
+                      (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = load ptr, ptr %_zonei8Ptr\n"
+                            os)
+                      (emit  "\n; let assign value to symbol " symstr "\n" os)
 
-                     (if (= (ast:env-alloc ast) 3)
-                         (begin
-                           (emit "%" symstr "Ptr = call ptr @llvm_zone_malloc("
-                                 "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
-                                 *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cadr e))) ")\n" os)
-                           )
-                         (begin
+                      (if (= (ast:env-alloc ast) 3)
+                          (begin
+                            (emit "%" symstr "Ptr = call ptr @llvm_zone_malloc("
+                                  "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
+                                  *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cadr e))) ")\n" os)
+                            )
+                          (begin
 
-                           ; (println 'typestr: typestr)
-                           (emit "%" symstr "Ptr = alloca " (xtc:codegen:ir-type typestr) "\n" os)
-                           ))
+                            ; (println 'typestr: typestr)
+                            (emit "%" symstr "Ptr = alloca " (xtc:codegen:ir-type typestr) "\n" os)
+                            ))
 
-                     ;; (if (pair? value)
-                     (list symstr typestr value e)))
-                 (ast:env-bindings ast))))
+                      ;; (if (pair? value)
+                      (list symstr typestr value e)))
+                  (ast:env-bindings ast))))
       ;; (println '____________A> ast)
       (map (lambda (p r)
              (let ((symstr (car r))
@@ -2645,8 +2645,8 @@
       (if (not (equal? (xtc:codegen:get-type-from-str (cadr val))
                        (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str (cadr var)))))
           (xtc:diagnostics:print-type-mismatch-error
-           (cadr val)
-           (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str (cadr var))) (car ast)))
+            (cadr val)
+            (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str (cadr var))) (car ast)))
       ;; type tests done
       (emit index-str os)
       (emit var-str os)
@@ -2895,9 +2895,9 @@
         (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = load ptr, ptr %_zonei8Ptr\n"
               os)
         (emit
-         (xtc:codegen:ssa-temp "dat" "i8*") " = call ptr @llvm_zone_malloc(ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
-         (car (xtc:codegen:ssa-temp "zonesize"))
-         ")\n" os)
+          (xtc:codegen:ssa-temp "dat" "i8*") " = call ptr @llvm_zone_malloc(ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
+          (car (xtc:codegen:ssa-temp "zonesize"))
+          ")\n" os)
         (emit "call ptr @memset(ptr " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, i64 " (car (xtc:codegen:ssa-temp "zonesize")) ")\n" os)
         (xtc:codegen:ssa-temp "val" (car (xtc:codegen:ssa-temp "dat")) (string-append (xtc:codegen:get-type-str tt) "*"))
         (xtc:codegen:strip-space os)))))
@@ -3239,30 +3239,30 @@
              (if (<> (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
                      (xtc:codegen:add-ptr-depth *xtc:codegen:si8*))
                  (xtc:diagnostics:print-bad-type-error-with-ast
-                  (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
-                  "first argument must be a format string" ast)))
+                   (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
+                   "first argument must be a format string" ast)))
             ((member (car ast) '(fprintf fscanf))
              (if (<> (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
                      (xtc:codegen:add-ptr-depth *xtc:codegen:si8*))
                  (xtc:diagnostics:print-bad-type-error-with-ast
-                  (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
-                  "first argument must be stdc FILE*" ast))
+                   (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
+                   "first argument must be stdc FILE*" ast))
              (if (<> (xtc:codegen:get-type-from-str (car (cdr (cdr (cadr args)))))
                      (xtc:codegen:add-ptr-depth *xtc:codegen:si8*))
                  (xtc:diagnostics:print-bad-type-error-with-ast
-                  (xtc:codegen:get-type-from-str (car (cdr (cdr (cadr args)))))
-                  "second argument must be a format string" ast)))
+                   (xtc:codegen:get-type-from-str (car (cdr (cdr (cadr args)))))
+                   "second argument must be a format string" ast)))
             ((member (car ast) '(sprintf sscanf))
              (if (<> (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
                      (xtc:codegen:add-ptr-depth *xtc:codegen:si8*))
                  (xtc:diagnostics:print-bad-type-error-with-ast
-                  (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
-                  "first argument must be allocated memory" ast))
+                   (xtc:codegen:get-type-from-str (car (cdr (cdr (car args)))))
+                   "first argument must be allocated memory" ast))
              (if (<> (xtc:codegen:get-type-from-str (car (cdr (cdr (cadr args)))))
                      (xtc:codegen:add-ptr-depth *xtc:codegen:si8*))
                  (xtc:diagnostics:print-bad-type-error-with-ast
-                  (xtc:codegen:get-type-from-str (car (cdr (cdr (cadr args)))))
-                  "second argument must be a format string" ast)))
+                   (xtc:codegen:get-type-from-str (car (cdr (cdr (cadr args)))))
+                   "second argument must be a format string" ast)))
             (else (xtc:diagnostics:print-bad-type-error "" "Bad VARARGS func!")))
       (if (equal? (car ast) 'printf)
           (string-append (apply string-append (map (lambda (a) (car a)) args))
@@ -3921,14 +3921,14 @@
 (define xtc:codegen:intrinsic-substitution
   (lambda (name)
     (cond
-     ((string=? name "memcpy") "llvm.memcpy.p0.p0.i64")
-     (else name))))
+      ((string=? name "memcpy") "llvm.memcpy.p0.p0.i64")
+      (else name))))
 
 (define xtc:codegen:function-fixup-args
   (lambda (name)
     (cond
-     ((string=? name "memcpy") ", i1 0")
-     (else ""))))
+      ((string=? name "memcpy") ", i1 0")
+      (else ""))))
 
 (define xtc:codegen:compiler:native-call
   (lambda (ast types)
@@ -3959,9 +3959,9 @@
                                                (xtc:codegen:get-type-from-str ft)))
                                   (equal? abass ftbass))
                              (cons (string-append
-                                    (car p)
-                                    (xtc:codegen:ssa-temp "val" ft)
-                                    " = bitcast " (xtc:codegen:ir-type atype) " " aname " to " (xtc:codegen:ir-type ft) "\n")
+                                     (car p)
+                                     (xtc:codegen:ssa-temp "val" ft)
+                                     " = bitcast " (xtc:codegen:ir-type atype) " " aname " to " (xtc:codegen:ir-type ft) "\n")
                                    (xtc:codegen:ssa-temp))
                              p)))
                      args (cdr ftypes))))
@@ -4090,7 +4090,7 @@
                                     ((= *xtc:codegen:fp64* (car hint?))
                                      (xtc:codegen:ssa-temp (xtc:codegen:double-literal ast) (xtc:codegen:get-type-str (car hint?))))
                                     (else
-                                     (xtc:codegen:ssa-temp (number->string ast) (xtc:codegen:get-type-str (car hint?)))))
+                                      (xtc:codegen:ssa-temp (number->string ast) (xtc:codegen:get-type-str (car hint?)))))
                               (if (integer? ast)
                                   (xtc:codegen:ssa-temp (number->string ast) "i64")
                                   (xtc:codegen:ssa-temp (xtc:codegen:double-literal ast) "double")))

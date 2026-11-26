@@ -38,9 +38,9 @@
 (define *xtmlib-studio_engine-loaded* #t)
 
 (xtc:aot:suppress-aot-do
- (sys:load "libs/core/audio_dsp.xtm"))
+  (sys:load "libs/core/audio_dsp.xtm"))
 (xtc:aot:insert-forms
- (sys:load "libs/core/audio_dsp.xtm" 'quiet))
+  (sys:load "libs/core/audio_dsp.xtm" 'quiet))
 
 (xtc:aot:insert-header "xtmstudio_engine")
 (xtc:aot:import-ll "xtmstudio_engine")
@@ -286,17 +286,17 @@ they have. idx is a parameter's index, or NOTE_GAIN or NOTE_PAN."
             ((= mode INST_MONO)
              (set! idx 0))
             (else
-             ;; take a free voice if there is one. Otherwise steal the voice
-             ;; that will be missed least: a released one if possible, and
-             ;; the oldest of those.
-             (dotimes (i n)
-               (set! v (pref-ptr voices i))
-               (if (and (< idx 0) (not (tref v 6)))
-                   (set! idx i))
-               (set! score (+ (tref v 4) (if (< (tref v 3) 0.5) 100000000 0)))
-               (if (> score oldest)
-                   (begin (set! oldest score) (set! steal i))))
-             (if (< idx 0) (set! idx steal))))
+              ;; take a free voice if there is one. Otherwise steal the voice
+              ;; that will be missed least: a released one if possible, and
+              ;; the oldest of those.
+              (dotimes (i n)
+                (set! v (pref-ptr voices i))
+                (if (and (< idx 0) (not (tref v 6)))
+                    (set! idx i))
+                (set! score (+ (tref v 4) (if (< (tref v 3) 0.5) 100000000 0)))
+                (if (> score oldest)
+                    (begin (set! oldest score) (set! steal i))))
+              (if (< idx 0) (set! idx steal))))
       (if (and (>= idx 0) (< idx n))
           (begin
             (set! v (pref-ptr voices idx))

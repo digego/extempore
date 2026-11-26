@@ -58,20 +58,20 @@
                                         (else l)))
                                 tmpargs)))
                (cond
-                ((or (list? (car tmpargs)) (pair? (car tmpargs)))
-                 (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
-                ((member (car tmpargs) '(_ |)) #f) ;; skip these symbols
-                (else
-                 ;; this is a messy expression, but it just counts the number of
-                 ;; '| symbols *after* the current value, and adds them to the
-                 ;; duration
-                 (let ((note-dur (* one_beat
-                                    (+ 1 (length (take-while (lambda (x) (equal? x '|))
-                                                             (cl:nthcdr (min (cdr t) (length (car args))) (car args))))))))
-                   (apply callback
-                          (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
-                          func (+ beat (- (car t) pos)) note-dur
-                          loopcnt targs))))))
+                 ((or (list? (car tmpargs)) (pair? (car tmpargs)))
+                  (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
+                 ((member (car tmpargs) '(_ |)) #f) ;; skip these symbols
+                 (else
+                   ;; this is a messy expression, but it just counts the number of
+                   ;; '| symbols *after* the current value, and adds them to the
+                   ;; duration
+                   (let ((note-dur (* one_beat
+                                      (+ 1 (length (take-while (lambda (x) (equal? x '|))
+                                                               (cl:nthcdr (min (cdr t) (length (car args))) (car args))))))))
+                     (apply callback
+                            (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
+                            func (+ beat (- (car t) pos)) note-dur
+                            loopcnt targs))))))
            newlst))))
 
 ;; rhythm map
@@ -292,12 +292,12 @@
       (cond ((<= k 0) (repeat n zero-val))
             ((>= k n) (repeat n one-val))
             (else
-             (let loop ((groups (euclid-distribute-zeros
-                                 (list (repeat k (list one-val))
-                                       (repeat (- n k) (list zero-val))))))
-               (if (or (= (length groups) 1) (member (cadr groups) (list zero-val)))
-                   (flatten groups)
-                   (loop (euclid-distribute-zeros groups)))))))))
+              (let loop ((groups (euclid-distribute-zeros
+                                   (list (repeat k (list one-val))
+                                         (repeat (- n k) (list zero-val))))))
+                (if (or (= (length groups) 1) (member (cadr groups) (list zero-val)))
+                    (flatten groups)
+                    (loop (euclid-distribute-zeros groups)))))))))
 
 ;; number of (numof -> nof)
 (define-macro (nof num body)
@@ -325,9 +325,9 @@
     (let loop ((ret '())
                (remaining lst))
       (cond
-       ((null? remaining) (reverse ret))
-       ((pred (car remaining)) (loop (cons (car remaining) ret) (cdr remaining)))
-       (else (reverse ret))))))
+        ((null? remaining) (reverse ret))
+        ((pred (car remaining)) (loop (cons (car remaining) ret) (cdr remaining)))
+        (else (reverse ret))))))
 
 ;; skip by m with a lst rotation of r
 ;; for example: (skip 2 -1 (scale 3 8))

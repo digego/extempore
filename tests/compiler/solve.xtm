@@ -24,29 +24,29 @@
 ;; an unconstrained integer literal defaults to si64 (code 2), propagated
 ;; through an equality to the variable that names the expression's result
 (xtmtest-result
- (solve1 (list (xtc:solve:c-default 'lit (list 2 4 6 9))
-               (xtc:solve:c-eq 'result 'lit))
-         'result)
- 2
- "default-int-propagates")
+  (solve1 (list (xtc:solve:c-default 'lit (list 2 4 6 9))
+                (xtc:solve:c-eq 'result 'lit))
+          'result)
+  2
+  "default-int-propagates")
 
 ;; an unconstrained float literal defaults to fp64 (code 0)
 (xtmtest-result
- (solve1 (list (xtc:solve:c-default 'lit (list 0 1))
-               (xtc:solve:c-eq 'result 'lit))
-         'result)
- 0
- "default-float-propagates")
+  (solve1 (list (xtc:solve:c-default 'lit (list 0 1))
+                (xtc:solve:c-eq 'result 'lit))
+          'result)
+  0
+  "default-float-propagates")
 
 ;; the old backtracking enumeration existed to rescue a literal whose width is
 ;; fixed only by a downstream use; here forward unification fixes it to si32
 ;; (code 4) BEFORE defaulting, so the default never fires --- no search needed
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'lit 4)
-               (xtc:solve:c-default 'lit (list 2 4 6 9)))
-         'lit)
- 4
- "downstream-constraint-beats-default")
+  (solve1 (list (xtc:solve:c-eq 'lit 4)
+                (xtc:solve:c-default 'lit (list 2 4 6 9)))
+          'lit)
+  4
+  "downstream-constraint-beats-default")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; equality            ;;
@@ -54,30 +54,30 @@
 
 ;; a chain of equalities carries a concrete type the length of the chain
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'a 'b)
-               (xtc:solve:c-eq 'b 'c)
-               (xtc:solve:c-eq 'c 102))
-         'a)
- 102
- "equality-chain")
+  (solve1 (list (xtc:solve:c-eq 'a 'b)
+                (xtc:solve:c-eq 'b 'c)
+                (xtc:solve:c-eq 'c 102))
+          'a)
+  102
+  "equality-chain")
 
 ;; structural unification of a compound type through a variable
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 't2 't1)
-               (xtc:solve:c-eq 't1 '(14 2 0)))
-         't2)
- '(14 2 0)
- "equality-tuple")
+  (solve1 (list (xtc:solve:c-eq 't2 't1)
+                (xtc:solve:c-eq 't1 '(14 2 0)))
+          't2)
+  '(14 2 0)
+  "equality-tuple")
 
 ;; genuinely distinct concrete types are a conflict, not a retained union
 (xtmtest-result
- (let ((intern (make-hashtable)))
-   (eq? 'conflict
-        (xtc:solve:run (list (xtc:solve:c-eq 'x 2)
-                             (xtc:solve:c-eq 'x 4))
-                       intern)))
- #t
- "equality-conflict-detected")
+  (let ((intern (make-hashtable)))
+    (eq? 'conflict
+         (xtc:solve:run (list (xtc:solve:c-eq 'x 2)
+                              (xtc:solve:c-eq 'x 4))
+                        intern)))
+  #t
+  "equality-conflict-detected")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; #315 pointer depth  ;;
@@ -88,19 +88,19 @@
 ;; depth cannot be lost because it is a ptr node, not trailing string stars.
 ;; This is the issue the whole canonical core was built to fix.
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'field '!a*)
-               (xtc:solve:c-eq '!a 2))
-         'field)
- 102
- "pointer-depth-315")
+  (solve1 (list (xtc:solve:c-eq 'field '!a*)
+                (xtc:solve:c-eq '!a 2))
+          'field)
+  102
+  "pointer-depth-315")
 
 ;; conversely the base variable resolves to the bare type
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'field '!a*)
-               (xtc:solve:c-eq 'field 102))
-         '!a)
- 2
- "pointer-depth-315-reverse")
+  (solve1 (list (xtc:solve:c-eq 'field '!a*)
+                (xtc:solve:c-eq 'field 102))
+          '!a)
+  2
+  "pointer-depth-315-reverse")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; unresolved          ;;
@@ -109,9 +109,9 @@
 ;; a variable with no constraint at all stays unresolved (#f), distinct from a
 ;; conflict --- the engine never invents a type it cannot justify
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'a 'b)) 'a)
- #f
- "unconstrained-is-unresolved")
+  (solve1 (list (xtc:solve:c-eq 'a 'b)) 'a)
+  #f
+  "unconstrained-is-unresolved")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; overloads           ;;
@@ -128,123 +128,123 @@
 ;; the parameter type (i32) and PRE-EMPTING the default that would otherwise make
 ;; the literal i64 --- the overloaded analogue of downstream-constraint-beats-default
 (xtmtest-result
- (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 4 4)))
-               (xtc:solve:c-default 'a (list 2 4 6 9)))
-         'a)
- 4
- "overload-single-candidate-forces-arg")
+  (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 4 4)))
+                (xtc:solve:c-default 'a (list 2 4 6 9)))
+          'a)
+  4
+  "overload-single-candidate-forces-arg")
 
 (xtmtest-result
- (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 4 4)))
-               (xtc:solve:c-default 'a (list 2 4 6 9)))
-         'r)
- 4
- "overload-single-candidate-return")
+  (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 4 4)))
+                (xtc:solve:c-default 'a (list 2 4 6 9)))
+          'r)
+  4
+  "overload-single-candidate-return")
 
 ;; two candidates (i64->i64 and f64->f64); a downstream equality fixes the
 ;; argument to i64, so only the first candidate is viable --- no search
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'a 2)
-               (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 0 0))))
-         'r)
- 2
- "overload-disambiguated-by-equality")
+  (solve1 (list (xtc:solve:c-eq 'a 2)
+                (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 0 0))))
+          'r)
+  2
+  "overload-disambiguated-by-equality")
 
 ;; the same two candidates, but the argument is a bare integer literal: its class
 ;; (integer widths) excludes the f64 candidate outright, so the i64 candidate is
 ;; selected without even needing to default --- a literal matches a candidate at
 ;; any width in its class, the bound the old candidate-list carried
 (xtmtest-result
- (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 0 0)))
-               (xtc:solve:c-default 'a (list 2 4 6 9)))
-         'r)
- 2
- "overload-literal-excludes-float-candidate")
+  (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 0 0)))
+                (xtc:solve:c-default 'a (list 2 4 6 9)))
+          'r)
+  2
+  "overload-literal-excludes-float-candidate")
 
 ;; an integer literal selects the i32 candidate over the f64 one --- i32 is in
 ;; its class though it is NOT the width defaulting would choose (i64).  This is
 ;; the case plain defaulting gets wrong: it would pin the literal to i64, which
 ;; matches neither candidate; reading the class instead matches the old checker.
 (xtmtest-result
- (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 0 0) (list 4 4)))
-               (xtc:solve:c-default 'a (list 2 4 6 9)))
-         'r)
- 4
- "overload-literal-matches-non-default-width")
+  (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 0 0) (list 4 4)))
+                (xtc:solve:c-default 'a (list 2 4 6 9)))
+          'r)
+  4
+  "overload-literal-matches-non-default-width")
 
 ;; a float literal selects the f64 candidate by the same class reasoning
 (xtmtest-result
- (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 0 0) (list 4 4)))
-               (xtc:solve:c-default 'a (list 0 1)))
-         'r)
- 0
- "overload-float-literal-matches-by-class")
+  (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 0 0) (list 4 4)))
+                (xtc:solve:c-default 'a (list 0 1)))
+          'r)
+  0
+  "overload-float-literal-matches-by-class")
 
 ;; when BOTH candidates are in the literal's class (i64 and i32), the class
 ;; cannot decide; defaulting then breaks the tie at the class's canonical width
 ;; (i64) --- the genuine default tie-break, distinct from the class filter above
 (xtmtest-result
- (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 4 4)))
-               (xtc:solve:c-default 'a (list 2 4 6 9)))
-         'r)
- 2
- "overload-default-breaks-in-class-tie")
+  (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 4 4)))
+                (xtc:solve:c-default 'a (list 2 4 6 9)))
+          'r)
+  2
+  "overload-default-breaks-in-class-tie")
 
 ;; a bare literal cannot be passed where a pointer is required: the parameter
 ;; (i64*) is outside the integer class, so no candidate admits the literal
 (xtmtest-result
- (let ((intern (make-hashtable)))
-   (eq? 'conflict
-        (xtc:solve:run (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 102)))
-                             (xtc:solve:c-default 'a (list 2 4 6 9)))
-                       intern)))
- #t
- "overload-literal-rejects-pointer-parameter")
+  (let ((intern (make-hashtable)))
+    (eq? 'conflict
+         (xtc:solve:run (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 102)))
+                              (xtc:solve:c-default 'a (list 2 4 6 9)))
+                        intern)))
+  #t
+  "overload-literal-rejects-pointer-parameter")
 
 ;; an argument fixed to i32 selects the i32 candidate over the i64 one
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'a 4)
-               (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 4 4))))
-         'r)
- 4
- "overload-picks-matching-width")
+  (solve1 (list (xtc:solve:c-eq 'a 4)
+                (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 4 4))))
+          'r)
+  4
+  "overload-picks-matching-width")
 
 ;; no candidate matches a concrete argument: an honest conflict, not a guess
 (xtmtest-result
- (let ((intern (make-hashtable)))
-   (eq? 'conflict
-        (xtc:solve:run (list (xtc:solve:c-eq 'a 2)
-                             (xtc:solve:c-overload 'r (list 'a) (list (list 0 0))))
-                       intern)))
- #t
- "overload-no-candidate-conflicts")
+  (let ((intern (make-hashtable)))
+    (eq? 'conflict
+         (xtc:solve:run (list (xtc:solve:c-eq 'a 2)
+                              (xtc:solve:c-overload 'r (list 'a) (list (list 0 0))))
+                        intern)))
+  #t
+  "overload-no-candidate-conflicts")
 
 ;; a comparison-shaped candidate: two f64 arguments but an i1 result --- the
 ;; return type need not relate to the argument types
 (xtmtest-result
- (solve1 (list (xtc:solve:c-overload 'r (list 'a 'b) (list (list 10 0 0)))
-               (xtc:solve:c-default 'a (list 0 1))
-               (xtc:solve:c-default 'b (list 0 1)))
-         'r)
- 10
- "overload-result-independent-of-args")
+  (solve1 (list (xtc:solve:c-overload 'r (list 'a 'b) (list (list 10 0 0)))
+                (xtc:solve:c-default 'a (list 0 1))
+                (xtc:solve:c-default 'b (list 0 1)))
+          'r)
+  10
+  "overload-result-independent-of-args")
 
 ;; a generic candidate ([!t,!t]: return equals parameter) instantiates to the
 ;; argument's type --- its variable, freshened per candidate, unifies with the
 ;; i64 argument and carries i64 back out as the result
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'a 2)
-               (xtc:solve:c-overload 'r (list 'a) (list (list '!t '!t))))
-         'r)
- 2
- "overload-generic-candidate-instantiates")
+  (solve1 (list (xtc:solve:c-eq 'a 2)
+                (xtc:solve:c-overload 'r (list 'a) (list (list '!t '!t))))
+          'r)
+  2
+  "overload-generic-candidate-instantiates")
 
 ;; a generic candidate at a pointer depth ([!t,!t*]: dereference): an i64*
 ;; argument reifies the result as i64, structurally --- the #315 property
 ;; surviving through overload instantiation
 (xtmtest-result
- (solve1 (list (xtc:solve:c-eq 'a 102)
-               (xtc:solve:c-overload 'r (list 'a) (list (list '!t '!t*))))
-         'r)
- 2
- "overload-generic-candidate-pointer-depth")
+  (solve1 (list (xtc:solve:c-eq 'a 102)
+                (xtc:solve:c-overload 'r (list 'a) (list (list '!t '!t*))))
+          'r)
+  2
+  "overload-generic-candidate-pointer-depth")

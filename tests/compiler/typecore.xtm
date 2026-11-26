@@ -27,14 +27,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:unify (xtc:type:var 1) 'i64 xtc:type:empty-subst))
+                  (xtc:type:var 1)
+                  (xtc:type:unify (xtc:type:var 1) 'i64 xtc:type:empty-subst))
                 'i64
                 "var-binds-base")
 
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:unify 'i64 (xtc:type:var 1) xtc:type:empty-subst))
+                  (xtc:type:var 1)
+                  (xtc:type:unify 'i64 (xtc:type:var 1) xtc:type:empty-subst))
                 'i64
                 "base-binds-var")
 
@@ -52,9 +52,9 @@
                 "younger-var-binds-older")
 
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:subst-extend 1 (xtc:type:var 2)
-                                        (xtc:type:subst-extend 2 'i64 xtc:type:empty-subst)))
+                  (xtc:type:var 1)
+                  (xtc:type:subst-extend 1 (xtc:type:var 2)
+                                         (xtc:type:subst-extend 2 'i64 xtc:type:empty-subst)))
                 'i64
                 "resolve-chain")
 
@@ -64,29 +64,29 @@
 
 ;; `!a*' unified with `i64*' keeps its pointer structure ...
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:ptr (xtc:type:var 1))
-                 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
-                                 (xtc:type:ptr 'i64)
-                                 xtc:type:empty-subst))
+                  (xtc:type:ptr (xtc:type:var 1))
+                  (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                  (xtc:type:ptr 'i64)
+                                  xtc:type:empty-subst))
                 (xtc:type:ptr 'i64)
                 "ptr-depth-preserved")
 
 ;; ... and binds the inner variable to the pointee, not the pointer.
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
-                                 (xtc:type:ptr 'i64)
-                                 xtc:type:empty-subst))
+                  (xtc:type:var 1)
+                  (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                  (xtc:type:ptr 'i64)
+                                  xtc:type:empty-subst))
                 'i64
                 "ptr-binds-pointee")
 
 ;; `!a*' unified with `i64**' binds the variable to `i64*' --- depth is
 ;; arithmetic over structure, not asterisk-counting in a symbol name.
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
-                                 (xtc:type:ptr (xtc:type:ptr 'i64))
-                                 xtc:type:empty-subst))
+                  (xtc:type:var 1)
+                  (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                  (xtc:type:ptr (xtc:type:ptr 'i64))
+                                  xtc:type:empty-subst))
                 (xtc:type:ptr 'i64)
                 "ptr-binds-deeper")
 
@@ -141,10 +141,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:tuple (xtc:type:var 1) (xtc:type:var 2))
-                 (xtc:type:unify (xtc:type:tuple (xtc:type:var 1) 'i64)
-                                 (xtc:type:tuple 'f64 (xtc:type:var 2))
-                                 xtc:type:empty-subst))
+                  (xtc:type:tuple (xtc:type:var 1) (xtc:type:var 2))
+                  (xtc:type:unify (xtc:type:tuple (xtc:type:var 1) 'i64)
+                                  (xtc:type:tuple 'f64 (xtc:type:var 2))
+                                  xtc:type:empty-subst))
                 (xtc:type:tuple 'f64 'i64)
                 "tuple-unify")
 
@@ -155,10 +155,10 @@
                 "tuple-arity-mismatch")
 
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:closure (xtc:type:var 1) (xtc:type:var 2))
-                 (xtc:type:unify (xtc:type:closure (xtc:type:var 1) 'i64)
-                                 (xtc:type:closure 'f64 (xtc:type:var 2))
-                                 xtc:type:empty-subst))
+                  (xtc:type:closure (xtc:type:var 1) (xtc:type:var 2))
+                  (xtc:type:unify (xtc:type:closure (xtc:type:var 1) 'i64)
+                                  (xtc:type:closure 'f64 (xtc:type:var 2))
+                                  xtc:type:empty-subst))
                 (xtc:type:closure 'f64 'i64)
                 "closure-unify")
 
@@ -171,10 +171,10 @@
 ;; array / vector sizes ride through unification as literals: equal sizes
 ;; agree, unequal sizes fail, and the element type still unifies.
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:unify (xtc:type:array 3 (xtc:type:var 1))
-                                 (xtc:type:array 3 'i64)
-                                 xtc:type:empty-subst))
+                  (xtc:type:var 1)
+                  (xtc:type:unify (xtc:type:array 3 (xtc:type:var 1))
+                                  (xtc:type:array 3 'i64)
+                                  xtc:type:empty-subst))
                 'i64
                 "array-size-match")
 
@@ -185,10 +185,10 @@
                 "array-size-mismatch")
 
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:unify (xtc:type:vector 4 (xtc:type:var 1))
-                                 (xtc:type:vector 4 'f32)
-                                 xtc:type:empty-subst))
+                  (xtc:type:var 1)
+                  (xtc:type:unify (xtc:type:vector 4 (xtc:type:var 1))
+                                  (xtc:type:vector 4 'f32)
+                                  xtc:type:empty-subst))
                 'f32
                 "vector-elt-unify")
 
@@ -209,10 +209,10 @@
 ;; nominal parametric types (napp): the name guards the match and the type
 ;; arguments unify pairwise.  List{!a} reifies !a from List{i64} ...
 (xtmtest-result (xtc:type:apply-subst
-                 (xtc:type:var 1)
-                 (xtc:type:unify (xtc:type:napp "List" (xtc:type:var 1))
-                                 (xtc:type:napp "List" 'i64)
-                                 xtc:type:empty-subst))
+                  (xtc:type:var 1)
+                  (xtc:type:unify (xtc:type:napp "List" (xtc:type:var 1))
+                                  (xtc:type:napp "List" 'i64)
+                                  xtc:type:empty-subst))
                 'i64
                 "napp-reify-arg")
 
@@ -250,14 +250,14 @@
 ;; of (closure !a !a) become the same fresh variable.
 (xtmtest-result (begin (xtc:type:reset-fresh!)
                        (xtc:type:instantiate
-                        (xtc:type:closure (xtc:type:var 5) (xtc:type:var 5))))
+                         (xtc:type:closure (xtc:type:var 5) (xtc:type:var 5))))
                 (xtc:type:closure (xtc:type:var 1) (xtc:type:var 1))
                 "instantiate-shares")
 
 ;; Distinct variables stay distinct.
 (xtmtest-result (begin (xtc:type:reset-fresh!)
                        (xtc:type:instantiate
-                        (xtc:type:closure (xtc:type:var 5) (xtc:type:var 6))))
+                         (xtc:type:closure (xtc:type:var 5) (xtc:type:var 6))))
                 (xtc:type:closure (xtc:type:var 1) (xtc:type:var 2))
                 "instantiate-distinct")
 
@@ -275,9 +275,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (xtmtest-result (xtc:type:free-vars
-                 (xtc:type:tuple (xtc:type:var 3)
-                                 (xtc:type:ptr (xtc:type:var 7))
-                                 'i64))
+                  (xtc:type:tuple (xtc:type:var 3)
+                                  (xtc:type:ptr (xtc:type:var 7))
+                                  'i64))
                 '(3 7)
                 "free-vars-collect")
 

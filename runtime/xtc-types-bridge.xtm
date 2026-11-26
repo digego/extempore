@@ -200,14 +200,14 @@
 (define xtc:type:generic-instance->napp
   (lambda (stripped depth intern)
     (cond
-     ((xtc:codegen:poly-or-adhoc? stripped)
-      (let ((dec (xtc:codegen:split-and-decode-poly-adhoc-name stripped)))
-        (and dec (xtc:type:napp-from-args (regex:replace (car dec) "^%" "")
-                                          (cadr dec) depth intern))))
-     ((string-contains? stripped "{")
-      (let ((p (xtc:desugar:split-namedtype stripped)))
-        (xtc:type:napp-from-args (car p) (cadr p) depth intern)))
-     (else #f))))
+      ((xtc:codegen:poly-or-adhoc? stripped)
+       (let ((dec (xtc:codegen:split-and-decode-poly-adhoc-name stripped)))
+         (and dec (xtc:type:napp-from-args (regex:replace (car dec) "^%" "")
+                                           (cadr dec) depth intern))))
+      ((string-contains? stripped "{")
+       (let ((p (xtc:desugar:split-namedtype stripped)))
+         (xtc:type:napp-from-args (car p) (cadr p) depth intern)))
+      (else #f))))
 
 (define xtc:type:from-intcode-string
   (lambda (s intern)
@@ -215,12 +215,12 @@
            (stripped (xtc:type:strip-trailing-stars s))
            (napp (xtc:type:generic-instance->napp stripped depth intern)))
       (cond
-       (napp napp)
-       ((and (> (string-length stripped) 0) (char=? (string-ref stripped 0) #\%))
-        (xtc:type:wrap-ptr depth
-                           (xtc:type:named (substring stripped 1 (string-length stripped)))))
-       (else (xtc:diagnostics:print-compiler-error
-              (string-append "cannot decode type string " s)))))))
+        (napp napp)
+        ((and (> (string-length stripped) 0) (char=? (string-ref stripped 0) #\%))
+         (xtc:type:wrap-ptr depth
+                            (xtc:type:named (substring stripped 1 (string-length stripped)))))
+        (else (xtc:diagnostics:print-compiler-error
+                (string-append "cannot decode type string " s)))))))
 
 (define xtc:type:from-intcode-number
   (lambda (n)
@@ -233,8 +233,8 @@
               (if base
                   (xtc:type:wrap-ptr depth base)
                   (xtc:diagnostics:print-compiler-error
-                   (string-append "cannot decode int-code type "
-                                  (number->string n))))))))))
+                    (string-append "cannot decode int-code type "
+                                   (number->string n))))))))))
 
 (define xtc:type:from-intcode-compound
   (lambda (ic intern)
@@ -244,20 +244,20 @@
            (fields (cdr ic))
            (decode (lambda (f) (xtc:type:from-intcode f intern))))
       (cond
-       ((= tag *xtc:codegen:tuple*)
-        (xtc:type:wrap-ptr rawdepth (cons 'tuple (map decode fields))))
-       ((= tag *xtc:codegen:closure*)
-        (xtc:type:wrap-ptr (- rawdepth 1) (cons 'closure (map decode fields))))
-       ((= tag *xtc:codegen:array*)
-        (xtc:type:wrap-ptr rawdepth
-                           (list 'array (car fields) (decode (cadr fields)))))
-       ((= tag *xtc:codegen:vector*)
-        (xtc:type:wrap-ptr rawdepth
-                           (list 'vector (car fields) (decode (cadr fields)))))
-       (else
-        (xtc:diagnostics:print-compiler-error
-         (string-append "cannot decode compound int-code with tag "
-                        (number->string tag))))))))
+        ((= tag *xtc:codegen:tuple*)
+         (xtc:type:wrap-ptr rawdepth (cons 'tuple (map decode fields))))
+        ((= tag *xtc:codegen:closure*)
+         (xtc:type:wrap-ptr (- rawdepth 1) (cons 'closure (map decode fields))))
+        ((= tag *xtc:codegen:array*)
+         (xtc:type:wrap-ptr rawdepth
+                            (list 'array (car fields) (decode (cadr fields)))))
+        ((= tag *xtc:codegen:vector*)
+         (xtc:type:wrap-ptr rawdepth
+                            (list 'vector (car fields) (decode (cadr fields)))))
+        (else
+          (xtc:diagnostics:print-compiler-error
+            (string-append "cannot decode compound int-code with tag "
+                           (number->string tag))))))))
 
 ;; Decode a live int-code value into a canonical term.  `intern' is the
 ;; bang-variable table (see xtc:type:intern-var); pass a fresh (make-hashtable)
@@ -269,8 +269,8 @@
           ((string? ic) (xtc:type:from-intcode-string ic intern))
           ((pair? ic)   (xtc:type:from-intcode-compound ic intern))
           (else (xtc:diagnostics:print-compiler-error
-                 (string-append "cannot decode int-code type "
-                                (sexpr->string ic)))))))
+                  (string-append "cannot decode int-code type "
+                                 (sexpr->string ic)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; term -> int-code    ;;
@@ -289,62 +289,62 @@
            (off (* depth *xtc:codegen:pointer*))
            (rec (lambda (x) (xtc:type:to-intcode-open x intern))))
       (cond
-       ((xtc:type:var? base)
-        (if intern
-            (let ((name (hashtable-ref intern (xtc:type:var-id base))))
-              (string->symbol
-               (string-append (if name name "!gx_unresolved")
-                              (make-string depth #\*))))
-            (xtc:diagnostics:print-compiler-error
-             (string-append "unresolved type variable "
-                            (xtc:type:term->string base)))))
-       ((symbol? base)
-        (let ((code (xtc:type:base->code base)))
-          (if code
-              (+ code off)
-              (xtc:diagnostics:print-compiler-error
-               (string-append "unknown base type " (symbol->string base))))))
-       ((xtc:type:named? base)
-        (string-append "%" (xtc:type:named-name base) (make-string depth #\*)))
-       ;; a nominal parametric type re-encodes to its concrete poly c-name ---
-       ;; %Name_poly_<base64-of-"<args>"> --- the inverse of the decode in
-       ;; from-intcode-string, so a reified generic instance (a container a
-       ;; generic returns, e.g. cdr's List{i64}*) reads back exactly as the live
-       ;; compiler spells it.  The arguments are concrete here (type-of declines
-       ;; a term with free variables before encoding).  The instance TYPE is
-       ;; registered on first encode by running the instance's pretty spelling
-       ;; through the old parser, whose side effects (the LLVM type, the
-       ;; namedtype-cache entry, the data constructors) the rest of the
-       ;; compiler relies on --- without the entry, type? on the c-name never
-       ;; resolves.  The nominal decode bypasses that parser, so the encode,
-       ;; where the c-name is minted, is the one choke point.
-       ((xtc:type:napp? base)
-        (let* ((argstr (string-join (map (lambda (a) (xtc:type:to-pretty a intern))
-                                         (xtc:type:napp-args base))
-                                    ","))
-               (name1 (string-append (xtc:type:napp-name base) "_poly_"
-                                     (cname-encode (string-append "<" argstr ">")))))
-          (if (not (xtc:cache:namedtype-exists? name1))
-              (xtc:codegen:get-type-from-pretty-str
-               (string-append (xtc:type:napp-name base) "{" argstr "}")))
-          (string-append "%" name1 (make-string depth #\*))))
-       ((xtc:type:tuple? base)
-        (cons (+ *xtc:codegen:tuple* off) (map rec (cdr base))))
-       ((xtc:type:array? base)
-        (list (+ *xtc:codegen:array* off)
-              (xtc:type:array-size base)
-              (rec (xtc:type:array-elt base))))
-       ((xtc:type:vector? base)
-        (list (+ *xtc:codegen:vector* off)
-              (xtc:type:vector-size base)
-              (rec (xtc:type:vector-elt base))))
-       ((xtc:type:closure? base)
-        ;; a closure carries an intrinsic box, hence (+ depth 1)
-        (cons (+ *xtc:codegen:closure* (* (+ depth 1) *xtc:codegen:pointer*))
-              (map rec (cdr base))))
-       (else
-        (xtc:diagnostics:print-compiler-error
-         (string-append "cannot encode term " (xtc:type:term->string base))))))))
+        ((xtc:type:var? base)
+         (if intern
+             (let ((name (hashtable-ref intern (xtc:type:var-id base))))
+               (string->symbol
+                 (string-append (if name name "!gx_unresolved")
+                                (make-string depth #\*))))
+             (xtc:diagnostics:print-compiler-error
+               (string-append "unresolved type variable "
+                              (xtc:type:term->string base)))))
+        ((symbol? base)
+         (let ((code (xtc:type:base->code base)))
+           (if code
+               (+ code off)
+               (xtc:diagnostics:print-compiler-error
+                 (string-append "unknown base type " (symbol->string base))))))
+        ((xtc:type:named? base)
+         (string-append "%" (xtc:type:named-name base) (make-string depth #\*)))
+        ;; a nominal parametric type re-encodes to its concrete poly c-name ---
+        ;; %Name_poly_<base64-of-"<args>"> --- the inverse of the decode in
+        ;; from-intcode-string, so a reified generic instance (a container a
+        ;; generic returns, e.g. cdr's List{i64}*) reads back exactly as the live
+        ;; compiler spells it.  The arguments are concrete here (type-of declines
+        ;; a term with free variables before encoding).  The instance TYPE is
+        ;; registered on first encode by running the instance's pretty spelling
+        ;; through the old parser, whose side effects (the LLVM type, the
+        ;; namedtype-cache entry, the data constructors) the rest of the
+        ;; compiler relies on --- without the entry, type? on the c-name never
+        ;; resolves.  The nominal decode bypasses that parser, so the encode,
+        ;; where the c-name is minted, is the one choke point.
+        ((xtc:type:napp? base)
+         (let* ((argstr (string-join (map (lambda (a) (xtc:type:to-pretty a intern))
+                                          (xtc:type:napp-args base))
+                                     ","))
+                (name1 (string-append (xtc:type:napp-name base) "_poly_"
+                                      (cname-encode (string-append "<" argstr ">")))))
+           (if (not (xtc:cache:namedtype-exists? name1))
+               (xtc:codegen:get-type-from-pretty-str
+                 (string-append (xtc:type:napp-name base) "{" argstr "}")))
+           (string-append "%" name1 (make-string depth #\*))))
+        ((xtc:type:tuple? base)
+         (cons (+ *xtc:codegen:tuple* off) (map rec (cdr base))))
+        ((xtc:type:array? base)
+         (list (+ *xtc:codegen:array* off)
+               (xtc:type:array-size base)
+               (rec (xtc:type:array-elt base))))
+        ((xtc:type:vector? base)
+         (list (+ *xtc:codegen:vector* off)
+               (xtc:type:vector-size base)
+               (rec (xtc:type:vector-elt base))))
+        ((xtc:type:closure? base)
+         ;; a closure carries an intrinsic box, hence (+ depth 1)
+         (cons (+ *xtc:codegen:closure* (* (+ depth 1) *xtc:codegen:pointer*))
+               (map rec (cdr base))))
+        (else
+          (xtc:diagnostics:print-compiler-error
+            (string-append "cannot encode term " (xtc:type:term->string base))))))))
 
 (define xtc:type:to-intcode
   (lambda (t) (xtc:type:to-intcode-open t #f)))
@@ -379,39 +379,39 @@
 (define xtc:type:to-pretty
   (lambda (t intern)
     (cond
-     ((xtc:type:var? t)
-      (let ((name (hashtable-ref intern (xtc:type:var-id t))))
-        (if name name "!gx_unresolved")))
-     ((symbol? t)
-      (let ((code (xtc:type:base->code t)))
-        (if code (xtc:codegen:pretty-print-type code) (symbol->string t))))
-     ((number? t) (number->string t))
-     ((xtc:type:ptr? t)
-      (string-append (xtc:type:to-pretty (xtc:type:ptr-to t) intern) "*"))
-     ;; surface form, no % prefix: the spelling cname-encode and the generic
-     ;; registry expect (the %-form is the INT-CODE spelling, to-intcode's job).
-     ;; Rendering it here once made a napp re-encode mint a poly c-name
-     ;; (List_poly_<base64 of "<%String*>">) the live compiler never creates.
-     ((xtc:type:named? t)
-      (xtc:type:named-name t))
-     ;; a nominal parametric instance renders as its surface instantiation ---
-     ;; nested generics (List{Pair{i64,double}*}) recurse through their args
-     ((xtc:type:napp? t)
-      (string-append (xtc:type:napp-name t) "{"
-                     (xtc:type:to-pretty-list (xtc:type:napp-args t) intern)
-                     "}"))
-     ((xtc:type:tuple? t)
-      (string-append "<" (xtc:type:to-pretty-list (cdr t) intern) ">"))
-     ((xtc:type:array? t)
-      (string-append "|" (number->string (xtc:type:array-size t)) ","
-                     (xtc:type:to-pretty (xtc:type:array-elt t) intern) "|"))
-     ((xtc:type:vector? t)
-      (string-append "/" (number->string (xtc:type:vector-size t)) ","
-                     (xtc:type:to-pretty (xtc:type:vector-elt t) intern) "/"))
-     ((xtc:type:closure? t)
-      (string-append "[" (xtc:type:to-pretty-list (cdr t) intern) "]"))
-     (else (xtc:diagnostics:print-compiler-error
-            (string-append "cannot render term " (xtc:type:term->string t)))))))
+      ((xtc:type:var? t)
+       (let ((name (hashtable-ref intern (xtc:type:var-id t))))
+         (if name name "!gx_unresolved")))
+      ((symbol? t)
+       (let ((code (xtc:type:base->code t)))
+         (if code (xtc:codegen:pretty-print-type code) (symbol->string t))))
+      ((number? t) (number->string t))
+      ((xtc:type:ptr? t)
+       (string-append (xtc:type:to-pretty (xtc:type:ptr-to t) intern) "*"))
+      ;; surface form, no % prefix: the spelling cname-encode and the generic
+      ;; registry expect (the %-form is the INT-CODE spelling, to-intcode's job).
+      ;; Rendering it here once made a napp re-encode mint a poly c-name
+      ;; (List_poly_<base64 of "<%String*>">) the live compiler never creates.
+      ((xtc:type:named? t)
+       (xtc:type:named-name t))
+      ;; a nominal parametric instance renders as its surface instantiation ---
+      ;; nested generics (List{Pair{i64,double}*}) recurse through their args
+      ((xtc:type:napp? t)
+       (string-append (xtc:type:napp-name t) "{"
+                      (xtc:type:to-pretty-list (xtc:type:napp-args t) intern)
+                      "}"))
+      ((xtc:type:tuple? t)
+       (string-append "<" (xtc:type:to-pretty-list (cdr t) intern) ">"))
+      ((xtc:type:array? t)
+       (string-append "|" (number->string (xtc:type:array-size t)) ","
+                      (xtc:type:to-pretty (xtc:type:array-elt t) intern) "|"))
+      ((xtc:type:vector? t)
+       (string-append "/" (number->string (xtc:type:vector-size t)) ","
+                      (xtc:type:to-pretty (xtc:type:vector-elt t) intern) "/"))
+      ((xtc:type:closure? t)
+       (string-append "[" (xtc:type:to-pretty-list (cdr t) intern) "]"))
+      (else (xtc:diagnostics:print-compiler-error
+              (string-append "cannot render term " (xtc:type:term->string t)))))))
 
 (define xtc:type:to-pretty-list
   (lambda (ts intern)
@@ -463,42 +463,42 @@
          (let ((tag (modulo (car tc) *xtc:codegen:pointer*))
                (fresh (make-hashtable)))
            (cond
-            ((= tag *xtc:codegen:tuple*)
-             (and (> (length tc) (+ 1 idx))
-                  (xtc:type:from-intcode (list-ref tc (+ 1 idx)) fresh)))
-            ((= tag *xtc:codegen:array*)
-             (xtc:type:from-intcode (caddr tc) fresh))
-            ((= tag *xtc:codegen:vector*)
-             (xtc:type:from-intcode (caddr tc) fresh))
-            (else #f))))))
+             ((= tag *xtc:codegen:tuple*)
+              (and (> (length tc) (+ 1 idx))
+                   (xtc:type:from-intcode (list-ref tc (+ 1 idx)) fresh)))
+             ((= tag *xtc:codegen:array*)
+              (xtc:type:from-intcode (caddr tc) fresh))
+             ((= tag *xtc:codegen:vector*)
+              (xtc:type:from-intcode (caddr tc) fresh))
+             (else #f))))))
 
 (define xtc:type:project-field-term
   (lambda (aggterm idx)
     (let ((t (if (xtc:type:ptr? aggterm) (xtc:type:ptr-to aggterm) aggterm)))
       (cond
-       ((xtc:type:tuple? t)
-        (let ((fs (xtc:type:tuple-fields t)))
-          (and (integer? idx) (>= idx 0) (> (length fs) idx) (list-ref fs idx))))
-       ((xtc:type:array? t)  (xtc:type:array-elt t))
-       ((xtc:type:vector? t) (xtc:type:vector-elt t))
-       ((xtc:type:named? t)
-        (let ((tc (xtc:cache:get-namedtype-type (xtc:type:named-name t))))
-          (and tc (xtc:type:field-from-tuplecode tc idx))))
-       ((xtc:type:napp? t)
-        (and (null? (xtc:type:free-vars t))
-             (let* ((argstr (string-join
-                             (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
-                                  (xtc:type:napp-args t))
-                             ","))
-                    ;; prefer the REGISTERED instance's tuplecode: its fields
-                    ;; are fully instantiated (a recursive field is the
-                    ;; instance's own c-name).  The declaration-expansion
-                    ;; fallback leaves the recursive type's own variables
-                    ;; free, so a projected field never grounds.
-                    (name1 (string-append (xtc:type:napp-name t) "_poly_"
-                                          (cname-encode (string-append "<" argstr ">"))))
-                    (tc (or (xtc:cache:get-namedtype-type name1)
-                            (xtc:desugar:get-generic-type-as-tuple
-                             (string-append (xtc:type:napp-name t) "{" argstr "}")))))
-               (and tc (xtc:type:field-from-tuplecode tc idx)))))
-       (else #f)))))
+        ((xtc:type:tuple? t)
+         (let ((fs (xtc:type:tuple-fields t)))
+           (and (integer? idx) (>= idx 0) (> (length fs) idx) (list-ref fs idx))))
+        ((xtc:type:array? t)  (xtc:type:array-elt t))
+        ((xtc:type:vector? t) (xtc:type:vector-elt t))
+        ((xtc:type:named? t)
+         (let ((tc (xtc:cache:get-namedtype-type (xtc:type:named-name t))))
+           (and tc (xtc:type:field-from-tuplecode tc idx))))
+        ((xtc:type:napp? t)
+         (and (null? (xtc:type:free-vars t))
+              (let* ((argstr (string-join
+                               (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
+                                    (xtc:type:napp-args t))
+                               ","))
+                     ;; prefer the REGISTERED instance's tuplecode: its fields
+                     ;; are fully instantiated (a recursive field is the
+                     ;; instance's own c-name).  The declaration-expansion
+                     ;; fallback leaves the recursive type's own variables
+                     ;; free, so a projected field never grounds.
+                     (name1 (string-append (xtc:type:napp-name t) "_poly_"
+                                           (cname-encode (string-append "<" argstr ">"))))
+                     (tc (or (xtc:cache:get-namedtype-type name1)
+                             (xtc:desugar:get-generic-type-as-tuple
+                               (string-append (xtc:type:napp-name t) "{" argstr "}")))))
+                (and tc (xtc:type:field-from-tuplecode tc idx)))))
+        (else #f)))))

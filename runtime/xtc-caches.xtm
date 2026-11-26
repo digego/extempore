@@ -263,19 +263,19 @@
        (xtc:aot:insert-xtmacro-binding-details ',name-and-args ,docstring ',body-expr)
        (xtc:cache:register-new-xtmacro ,(symbol->string (car name-and-args)) ,docstring)
        (xtc:diagnostics:print-binding-details-to-log
-        "XtmMacro:"
-        ',(car name-and-args)
-        "")
+         "XtmMacro:"
+         ',(car name-and-args)
+         "")
        (define-macro
          ,(cons (string->symbol (string-append "xtmacro_" (symbol->string (car name-and-args))))
                 (cdr name-and-args))
          ,@body))))
 
 (xtc:cache:register-new-builtin
- "bind-macro"
- ""
- "bind an xtlang macro"
- '([docstring] name-and-args-list macro-body))
+  "bind-macro"
+  ""
+  "bind an xtlang macro"
+  '([docstring] name-and-args-list macro-body))
 
 ;;;;;;;;;;;
 ;; closures
@@ -1002,11 +1002,11 @@
     (let ((candidates (xtc:cache:get-polyfunc-candidate-list polyfunc-name)))
       (and candidates
            (xtc:cache:pretty-print-candidates
-            "Polymorphic options for " polyfunc-name
-            (map (lambda (func-vector)
-                   (cons (vector-ref func-vector 0)
-                         (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
-                 candidates))))))
+             "Polymorphic options for " polyfunc-name
+             (map (lambda (func-vector)
+                    (cons (vector-ref func-vector 0)
+                          (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
+                  candidates))))))
 
 ;; takes a polyname and a type, and returns the (first)
 ;; poly'd over function with that type
@@ -1044,13 +1044,13 @@
 
 (define-macro (remove-func name type)
   `(xtc:cache:remove-polyfunc-candidate
-    ,(symbol->string name)
-    ',(xtc:codegen:add-ptr-depth (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
+     ,(symbol->string name)
+     ',(xtc:codegen:add-ptr-depth (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
 
 (define-macro (unique-func name type)
   `(xtc:cache:unique-polyfunc-candidate
-    ,(symbol->string name)
-    ',(xtc:codegen:add-ptr-depth (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
+     ,(symbol->string name)
+     ',(xtc:codegen:add-ptr-depth (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
 
 (define-macro (clear-session)
   (hashtable-clear! *xtc:cache:polyfunc-cache*))
@@ -1088,8 +1088,8 @@
                 (symbol? (car ast))
                 (xtc:cache:xtmacro-exists? (symbol->string (car ast))))
            (macro-expand (cons (string->symbol
-                                (string-append "xtmacro_"
-                                               (symbol->string (car ast))))
+                                 (string-append "xtmacro_"
+                                                (symbol->string (car ast))))
                                (cdr ast))))
           ((pair? ast)
            (cons (xtc:cache:genericfunc-apply-macros (car ast))
@@ -1159,22 +1159,22 @@
                (entries (or (hashtable-ref *xtc:cache:genericfunc-cache* name-str) '()))
                (v (cl:remove-if (lambda (x)
                                   (or
-                                   (<> arity (cadr x))
-                                   (not (equal? type-constraint (car (cdr (cddddr x)))))
-                                   (member #f
-                                           (map (lambda (xx yy)
-                                                  ;; (println 'for x 'xx: xx 'yy: yy (car (cddddr x)))
-                                                  (let ((res (if (and (> (string-length xx) 2) (char=? (string-ref xx 1) #\g))
-                                                                 (string=?
-                                                                  (car (string-split-on yy "_"))
-                                                                  (car (string-split-on xx "_")))
-                                                                 (string=?
-                                                                  (car (xtc:desugar:split-namedtype yy))
-                                                                  (car (xtc:desugar:split-namedtype xx))))))
-                                                    ;; (println 'res: res)
-                                                    res))
-                                                (xtc:codegen:get-pretty-closure-arg-strings (symbol->string newtype))
-                                                (xtc:codegen:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
+                                    (<> arity (cadr x))
+                                    (not (equal? type-constraint (car (cdr (cddddr x)))))
+                                    (member #f
+                                            (map (lambda (xx yy)
+                                                   ;; (println 'for x 'xx: xx 'yy: yy (car (cddddr x)))
+                                                   (let ((res (if (and (> (string-length xx) 2) (char=? (string-ref xx 1) #\g))
+                                                                  (string=?
+                                                                    (car (string-split-on yy "_"))
+                                                                    (car (string-split-on xx "_")))
+                                                                  (string=?
+                                                                    (car (xtc:desugar:split-namedtype yy))
+                                                                    (car (xtc:desugar:split-namedtype xx))))))
+                                                     ;; (println 'res: res)
+                                                     res))
+                                                 (xtc:codegen:get-pretty-closure-arg-strings (symbol->string newtype))
+                                                 (xtc:codegen:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
                                 entries)))
           (if (not (null? v))
               (set-cdr! (car v) (list arity newtype newcode newtypematch type-constraint))
@@ -1227,14 +1227,14 @@
                      ((xtc:codegen:closure? x)
                       (let* ((depth (+ -1 (xtc:codegen:get-ptr-depth x)))
                              (res (apply
-                                   string-append "[" (xtc:codegen:genericfunc-stringify-generic-arg-strings (cdr x)) "]"
-                                   (make-list depth "*"))))
+                                    string-append "[" (xtc:codegen:genericfunc-stringify-generic-arg-strings (cdr x)) "]"
+                                    (make-list depth "*"))))
                         res))
                      ((xtc:codegen:tuple? x)
                       (let* ((depth (+ 0 (xtc:codegen:get-ptr-depth x)))
                              (res (apply
-                                   string-append "<" (xtc:codegen:genericfunc-stringify-generic-arg-strings (cdr x)) ">"
-                                   (make-list depth "*"))))
+                                    string-append "<" (xtc:codegen:genericfunc-stringify-generic-arg-strings (cdr x)) ">"
+                                    (make-list depth "*"))))
                         res))
                      ((xtc:codegen:array? x)
                       (if (xtc:codegen:type? x)
@@ -1341,17 +1341,17 @@
       (let* ((tmp (reverse (or (hashtable-ref *xtc:cache:genericfunc-cache* name) '())))
              (res (cl:remove-if (lambda (x)
                                   (or
-                                   (not (if (list-ref x 5)
-                                            (apply (eval (list-ref x 5))
-                                                   (map (lambda (x)
-                                                          (if (string? x)
-                                                              (if (string=? x "_")
-                                                                  *xtc:codegen:notype*
-                                                                  (xtc:codegen:get-type-from-pretty-str x))
-                                                              *xtc:codegen:notype*))
-                                                        type))
-                                            #t))
-                                   (<> arity (cadr x))))
+                                    (not (if (list-ref x 5)
+                                             (apply (eval (list-ref x 5))
+                                                    (map (lambda (x)
+                                                           (if (string? x)
+                                                               (if (string=? x "_")
+                                                                   *xtc:codegen:notype*
+                                                                   (xtc:codegen:get-type-from-pretty-str x))
+                                                               *xtc:codegen:notype*))
+                                                         type))
+                                             #t))
+                                    (<> arity (cadr x))))
                                 tmp)))
         ;; (println 'res res 'tmp tmp)
         ;; if we are searching for 'notype' (i.e. haven't really
@@ -1421,8 +1421,8 @@
             (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
             (println))
           (xtc:cache:pretty-print-candidates
-           "Generic specialisations for " name
-           (map (lambda (gf-list) (cons (car gf-list) (caddr gf-list))) candidates))))
+            "Generic specialisations for " name
+            (map (lambda (gf-list) (cons (car gf-list) (caddr gf-list))) candidates))))
     #t))
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1487,11 +1487,11 @@
     (let ((candidates (xtc:cache:get-polytype-candidate-list polytype-name)))
       (and candidates
            (xtc:cache:pretty-print-candidates
-            "Polymorphic types for " polytype-name
-            (map (lambda (func-vector)
-                   (cons (vector-ref func-vector 0)
-                         (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
-                 candidates))))))
+             "Polymorphic types for " polytype-name
+             (map (lambda (func-vector)
+                    (cons (vector-ref func-vector 0)
+                          (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
+                  candidates))))))
 
 ;;;;;;;;;;;;;;;;
 ;; generic types
