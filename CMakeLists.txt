@@ -337,7 +337,6 @@ set(EXTEMPORE_SOURCES
     src/EXTLLVM.cpp
     src/EXTThread.cpp
     src/HangReport.cpp
-    src/shims/__hash_memory.cpp
     src/OSC.cpp
     src/SchemeS7.cpp
     src/SchemeFFI.cpp
@@ -485,7 +484,7 @@ endif()
 # Filters to extempore source files only, not vendored third-party code.
 set(TIDY_SOURCES "")
 foreach(_src ${EXTEMPORE_SOURCES})
-    if(NOT _src MATCHES "(s7\\.c|shims/|linenoise)")
+    if(NOT _src MATCHES "(s7\\.c|linenoise)")
         list(APPEND TIDY_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
     endif()
 endforeach()
