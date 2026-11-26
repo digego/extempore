@@ -46,9 +46,8 @@
 define dllexport double @imp_dsp_wrapper(ptr %_zonei8, ptr %closure, double %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast ptr %closure to ptr
-  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 1
   %f = load ptr, ptr %fPtr
   %e = load ptr, ptr %ePtr
   %result = tail call fastcc double %f(ptr %_zonei8, ptr %e, double %sample, i64 %time, i64 %channel, ptr %data)
@@ -59,9 +58,8 @@ entry:
 define dllexport double @imp_dsp_sum_wrapper(ptr %_zonei8, ptr %closure, ptr %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast ptr %closure to ptr
-  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 1
   %f = load ptr, ptr %fPtr
   %e = load ptr, ptr %ePtr
   %result = tail call fastcc double %f(ptr %_zonei8, ptr %e, ptr %sample, i64 %time, i64 %channel, ptr %data)
@@ -72,9 +70,8 @@ entry:
 define dllexport float @imp_dspf_wrapper(ptr %_zonei8, ptr %closure, float %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast ptr %closure to ptr
-  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 1
   %f = load ptr, ptr %fPtr
   %e = load ptr, ptr %ePtr
   %result = tail call fastcc float %f(ptr %_zonei8, ptr %e, float %sample, i64 %time, i64 %channel, ptr %data)
@@ -85,9 +82,8 @@ entry:
 define dllexport float @imp_dspf_sum_wrapper(ptr %_zonei8, ptr %closure, ptr %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast ptr %closure to ptr
-  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 1
   %f = load ptr, ptr %fPtr
   %e = load ptr, ptr %ePtr
   %result = tail call fastcc float %f(ptr %_zonei8, ptr %e, ptr %sample, i64 %time, i64 %channel, ptr %data)
@@ -98,8 +94,7 @@ entry:
 define dllexport ptr @impc_get_env(ptr %impz, ptr %closure)
 {
 entry:
-  %closureVal = bitcast ptr %closure to ptr
-  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closure, i32 0, i32 1
   %e = load ptr, ptr %ePtr
   ret ptr %e
 }
