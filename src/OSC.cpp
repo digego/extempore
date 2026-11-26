@@ -83,41 +83,39 @@ typedef struct scm_osc_pair {
 ///////////////////////////////////////////////
 //
 // Byte-order conversion for xtlang: these eight functions keep their extern "C"
-// signatures because they are registered into the JIT by name. The conversion
-// itself lives in ext/OscWire.h alongside the message writer.
+// signatures because they are registered into the JIT by name.
 //
-using extemp::osc::byteswap;
 
 uint64_t swap64f(double d) {
-    return byteswap(std::bit_cast<uint64_t>(d));
+    return std::byteswap(std::bit_cast<uint64_t>(d));
 }
 
 double unswap64f(uint64_t a) {
-    return std::bit_cast<double>(byteswap(a));
+    return std::bit_cast<double>(std::byteswap(a));
 }
 
 uint32_t swap32f(float f) {
-    return byteswap(std::bit_cast<uint32_t>(f));
+    return std::byteswap(std::bit_cast<uint32_t>(f));
 }
 
 float unswap32f(uint32_t a) {
-    return std::bit_cast<float>(byteswap(a));
+    return std::bit_cast<float>(std::byteswap(a));
 }
 
 uint64_t swap64i(uint64_t d) {
-    return byteswap(d);
+    return std::byteswap(d);
 }
 
 uint64_t unswap64i(uint64_t a) {
-    return byteswap(a);
+    return std::byteswap(a);
 }
 
 uint32_t swap32i(uint32_t f) {
-    return byteswap(f);
+    return std::byteswap(f);
 }
 
 uint32_t unswap32i(uint32_t a) {
-    return byteswap(a);
+    return std::byteswap(a);
 }
 
 ///////////////////////////////////////////////////////////////

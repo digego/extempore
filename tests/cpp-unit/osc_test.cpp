@@ -267,9 +267,3 @@ TEST(OscWriter, GrowsPastTheOldFixedBuffers) {
     EXPECT_EQ(msg.size(), 8u + 4u + 4100u);
     EXPECT_EQ(std::memcmp(msg.data() + 12, big.data(), big.size()), 0);
 }
-
-TEST(OscWriter, ByteswapIsItsOwnInverse) {
-    EXPECT_EQ(extemp::osc::byteswap(extemp::osc::byteswap(uint32_t(0x12345678))), 0x12345678u);
-    EXPECT_EQ(extemp::osc::byteswap(extemp::osc::byteswap(uint64_t(0x0123456789abcdefULL))),
-              0x0123456789abcdefULL);
-}
