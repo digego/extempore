@@ -67,7 +67,7 @@ users will care about:
 
 ## LLVM
 
-Extempore links against a specific version of LLVM (currently 22.1.8, pinned in
+Extempore links against a specific version of LLVM (currently 23.1.6, pinned in
 `CMakeLists.txt`). LLVM is fetched and built in-tree via CMake's
 `FetchContent` --- no system LLVM required.
 

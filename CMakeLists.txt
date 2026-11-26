@@ -136,8 +136,8 @@ endforeach()
 # Every archive is pinned by SHA256 so a re-tagged or tampered-with download is
 # rejected rather than built. Hashes come from the upstream release assets /
 # GitHub source archives at the pinned version.
-set(DEP_LLVM_VERSION "22.1.8")
-set(DEP_LLVM_SHA256 "922f1817a0df7b1489272d18134ee0087a8b068828f87ac63b9861b1a9965888")
+set(DEP_LLVM_VERSION "23.1.6")
+set(DEP_LLVM_SHA256 "d3b86ab29cfb4445a6652e5c2642ccc75e04e38084dde3701d323320f35a31da")
 # PortAudio tags releases rarely (v19.7.0 is from 2021), so pin master by commit
 # SHA for its modern CMake and five years of platform fixes.
 set(DEP_PORTAUDIO_VERSION "b0fe9de7ec86ebe5a26086f1d662ab74d7ebfae4")

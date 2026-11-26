@@ -991,7 +991,7 @@ std::string llvm_disassemble(const unsigned char* Code, int syntax) {
     if (!MII)
         return "Failed to create MCInstrInfo";
 
-    llvm::MCContext Ctx(Triple, AsmInfo.get(), MRI.get(), STI.get());
+    llvm::MCContext Ctx(Triple, *AsmInfo, *MRI, *STI);
     std::unique_ptr<llvm::MCDisassembler> DisAsm(TheTarget->createMCDisassembler(*STI, Ctx));
     if (!DisAsm)
         return "Failed to create MCDisassembler";
@@ -1300,18 +1300,26 @@ void initLLVM() {
         JTMB.setRelocationModel(llvm::Reloc::PIC_);
     }
     JITBuilder.setJITTargetMachineBuilder(std::move(JTMB));
-    JITBuilder.setObjectLinkingLayerCreator(
-        [useJITLink, isCOFF](llvm::orc::ExecutionSession& ES)
-            -> llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>> {
-            if (useJITLink) {
+    if (useJITLink) {
+        JITBuilder.setMemoryManagerCreator(
+            [](llvm::orc::ExecutionSession&)
+                -> llvm::Expected<std::unique_ptr<llvm::jitlink::JITLinkMemoryManager>> {
                 auto inner = llvm::jitlink::InProcessMemoryManager::Create();
                 if (!inner) {
                     return inner.takeError();
                 }
                 auto memMgr = std::make_unique<GraceJITLinkMemoryManager>(std::move(*inner));
                 sGraceReaper = memMgr.get();
+                return std::unique_ptr<llvm::jitlink::JITLinkMemoryManager>(std::move(memMgr));
+            });
+    }
+    JITBuilder.setObjectLinkingLayerCreator(
+        [useJITLink, isCOFF](llvm::orc::ExecutionSession& ES,
+                             llvm::jitlink::JITLinkMemoryManager& MemMgr)
+            -> llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>> {
+            if (useJITLink) {
                 return std::unique_ptr<llvm::orc::ObjectLayer>(
-                    std::make_unique<llvm::orc::ObjectLinkingLayer>(ES, std::move(memMgr)));
+                    std::make_unique<llvm::orc::ObjectLinkingLayer>(ES, MemMgr));
             }
             // Leaked on purpose: it must outlive every SectionMemoryManager,
             // which the JIT destroys during static destruction.
@@ -1343,8 +1351,14 @@ void initLLVM() {
 
     // Add DynamicLibrarySearchGenerator to make all process symbols available.
     auto& MainJD = JIT->getMainJITDylib();
-    auto DLSGOrErr = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-        JIT->getDataLayout().getGlobalPrefix());
+    // The last two arguments are the defaults, spelt out. The header's own
+    // default for the third is `nullptr`, which leaves unique_function's inline
+    // storage unset, and GCC's -Wmaybe-uninitialized (an error here) fires when
+    // the move is inlined into this function. `Fn()` zeroes the storage.
+    using DLSG = llvm::orc::DynamicLibrarySearchGenerator;
+    auto DLSGOrErr =
+        DLSG::GetForCurrentProcess(JIT->getDataLayout().getGlobalPrefix(), DLSG::SymbolPredicate(),
+                                   DLSG::AddAbsoluteSymbolsFn());
     if (!DLSGOrErr) {
         log::error(log::jit, "failed to create DynamicLibrarySearchGenerator: {}",
                    llvm::toString(DLSGOrErr.takeError()));

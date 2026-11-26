@@ -39,7 +39,7 @@ changes about the language, but a lot changes underneath it.
   and `topclock` no longer starts its network loop at load when
   `*topclock-autostart*` is `#f`.
 
-Extempore's current stack came together over v0.9.0 and v0.10.0: LLVM 22.1.8
+Extempore's current stack came together over v0.9.0 and v0.10.0: LLVM 23.1.6
 with the ORC JIT (in place of the legacy MCJIT), s7 Scheme (in place of
 TinyScheme), a single constraint-based type inference engine in the xtlang
 compiler, a C++23 runtime, first-class Linux aarch64, and an interactive

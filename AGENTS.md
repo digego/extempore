@@ -25,7 +25,7 @@ Key options: `-DASSETS=ON` (download multimedia assets), `-DBUILD_TESTS=ON`
 ### LLVM dependency
 
 LLVM is fetched and built automatically via CMake's `FetchContent`. The version
-is pinned in `CMakeLists.txt` (currently 22.x). On first build, CMake downloads
+is pinned in `CMakeLists.txt`. On first build, CMake downloads
 the LLVM source tarball and builds only the required components (OrcJIT, target
 codegen, AsmParser, Passes, MCDisassembler, IRPrinter).
 

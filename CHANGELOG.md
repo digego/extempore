@@ -65,7 +65,7 @@ source tree, and `(sys:build-dir)` names that directory. When upgrading a source
 checkout, delete its `libs/aot-cache/` and `libs/platform-shlibs/`. On Windows,
 `extempore.exe` is built into `build\` too.
 
-LLVM goes to 22.1.8 and PCRE2 to 10.49, and rtmidi is no longer built, since
+LLVM goes to 23.1.6 and PCRE2 to 10.49, and rtmidi is no longer built, since
 nothing used it. Release archives are packaged with CPack and carry
 build-provenance attestations, and clang-tidy runs on every push.
 
