@@ -697,7 +697,7 @@ static pointer llvm_print_closure(scheme* Scheme, pointer Args)  // TODO
                 std::string str;
                 llvm::raw_string_ostream ss(str);
                 ss << func;
-                if (ss.str().find('{') != std::string::npos) {
+                if (ss.str().contains('{')) {
                     std::cout << str << std::endl;
                 }
             }

@@ -766,7 +766,7 @@ static int findDevice(const std::string& Name) {
             if (std::regex_search(deviceName, match, pattern)) {
                 return i;
             }
-        } else if (std::string(deviceName).find(Name) != std::string::npos) {
+        } else if (std::string_view(deviceName).contains(Name)) {
             return i;
         }
     }
