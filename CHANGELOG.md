@@ -161,8 +161,9 @@ with Extempore from configuration alone: evaluate the form at the cursor, a
 selection or the whole buffer (as it stands, saved or not), with values in the
 status line and errors marked on their forms; interrupt an evaluation; complete
 names and show a function's arguments, type and docstring on hover; and, with
-nothing running, unbalanced parentheses, an outline and folding. The editor
-support guide has the Helix setup.
+nothing running, unbalanced parentheses, an outline and folding. A client can
+ask for each evaluation's result as the answer to its request, to show beside
+the code. The editor support guide has the Helix setup.
 
 Offline rendering is now deterministic. The render keeps the audio clock in step
 with the work: scheduled callbacks run before the block they fall in, however

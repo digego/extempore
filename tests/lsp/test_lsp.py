@@ -150,9 +150,9 @@ class Editor:
         character: int = 0,
         end: tuple[int, int] | None = None,
         uri: str = URI,
-    ) -> None:
+    ):
         stop = end or (line, character)
-        self.request(
+        return self.request(
             "workspace/executeCommand",
             {
                 "command": "extempore.eval",
@@ -187,6 +187,7 @@ class Editor:
 
 
 ERROR, WARNING, INFO = 1, 2, 3
+EMPTY_RANGE = {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}}
 
 SONG = """\
 ;; a song
@@ -621,6 +622,94 @@ class WithExtempore(unittest.TestCase):
         editor.open("(ipc:get-process-name)\n")
         editor.eval_at(0, 0)
         self.assertEqual(editor.message(), (INFO, '=> "utility"'))
+
+
+class EvalResults(unittest.TestCase):
+    """With evalResults "response", an eval's request is answered when it
+    finishes, with its result, and nothing is said with showMessage."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.xtm = Extempore()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.xtm.stop()
+
+    def setUp(self) -> None:
+        self.editor = Editor(options={"port": self.xtm.port, "evalResults": "response"})
+        self.addCleanup(self.editor.stop)
+
+    def test_a_value_and_the_range_of_its_form(self) -> None:
+        self.editor.open(SONG)
+        self.editor.diagnostics()
+        result = self.editor.eval_at(4, 9)  # inside play
+        self.assertEqual(result["values"], ["play"])
+        self.assertEqual(
+            result["range"],
+            {"start": {"line": 3, "character": 0}, "end": {"line": 5, "character": 13}},
+        )
+        self.assertNotIn("error", result)
+        self.editor.no_notification("window/showMessage")
+
+    def test_output_and_a_selection(self) -> None:
+        self.editor.open('(list (begin (println "hi") 1) (* 6 7))\n')
+        self.editor.diagnostics()
+        result = self.editor.eval_at(0, 6, end=(0, 30))
+        self.assertEqual((result["out"], result["values"]), ('"hi"\n', ["1"]))
+        self.assertEqual(result["range"]["start"], {"line": 0, "character": 6})
+        self.editor.no_notification("window/logMessage")
+
+    def test_an_error_is_answered_and_still_marked(self) -> None:
+        self.editor.open("(define ok 1)\n(car 5)\n")
+        self.editor.diagnostics()
+        result = self.editor.eval_at(1, 0)
+        self.assertEqual(result["values"], [])
+        self.assertEqual(result["error"]["line"], 2)
+        self.assertIn("car argument, 5, is an integer", result["error"]["message"])
+        self.assertTrue(result["error"]["kind"])
+        (found,) = self.editor.diagnostics()
+        self.assertEqual(found["range"]["start"], {"line": 1, "character": 0})
+        self.editor.no_notification("window/showMessage")
+
+    def test_eval_buffer_gives_the_range_of_the_form_which_failed(self) -> None:
+        self.editor.open("(define lsp-b 20)\n\n(car lsp-b)\n(+ 1 2)\n")
+        self.editor.diagnostics()
+        result = self.editor.request(
+            "workspace/executeCommand",
+            {"command": "extempore.evalBuffer", "arguments": [{"uri": URI}]},
+        )
+        self.assertIn("error", result)
+        self.assertEqual(
+            result["range"],
+            {"start": {"line": 2, "character": 0}, "end": {"line": 2, "character": 11}},
+        )
+
+    def test_an_interrupted_eval(self) -> None:
+        self.editor.open("(let loop ((i 0)) (set! i (+ i 1)) (loop i))\n")
+        # sent without waiting for its answer, which comes once it stops
+        self.editor.ids += 1
+        ident = self.editor.ids
+        self.editor._send(
+            {
+                "id": ident,
+                "method": "workspace/executeCommand",
+                "params": {
+                    "command": "extempore.eval",
+                    "arguments": [{"uri": URI, "range": EMPTY_RANGE}],
+                },
+            }
+        )
+        time.sleep(0.5)
+        self.assertIsNone(
+            self.editor.request(
+                "workspace/executeCommand",
+                {"command": "extempore.interrupt", "arguments": []},
+            )
+        )
+        result = self.editor._next(lambda m: m.get("id") == ident, 30)["result"]
+        self.assertTrue(result["interrupted"])
+        self.assertNotIn("error", result)
 
 
 class Reconnect(unittest.TestCase):

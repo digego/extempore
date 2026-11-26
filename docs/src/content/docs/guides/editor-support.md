@@ -97,6 +97,16 @@ The range is an LSP range: lines and characters from 0. Values and the first
 line of output come back as `window/showMessage`, the whole output as
 `window/logMessage`, and an error as a diagnostic on the first line of its form.
 
+A client which sends `"evalResults": "response"` in its `initializationOptions`
+gets each evaluation's result as the answer to its `workspace/executeCommand`
+request, sent when the evaluation finishes, in place of the two messages:
+`values` (one per form), `out` (what it printed), `interrupted`, and when it
+failed `error` (`message`, and `kind` and `line` where extempore gives them).
+`range` is where the code came from: the selection or form evaluated, or for
+`extempore.evalBuffer` the form which failed. Errors are still marked as
+diagnostics. This suits an editor which shows results beside the code, as the
+[VSCode extension](#vscode) does.
+
 An editor which can only run a shell command can use
 [`extempore send`](/guides/nrepl/#from-the-command-line): pipe the selection to
 it, or give it `--file` and `--line`.

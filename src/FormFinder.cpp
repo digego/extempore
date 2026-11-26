@@ -27,8 +27,7 @@ Scan scan(std::string_view Text) {
     for (std::size_t i = 0; i < n; ++i) {
         const char c = Text[i];
         const char next = i + 1 < n ? Text[i + 1] : '\0';
-        if (depth == 0 && commentNext &&
-            std::string_view(" \t\r\n;#('`,@").find(c) == std::string_view::npos) {
+        if (depth == 0 && commentNext && !std::string_view(" \t\r\n;#('`,@").contains(c)) {
             commentNext = false;  // the commented datum is an atom
         }
         if (c == '\n') {

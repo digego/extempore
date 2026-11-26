@@ -147,7 +147,7 @@ std::string formKey(std::string_view Form) {
         if (end == std::string_view::npos) {
             end = Form.size();
         }
-        std::string_view line = Form.substr(start, end - start);
+        const std::string_view line = Form.substr(start, end - start);
         const auto first = line.find_first_not_of(" \t");
         const auto last = line.find_last_not_of(" \t\r");
         if (first != std::string_view::npos) {
@@ -186,11 +186,17 @@ struct Pending {
     std::string out;
     std::string err;
     std::vector<std::string> values;
-    // from extempore/error: what went wrong, and the line its form starts on
+    // from extempore/error: what went wrong, of what kind, and the line its
+    // form starts on
     std::string message;
+    std::string kind;
     std::int64_t errorLine = 0;
     bool failed = false;
     bool interrupted = false;
+    // With evalResults "response", the executeCommand request to answer when
+    // it finishes, and the range of what was sent (none for the whole buffer)
+    std::optional<json::Value> request;
+    std::optional<json::Object> range;
 };
 
 // A question the main thread is waiting on the answer to (completions, lookup).
@@ -335,8 +341,9 @@ class Server {
         } else if (Method == "textDocument/hover") {
             respond(Id, hover(Params, Lock));
         } else if (Method == "workspace/executeCommand") {
-            executeCommand(Params);
-            respond(Id, nullptr);
+            if (!executeCommand(Id, Params)) {
+                respond(Id, nullptr);
+            }
         } else {
             write(json::Object{
                 {"id", Id},
@@ -396,6 +403,7 @@ class Server {
             if (const auto process = options->getString("process")) {
                 m_target.process = std::string(*process);
             }
+            m_evalResults = options->getString("evalResults") == llvm::StringRef("response");
         }
         // UTF-16 positions unless the client offers UTF-8, which needs no
         // conversion
@@ -804,7 +812,10 @@ class Server {
 
     // --- evaluation
 
-    void executeCommand(const json::Object& Params) {
+    // An eval answers its request itself when it finishes if the client asked
+    // for evalResults "response" (true is returned); otherwise the request is
+    // answered at once with null, and the result is told with showMessage.
+    bool executeCommand(const json::Value& Id, const json::Object& Params) {
         const auto command = Params.getString("command").value_or("");
         const json::Array* arguments = Params.getArray("arguments");
         const json::Object* argument =
@@ -817,23 +828,26 @@ class Server {
             } else {
                 showMessage(Info, "nothing is being evaluated");
             }
-            return;
+            return false;
         }
         if (command != "extempore.eval" && command != "extempore.evalBuffer") {
             showMessage(Error, ("extempore: no such command: " + command).str());
-            return;
+            return false;
         }
         const std::string uri(argument ? argument->getString("uri").value_or("") : "");
         const auto found = m_documents.find(uri);
         if (found == m_documents.end()) {
             showMessage(Error,
                         std::string(command) + " takes {uri, range} for a document which is open");
-            return;
+            return false;
         }
         const Document& doc = found->second;
         const std::string path = pathFromUri(uri);
         Pending pending;
         pending.uri = uri;
+        if (m_evalResults) {
+            pending.request = Id;
+        }
         bencode::Dict message;
         if (command == "extempore.evalBuffer") {
             pending.whole = true;
@@ -854,12 +868,14 @@ class Server {
             if (isSelection(doc.text, begin, end)) {
                 code = doc.text.substr(begin, end - begin);
                 line = std::int64_t(positionAt(doc.text, begin, m_utf8).line) + 1;
+                pending.range = range(doc, begin, end);
             } else if (form) {
                 code = doc.text.substr(form->begin, form->end - form->begin);
                 line = std::int64_t(form->line);
+                pending.range = range(doc, form->begin, form->end);
             } else {
                 showMessage(Warning, "there is no form here to evaluate");
-                return;
+                return false;
             }
             message = {{"op", bencode::Value("eval")},
                        {"code", bencode::Value(std::move(code))},
@@ -867,16 +883,18 @@ class Server {
                        {"line", bencode::Value(line)}};
         }
         if (!connect(path, false)) {
-            return;
+            return false;
         }
         message["session"] = bencode::Value(m_link->session);
         const std::string id = m_link->connection.send(std::move(message));
         if (id.empty()) {
             m_link->alive = false;
             showMessage(Error, "extempore went away");
-            return;
+            return false;
         }
+        const bool answersLater = pending.request.has_value();
         m_link->pending.emplace(id, std::move(pending));
+        return answersLater;
     }
 
     // Makes sure there is a connection to the extempore for a file at Path.
@@ -960,6 +978,7 @@ class Server {
                     pending.errorLine = line->integer;
                 }
                 pending.message = std::string(bencode::findString(error->dict, "message"));
+                pending.kind = std::string(bencode::findString(error->dict, "kind"));
             }
             using nrepl::client::hasStatus;
             pending.failed |= hasStatus(message, "eval-error") || hasStatus(message, "error");
@@ -973,14 +992,24 @@ class Server {
         Link_->alive = false;
         m_answered.notify_all();
         if (!Link_->pending.empty()) {
+            bool told = false;
+            for (auto& [id, pending] : Link_->pending) {
+                if (pending.request) {
+                    pending.failed = true;
+                    pending.message = "extempore went away before the evaluation finished";
+                    answer(pending);
+                } else if (!told) {
+                    showMessage(Error, "extempore went away before the evaluation finished");
+                    told = true;
+                }
+            }
             Link_->pending.clear();
-            showMessage(Error, "extempore went away before the evaluation finished");
         }
     }
 
     // An evaluation is done: tell the user, and mark or clear its form.
     void finished(Pending& Eval) {
-        if (!trimmed(Eval.out).empty()) {
+        if (!trimmed(Eval.out).empty() && !Eval.request) {
             notify("window/logMessage",
                    json::Object{{"type", int(Log)}, {"message", json::fixUTF8(Eval.out)}});
         }
@@ -999,8 +1028,25 @@ class Server {
                 }
             }
         }
+        if (Eval.request) {
+            if (failed && Eval.message.empty()) {
+                Eval.message = trimmed(Eval.err);
+            }
+            // the buffer's failing form, for the client to show the error at
+            if (doc && Eval.whole && failed && Eval.errorLine > 0) {
+                for (const auto& form : forms::topLevel(doc->text)) {
+                    if (std::int64_t(form.line) == Eval.errorLine) {
+                        Eval.range = range(*doc, form.begin, form.end);
+                    }
+                }
+            }
+            Eval.failed = failed;
+            answer(Eval);
+        }
         if (Eval.interrupted) {
-            showMessage(Warning, "interrupted");
+            if (!Eval.request) {
+                showMessage(Warning, "interrupted");
+            }
         } else if (failed) {
             // the message alone where the server gives one: the report around
             // it says where, which the diagnostic's own place already does
@@ -1008,7 +1054,9 @@ class Server {
             if (report.empty()) {
                 report = "the evaluation failed";
             }
-            showMessage(Error, firstLine(report));
+            if (!Eval.request) {
+                showMessage(Error, firstLine(report));
+            }
             if (doc && !Eval.key.empty()) {
                 doc->failed[Eval.key] = report;
             }
@@ -1017,7 +1065,9 @@ class Server {
             for (const auto& value : Eval.values) {
                 summary += (summary.empty() ? "=> " : "  => ") + value;
             }
-            showMessage(Info, summary.empty() ? "evaluated" : summary);
+            if (!Eval.request) {
+                showMessage(Info, summary.empty() ? "evaluated" : summary);
+            }
             if (doc && !Eval.key.empty()) {
                 doc->failed.erase(Eval.key);
             }
@@ -1027,8 +1077,42 @@ class Server {
         }
     }
 
+    // The answer to an eval's executeCommand request: what it printed, each
+    // form's value, and what went wrong if anything did.
+    void answer(const Pending& Eval) {
+        if (!Eval.request) {
+            return;
+        }
+        json::Array values;
+        for (const auto& value : Eval.values) {
+            values.push_back(json::fixUTF8(value));
+        }
+        json::Object result{
+            {"values", std::move(values)},
+            {"out", json::fixUTF8(Eval.out)},
+            {"interrupted", Eval.interrupted},
+        };
+        if (Eval.failed && !Eval.interrupted) {
+            json::Object error{
+                {"message",
+                 json::fixUTF8(Eval.message.empty() ? "the evaluation failed" : Eval.message)}};
+            if (!Eval.kind.empty()) {
+                error["kind"] = Eval.kind;
+            }
+            if (Eval.errorLine > 0) {
+                error["line"] = Eval.errorLine;
+            }
+            result["error"] = std::move(error);
+        }
+        if (Eval.range) {
+            result["range"] = json::Object(*Eval.range);
+        }
+        respond(*Eval.request, std::move(result));
+    }
+
     nrepl::client::Target m_target;
     bool m_utf8 = false;
+    bool m_evalResults = false;
     bool m_shutdown = false;
     // Guards everything below; the reader threads take it for each message.
     std::mutex m_mutex;
