@@ -377,6 +377,7 @@ namespace EXTLLVM {
 // ORC JIT
 std::unique_ptr<llvm::orc::LLJIT> JIT = nullptr;
 std::unique_ptr<llvm::orc::ThreadSafeContext> TSC = nullptr;
+std::unique_ptr<llvm::TargetMachine> TM = nullptr;
 
 // A context whose diagnostics (LLVM's warnings, remarks and errors, which it
 // would otherwise print to stderr itself) go to the logger.
@@ -947,6 +948,7 @@ static void cleanupLLVM() {
     }
     sGraceReaper = nullptr;
     JIT.reset();
+    TM.reset();
 }
 
 static struct EXTLLVMCleanupRegistrar {
@@ -1299,6 +1301,14 @@ void initLLVM() {
         JTMB.setCodeModel(llvm::CodeModel::Small);
         JTMB.setRelocationModel(llvm::Reloc::PIC_);
     }
+    auto TMResult = JTMB.createTargetMachine();
+    if (!TMResult) {
+        log::error(log::jit, "failed to create the target machine: {}",
+                   llvm::toString(TMResult.takeError()));
+        log::flush();
+        exit(1);
+    }
+    TM = std::move(*TMResult);
     JITBuilder.setJITTargetMachineBuilder(std::move(JTMB));
     if (useJITLink) {
         JITBuilder.setMemoryManagerCreator(

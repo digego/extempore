@@ -69,6 +69,12 @@ LLVM goes to 23.1.6 and PCRE2 to 10.49, and rtmidi is no longer built, since
 nothing used it. Release archives are packaged with CPack and carry
 build-provenance attestations, and clang-tidy runs on every push.
 
+xtlang's optimiser now knows the host CPU, so it vectorises loops: one which
+scales and adds two `float` buffers runs about six times faster on an AVX-512
+machine. A sum carried from one iteration to the next (a dot product) is still
+scalar, since vectorising it would change the rounding. A true `i1` handed to
+a C function is now always 1, where it could arrive as any non-zero byte.
+
 The FFTs are now written in xtlang, so kissfft is no longer a dependency. Load
 `libs/core/fft.xtm` instead of `libs/external/fft.xtm`: `fft_config`,
 `fftr_config`, `ifft_config`, `ifftr_config`, `fft` and `ifft` keep their

@@ -71,6 +71,7 @@ class GlobalValue;
 class Function;
 class StructType;
 class LLVMContext;
+class TargetMachine;
 
 namespace orc {
 class LLJIT;
@@ -90,6 +91,10 @@ void registerAdhocAlias(std::string_view fullName);
 extern std::unique_ptr<llvm::orc::LLJIT> JIT;
 
 extern std::unique_ptr<llvm::orc::ThreadSafeContext> TSC;
+
+// The host target machine the optimiser consults (vector widths, costs). The
+// JIT's compile layer has one of its own, built from the same settings.
+extern std::unique_ptr<llvm::TargetMachine> TM;
 
 llvm::orc::ThreadSafeContext& getThreadSafeContext();
 

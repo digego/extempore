@@ -1186,7 +1186,9 @@ static llvm::Module* jitCompile(const std::string& irString) {
             CGSCCAnalysisManager CGAM;
             ModuleAnalysisManager MAM;
 
-            PassBuilder PB;
+            // With the target machine the passes know the host's vector
+            // registers and costs; without it the loop vectoriser does nothing.
+            PassBuilder PB(EXTLLVM::TM.get());
             PB.registerModuleAnalyses(MAM);
             PB.registerCGSCCAnalyses(CGAM);
             PB.registerFunctionAnalyses(FAM);
