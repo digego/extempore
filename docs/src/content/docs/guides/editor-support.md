@@ -116,11 +116,12 @@ it, or give it `--file` and `--line`.
 `extempore fmt` formats `.xtm` files: `extempore fmt FILE` or `extempore fmt DIR`
 rewrites them in place, `--check` lists the ones which aren't formatted (and
 exits 1 if there are any), and with no files it formats stdin to stdout. It
-changes whitespace only. A call's arguments align with the first one when it's
-on the head's line, and indent two columns when it isn't; a special form's body
-(`lambda`, `let`, `when`, a `bind-func`, and anything named `define…`, `def-…`
-or `with-…`) indents two columns; data (a quoted list, a vector, a list not
-headed by a symbol) aligns with its first element. Whitespace at the ends of lines and of
+changes whitespace only, and indents as Racket and Clojure code is indented. A
+call's arguments align with the first one when it's on the head's line, and
+with the head when it isn't; a body form's body (`begin`, `cond`, `lambda`,
+`let`, `when`, a `bind-func`, and anything named `define…`, `def-…` or
+`with-…`) indents two columns; data (a quoted list, a vector, a list not headed
+by a symbol) aligns with its first element. Whitespace at the ends of lines and of
 the file goes. Line breaks stay where they are, and so do the lines of a string
 or a block comment. The Extempore source tree is formatted this way, and CI
 checks that it stays so.

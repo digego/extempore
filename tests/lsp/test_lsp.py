@@ -307,9 +307,9 @@ class WithoutExtempore(unittest.TestCase):
             formatted, "(define (f x)\n  (+ x 1))\n(define (g y)\n  (* y 2))\n"
         )
         # and what follows the last line
-        self.editor.change("(f\n x)\n\n\n")
+        self.editor.change("(f\n   x)\n\n\n")
         self.assertEqual(
-            apply_edits("(f\n x)\n\n\n", edits("textDocument/formatting")), "(f\n  x)\n"
+            apply_edits("(f\n   x)\n\n\n", edits("textDocument/formatting")), "(f\n x)\n"
         )
         self.editor.change("(f)")
         self.assertEqual(apply_edits("(f)", edits("textDocument/formatting")), "(f)\n")

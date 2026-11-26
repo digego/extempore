@@ -6,12 +6,13 @@
 // they are, as does every line which begins inside a string or a block
 // comment.
 //
-// A call's arguments align with the first one when it shares the head's line,
-// and indent two columns when it doesn't. A special form's body indents two
-// columns, and data (a quoted list, a vector, a list not headed by a symbol)
-// aligns with its first element. Which symbols are special forms is the table
-// and the name prefixes in Formatter.cpp; extempore-emacs-mode and
-// tree-sitter-extempore's indents.scm follow them.
+// The rules are Racket's and Clojure's (racket-mode, clojure-mode, cljfmt): a
+// call's arguments align with the first one when it shares the head's line,
+// and with the head when it doesn't; a body form's body (begin, cond, lambda,
+// let, a definition) indents two columns; data (a quoted list, a vector, a
+// list not headed by a symbol) aligns with its first element. Which symbols
+// head body forms is the table and the name prefixes in Formatter.cpp;
+// extempore-emacs-mode and tree-sitter-extempore's indents.scm follow them.
 
 #include <expected>
 #include <string>

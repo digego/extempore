@@ -14,7 +14,7 @@ namespace extemp::format {
 namespace {
 
 // How a list headed by a symbol indents the lines after its first.
-constexpr int kCall = -1;        // align with the first argument, or indent two columns
+constexpr int kCall = -1;        // align with the first argument, or with the head
 constexpr int kDefinition = -2;  // the body indents two columns
 
 struct Special {
@@ -22,10 +22,14 @@ struct Special {
     int distinguished;  // arguments before the body: on their own lines they indent four
 };
 
-// A form which distinguishes no arguments (begin) indents as a call does, so
-// it needs no entry. extempore-emacs-mode and tree-sitter-extempore's
-// indents.scm keep copies of this table.
+// extempore-emacs-mode and tree-sitter-extempore's indents.scm keep copies of
+// this table.
 constexpr auto kSpecial = std::to_array<Special>({
+    {"begin", 0},
+    {"beginz", 0},
+    {"delay", 0},
+    {"cond", 0},
+    {"case-lambda", 0},
     {"lambda", 1},
     {"lambda*", 1},
     {"lambdaz", 1},
@@ -51,11 +55,7 @@ constexpr auto kSpecial = std::to_array<Special>({
     {"letrec-syntax", 1},
     {"syntax-rules", 1},
     {"call-with-input-file", 1},
-    {"with-input-from-file", 1},
-    {"with-input-from-port", 1},
     {"call-with-output-file", 1},
-    {"with-output-to-file", 1},
-    {"with-output-to-port", 1},
     {"call-with-values", 1},
     {"do", 2},
     {"receive", 2},
@@ -168,7 +168,7 @@ std::size_t indentation(const std::vector<Open>& Stack, std::string_view First) 
         if (elements.size() > 1 && elements[1].line == head.line) {
             return elements[1].column;
         }
-        return paren + 2;
+        return head.column;
     }
     if (isLet(head.text) && elements.size() > 1 && elements[1].kind == Kind::Symbol) {
         kind = 2;
