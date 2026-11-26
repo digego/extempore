@@ -24,6 +24,9 @@ target_link_libraries(extempore_cpp_unit PRIVATE
 
 if(WIN32)
     target_link_libraries(extempore_cpp_unit PRIVATE ws2_32)
+    # As for the extempore target: without it Windows.h's min and max macros
+    # break std::min (src/Log.cpp).
+    target_compile_definitions(extempore_cpp_unit PRIVATE NOMINMAX)
 endif()
 
 target_include_directories(extempore_cpp_unit PRIVATE
