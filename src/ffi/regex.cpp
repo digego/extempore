@@ -35,7 +35,7 @@
 
 #include "SchemeFFIRegistry.h"
 
-#include "Regex.h"
+#include "EXTRegex.h"
 
 #include <string>
 #include <string_view>

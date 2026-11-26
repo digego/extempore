@@ -277,9 +277,9 @@ endif()
 # PCRE2 #
 #########
 
-# Every regex in Extempore (src/Regex.cpp) runs on PCRE2. The xtlang compiler's
-# type-string grammars use recursive subpatterns and named groups, which
-# std::regex has no answer for.
+# Every regex in Extempore (src/EXTRegex.cpp) runs on PCRE2. The xtlang
+# compiler's type-string grammars use recursive subpatterns and named groups,
+# which std::regex has no answer for.
 #
 # Built as a static library and linked in, so nothing has to be shipped
 # alongside the binary. pcre2-8-static carries PCRE2_STATIC as a PUBLIC compile
@@ -354,7 +354,7 @@ set(EXTEMPORE_SOURCES
     src/SchemeREPL.cpp
     src/NreplServer.cpp
     src/TaskScheduler.cpp
-    src/Regex.cpp
+    src/EXTRegex.cpp
     src/UNIV.cpp
     src/Log.cpp)
 

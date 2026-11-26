@@ -102,7 +102,7 @@
 #include <ext/UdpSocket.h>
 #include <EXTClosureAddressTable.h>
 #include <EXTThread.h>
-#include <Regex.h>
+#include <EXTRegex.h>
 #include <UNIV.h>
 #include <SchemeFFI.h>
 #include <TaskScheduler.h>

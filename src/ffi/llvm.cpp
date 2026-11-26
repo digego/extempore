@@ -77,7 +77,7 @@
 
 #include "EXTLLVM.h"
 #include "IRPreamble.h"
-#include "Regex.h"
+#include "EXTRegex.h"
 #include "UNIV.h"
 
 #include <algorithm>

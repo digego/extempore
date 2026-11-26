@@ -41,7 +41,7 @@
 
 #include "AudioDevice.h"
 #include "Log.h"
-#include "Regex.h"
+#include "EXTRegex.h"
 #include "TaskScheduler.h"
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
