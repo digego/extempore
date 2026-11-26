@@ -202,6 +202,19 @@ SONG = """\
 """
 
 
+def apply_edits(text: str, edits: list[dict]) -> str:
+    """Text with LSP edits applied (ASCII text: a character is a byte)."""
+    starts = [0] + [i + 1 for i, c in enumerate(text) if c == "\n"]
+
+    def offset(at: dict) -> int:
+        return starts[at["line"]] + at["character"]
+
+    for edit in sorted(edits, key=lambda e: offset(e["range"]["start"]), reverse=True):
+        begin, end = offset(edit["range"]["start"]), offset(edit["range"]["end"])
+        text = text[:begin] + edit["newText"] + text[end:]
+    return text
+
+
 class WithoutExtempore(unittest.TestCase):
     """What a parser can say, and what it says when nothing is running."""
 
@@ -285,13 +298,21 @@ class WithoutExtempore(unittest.TestCase):
             )
 
         self.editor.open(messy)
+        # only the lines which change
         whole = edits("textDocument/formatting")
-        self.assertEqual(len(whole), 1)
+        self.assertEqual([edit["range"]["start"]["line"] for edit in whole], [1, 3])
+        formatted = apply_edits(messy, whole)
         self.assertEqual(
-            whole[0]["newText"],
-            "(define (f x)\n  (+ x 1))\n(define (g y)\n  (* y 2))\n",
+            formatted, "(define (f x)\n  (+ x 1))\n(define (g y)\n  (* y 2))\n"
         )
-        self.assertEqual(whole[0]["range"]["start"], {"line": 0, "character": 0})
+        # and what follows the last line
+        self.editor.change("(f\n x)\n\n\n")
+        self.assertEqual(
+            apply_edits("(f\n x)\n\n\n", edits("textDocument/formatting")), "(f\n  x)\n"
+        )
+        self.editor.change("(f)")
+        self.assertEqual(apply_edits("(f)", edits("textDocument/formatting")), "(f)\n")
+        self.editor.change(messy)
         # a range reformats only its own lines
         some = edits(
             "textDocument/rangeFormatting",
@@ -313,7 +334,7 @@ class WithoutExtempore(unittest.TestCase):
             ],
         )
         # a formatted document, or one which doesn't read, has nothing to change
-        self.editor.change(whole[0]["newText"])
+        self.editor.change(formatted)
         self.assertEqual(edits("textDocument/formatting"), [])
         self.editor.change("(define (f x)\n")
         self.assertEqual(edits("textDocument/formatting"), [])
@@ -467,6 +488,14 @@ class WithExtempore(unittest.TestCase):
         self.assertEqual(len(self.editor.diagnostics()), 1)
         self.editor.change("(car '(5 6))\n")
         self.assertEqual(self.editor.diagnostics(), [])
+
+    def test_reformatting_a_marked_form_keeps_its_mark(self) -> None:
+        self.open("(car\n        5)\n")
+        self.editor.eval_at(0, 0)
+        self.editor.message()
+        self.assertEqual(len(self.editor.diagnostics()), 1)
+        self.editor.change("(car\n  5)\n")
+        self.assertEqual(len(self.editor.diagnostics()), 1)
 
     def test_an_xtlang_error_is_reported_the_same_way(self) -> None:
         self.open('(bind-func lsp_bad (lambda (x:i64) (+ x "s")))\n')

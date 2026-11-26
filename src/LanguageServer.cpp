@@ -137,6 +137,28 @@ std::string trimmed(std::string_view Text) {
     return std::string(Text.substr(first, last - first + 1));
 }
 
+// A form's text with each line's indentation and trailing whitespace taken
+// out, which is what formatting changes: a diagnostic keyed by it stays with
+// its form when the form is reindented.
+std::string formKey(std::string_view Form) {
+    std::string key;
+    for (std::size_t start = 0; start < Form.size();) {
+        auto end = Form.find('\n', start);
+        if (end == std::string_view::npos) {
+            end = Form.size();
+        }
+        std::string_view line = Form.substr(start, end - start);
+        const auto first = line.find_first_not_of(" \t");
+        const auto last = line.find_last_not_of(" \t\r");
+        if (first != std::string_view::npos) {
+            key += line.substr(first, last - first + 1);
+        }
+        key += '\n';
+        start = end + 1;
+    }
+    return key;
+}
+
 std::string firstLine(std::string_view Text) {
     const std::string text = trimmed(Text);
     return text.substr(0, text.find('\n'));
@@ -146,9 +168,9 @@ std::string firstLine(std::string_view Text) {
 
 struct Document {
     std::string text;
-    // Forms whose last evaluation failed, by their text, with the report. A
-    // diagnostic follows its form about the file and goes when the form is
-    // edited or evaluates cleanly.
+    // Forms whose last evaluation failed, by formKey, with the report. A
+    // diagnostic follows its form about the file, and through reformatting,
+    // and goes when the form is edited or evaluates cleanly.
     std::map<std::string, std::string, std::less<>> failed;
     // Reader problems are found when the file is opened or saved. Once shown
     // they follow each edit until they are fixed; a form which is open only
@@ -159,7 +181,7 @@ struct Document {
 // An evaluation which has been sent and not yet finished.
 struct Pending {
     std::string uri;
-    std::string key;     // the form's text, for its diagnostic ("" for none)
+    std::string key;     // the form's formKey, for its diagnostic ("" for none)
     bool whole = false;  // the whole buffer
     std::string out;
     std::string err;
@@ -474,7 +496,10 @@ class Server {
 
     // The edits which format a document (extempore fmt), or the lines of a
     // range of it: none if it doesn't read. Formatting keeps the line breaks,
-    // so a line of the formatted text replaces the same line of the document.
+    // so a line of the formatted text replaces the same line of the document,
+    // and only the lines which change are sent (an editor keeps its cursors
+    // and marks on the others). The whole document's edits also take in what
+    // follows the last line: blank lines at the end, and a final newline.
     json::Value formatting(const json::Object& Params, bool InRange) {
         json::Array edits;
         const auto found = m_documents.find(uriOf(Params));
@@ -486,16 +511,8 @@ class Server {
         if (!result || *result == doc.text) {
             return edits;
         }
-        const json::Object* where = InRange ? Params.getObject("range") : nullptr;
-        if (!where) {
-            edits.push_back(
-                json::Object{{"range", range(doc, 0, doc.text.size())}, {"newText", *result}});
-            return edits;
-        }
-        const std::size_t first =
-            positionAt(doc.text, offsetIn(doc, where->getObject("start")), m_utf8).line;
-        const std::size_t last =
-            positionAt(doc.text, offsetIn(doc, where->getObject("end")), m_utf8).line;
+        const std::string_view now = doc.text;
+        const std::string_view then = *result;
         const auto lineStarts = [](std::string_view Text) {
             std::vector<std::size_t> starts{0};
             for (std::size_t i = 0; i < Text.size(); ++i) {
@@ -505,24 +522,38 @@ class Server {
             }
             return starts;
         };
+        const auto nowStarts = lineStarts(now);
+        const auto thenStarts = lineStarts(then);
+        // [begin, end) of a line, without its newline
         const auto lineOf = [](std::string_view Text, const std::vector<std::size_t>& Starts,
                                std::size_t Line) {
-            const std::size_t begin = Starts[Line];
             const std::size_t end = Line + 1 < Starts.size() ? Starts[Line + 1] - 1 : Text.size();
-            return std::pair{begin, end};
+            return std::pair{Starts[Line], end};
         };
-        const auto docStarts = lineStarts(doc.text);
-        const auto newStarts = lineStarts(*result);
-        for (std::size_t line = first;
-             line <= last && line < docStarts.size() && line < newStarts.size(); ++line) {
-            const auto [begin, end] = lineOf(doc.text, docStarts, line);
-            const auto [newBegin, newEnd] = lineOf(*result, newStarts, line);
-            const std::string_view now = std::string_view(doc.text).substr(begin, end - begin);
-            const std::string_view then =
-                std::string_view(*result).substr(newBegin, newEnd - newBegin);
-            if (now != then) {
-                edits.push_back(json::Object{{"range", range(doc, begin, end)},
-                                             {"newText", std::string(then)}});
+        const std::size_t lines = std::min(nowStarts.size(), thenStarts.size());
+        std::size_t first = 0;
+        std::size_t last = lines - 1;
+        const json::Object* where = InRange ? Params.getObject("range") : nullptr;
+        if (where) {
+            first = positionAt(now, offsetIn(doc, where->getObject("start")), m_utf8).line;
+            last = std::min(last,
+                            positionAt(now, offsetIn(doc, where->getObject("end")), m_utf8).line);
+        }
+        for (std::size_t line = first; line <= last; ++line) {
+            const auto [begin, end] = lineOf(now, nowStarts, line);
+            const auto [newBegin, newEnd] = lineOf(then, thenStarts, line);
+            if (now.substr(begin, end - begin) != then.substr(newBegin, newEnd - newBegin)) {
+                edits.push_back(json::Object{
+                    {"range", range(doc, begin, end)},
+                    {"newText", std::string(then.substr(newBegin, newEnd - newBegin))}});
+            }
+        }
+        if (!where) {
+            const std::size_t tail = lineOf(now, nowStarts, lines - 1).second;
+            const std::size_t newTail = lineOf(then, thenStarts, lines - 1).second;
+            if (now.substr(tail) != then.substr(newTail)) {
+                edits.push_back(json::Object{{"range", range(doc, tail, now.size())},
+                                             {"newText", std::string(then.substr(newTail))}});
             }
         }
         return edits;
@@ -566,15 +597,19 @@ class Server {
 
     // --- completion and hover: questions for the extempore, when there is one
 
-    // Asks the extempore and waits a moment for its answer: a process which
+    // Asks the extempore and waits a moment for its answer. A process which
     // is busy with an evaluation answers after it, which is too late for a
-    // menu. Lock (m_mutex) is released while waiting.
+    // menu, so nothing is asked while one of ours is running. Lock (m_mutex)
+    // is released while waiting.
     std::optional<bencode::Dict> ask(const std::string& Uri, bencode::Dict Message,
                                      std::unique_lock<std::mutex>& Lock) {
         if (!connect(pathFromUri(Uri), true)) {
             return std::nullopt;
         }
         const std::shared_ptr<Link> link = m_link;
+        if (!link->pending.empty()) {
+            return std::nullopt;  // it answers after the evaluation
+        }
         Message["session"] = bencode::Value(link->session);
         const std::string id = link->connection.send(std::move(Message));
         if (id.empty()) {
@@ -720,8 +755,9 @@ class Server {
         if (!Doc.failed.empty()) {
             std::map<std::string, std::string, std::less<>> still;
             for (const auto& form : forms::topLevel(Doc.text)) {
-                const auto text = Doc.text.substr(form.begin, form.end - form.begin);
-                if (const auto found = Doc.failed.find(text); found != Doc.failed.end()) {
+                const auto key =
+                    formKey(std::string_view(Doc.text).substr(form.begin, form.end - form.begin));
+                if (const auto found = Doc.failed.find(key); found != Doc.failed.end()) {
                     still.insert(*found);
                 }
             }
@@ -753,8 +789,8 @@ class Server {
         }
         if (!doc.failed.empty()) {
             for (const auto& form : forms::topLevel(doc.text)) {
-                const auto found_ =
-                    doc.failed.find(doc.text.substr(form.begin, form.end - form.begin));
+                const auto found_ = doc.failed.find(
+                    formKey(std::string_view(doc.text).substr(form.begin, form.end - form.begin)));
                 if (found_ != doc.failed.end()) {
                     // on the form's first line, the only place nREPL names
                     add(form.begin, std::min(endOfLine(doc.text, form.begin), form.end),
@@ -810,7 +846,8 @@ class Server {
             const std::size_t end = offsetIn(doc, where ? where->getObject("end") : nullptr);
             const auto form = forms::at(doc.text, begin);
             if (form) {
-                pending.key = doc.text.substr(form->begin, form->end - form->begin);
+                pending.key = formKey(
+                    std::string_view(doc.text).substr(form->begin, form->end - form->begin));
             }
             std::string code;
             std::int64_t line = 1;
@@ -818,7 +855,7 @@ class Server {
                 code = doc.text.substr(begin, end - begin);
                 line = std::int64_t(positionAt(doc.text, begin, m_utf8).line) + 1;
             } else if (form) {
-                code = pending.key;
+                code = doc.text.substr(form->begin, form->end - form->begin);
                 line = std::int64_t(form->line);
             } else {
                 showMessage(Warning, "there is no form here to evaluate");
@@ -956,7 +993,8 @@ class Server {
             if (failed && Eval.errorLine > 0) {
                 for (const auto& form : forms::topLevel(doc->text)) {
                     if (std::int64_t(form.line) == Eval.errorLine) {
-                        Eval.key = doc->text.substr(form.begin, form.end - form.begin);
+                        Eval.key = formKey(
+                            std::string_view(doc->text).substr(form.begin, form.end - form.begin));
                     }
                 }
             }
