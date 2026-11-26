@@ -89,7 +89,7 @@ After that, `extempore` will launch normally.
 **For more information**, check out [BUILDING.md](./BUILDING.md).
 
 Extempore's CMake build process downloads and builds all the dependencies you
-need (including LLVM). So, if you've got a C++ compiler, git, CMake >= 3.28 and
+need (including LLVM). So, if you've got a C++ compiler, git, CMake >= 4.0 and
 Ninja, here are some one-liner build commands.
 
 On **Linux/macOS** (and on **Windows** from a Visual Studio developer prompt):
