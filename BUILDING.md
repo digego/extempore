@@ -140,7 +140,7 @@ on its own --- name it explicitly:
 ### macOS
 
 Extempore's macOS builds target arm64 (Apple Silicon) with a minimum deployment
-target of macOS 13.3 Ventura.
+target of macOS 13.3 Ventura. CI builds and tests on macOS 15 and macOS 26.
 
 Apple requires distributed binaries to be signed & notarised, and the Extempore
 core team haven't got an Apple Developer account set up for that. If Gatekeeper
