@@ -299,7 +299,7 @@ void print_greeting() {
     const std::string text = log::dim("   .-.     .-.     .-.\n"
                                       "  /   \\   /   \\   /   \\     ") +
                              log::bold("e x t e m p o r e") + "\n" +
-                             log::dim("-'     '-'     '-'     '-   ex tempore: out of time") +
+                             log::dim("-'     '-'     '-'     '-   cyberphysical programming") +
                              "\n\n";
     std::fputs(text.c_str(), stderr);
 }

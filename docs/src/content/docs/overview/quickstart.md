@@ -81,7 +81,7 @@ running. If you see something like this, everything's working---nice one.
 ```
    .-.     .-.     .-.
   /   \   /   \   /   \     e x t e m p o r e
--'     '-'     '-'     '-   ex tempore: out of time
+-'     '-'     '-'     '-   cyberphysical programming
 
 Extempore 0.11.2, LLVM 22.1.8, arm64-apple-darwin23.6.0 (apple-m1)
 Audio: MacBook Pro Speakers, 2 out, 44100 Hz, 1024 frames, 23 ms latency
