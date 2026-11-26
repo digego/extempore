@@ -59,11 +59,110 @@ and put it wherever you like (e.g. in your _Documents_ folder). Then set the
 _Extempore: Sharedir_ VSCode config setting to point at that folder---this lets
 VSCode start Extempore for you (we'll do that in the next step).
 
-:::caution
+:::tip
 
-The VSCode extension used to offer an _Extempore: Download binary_ command for
-one-click setup. It hasn't been updated for the current releases, so download
-the release archive manually for now.
+The _Extempore: Download binary_ command does all this for you: it downloads
+the latest release for your computer, unzips it where you say, and sets
+_Extempore: Sharedir_ and _Extempore: Executable_ to point at it.
+
+:::
+
+## Using Extempore {#using-extempore}
+
+Here's the stuff you need to do every time you want to work with Extempore.
+
+### Step 1: start Extempore {#step-1}
+
+You can start Extempore using the _Extempore: Start_ command (again, you can
+find this command using the [command palette](#vscode-command-palette)). It'll
+open up a terminal, `cd` into your extempore folder, and start the Extempore
+running. If you see something like this, everything's working---nice one.
+
+```
+   .-.     .-.     .-.
+  /   \   /   \   /   \     e x t e m p o r e
+-'     '-'     '-'     '-   cyberphysical programming
+
+Extempore 0.11.2, LLVM 22.1.8, arm64-apple-darwin23.6.0 (apple-m1)
+Audio: MacBook Pro Speakers, 2 out, 44100 Hz, 1024 frames, 23 ms latency
+nREPL server started on port 7888 on host 127.0.0.1 - nrepl://127.0.0.1:7888
+Loaded xtmbase in 1.63 s
+Ready: connect your editor to nREPL port 7888 (or the legacy server on 7099)
+```
+
+:::note
+
+If you can't (or don't want to) start Extempore using the _Extempore: Start_
+VSCode command, then open a terminal in your Extempore directory (VSCode has a
+built-in terminal which you can bring up with <kbd>CTRL</kbd>+<kbd>&#96;</kbd>)
+and type `./extempore` (or `.\extempore.exe` if you're on Windows---note the
+backslash instead of the forward slash) and hit <kbd>return</kbd>. Extempore
+supports a bunch of command line options---try
+`./extempore --help`/`.\extempore.exe --help` to see the full list.
+
+:::
+
+### Step 2: open some Extempore code
+
+Open (or create) a file ending in `.xtm`. VSCode finds the running Extempore by
+itself, through its nREPL server on port 7888, so there's nothing to connect.
+
+<details>
+<summary>Non-VSCode editors</summary>
+
+This quickstart guide is based on VSCode. If you'd prefer to use another editor
+(e.g. Emacs, Atom, ST, Vim) then that's fine as well---these boxes will explain
+how your setup process will be different.
+
+</details>
+
+:::note
+
+With everything on this page, if you run in to problems make sure you check the
+[Troubleshooting](#troubleshooting) section at the end.
+
+:::
+
+## Setup
+
+Here's the stuff you only need to do once.
+
+### Download & set up VSCode {#editor-setup}
+
+**VSCode** (a.k.a. Visual Studio Code) is freely available on all the operating
+systems that Extempore runs on (macOS, Windows & Linux). To install VSCode, go
+to the [homepage](https://code.visualstudio.com/) and hit the big "Download"
+button (you can't miss it). Once you've installed VSCode, you need to install
+the
+[VSCode Extempore extension](https://github.com/extemporelang/vscode-extempore)---this
+tells VSCode how to deal with Extempore code.
+
+Open the _Command Palette_, type in a few characters of the command _Extensions:
+Install Extensions_ until it shows up, then hit <kbd>return</kbd>. Then, search
+for "Extempore" and install the extension.
+
+:::note
+
+The main way to run commands (in other words, to "do things") in VSCode is
+through the _Command Palette_, which you can open up with
+<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>P</kbd> (or through the menu
+`View > Command Palette...`).
+
+:::
+
+### Download Extempore
+
+Grab the latest release from the
+[GitHub releases page](https://github.com/digego/extempore/releases), unzip it
+and put it wherever you like (e.g. in your _Documents_ folder). Then set the
+_Extempore: Sharedir_ VSCode config setting to point at that folder---this lets
+VSCode start Extempore for you (we'll do that in the next step).
+
+:::tip
+
+The _Extempore: Download binary_ command does all this for you: it downloads
+the latest release for your computer, unzips it where you say, and sets
+_Extempore: Sharedir_ and _Extempore: Executable_ to point at it.
 
 :::
 
@@ -140,9 +239,9 @@ you'll manage 😉, and you can find the specific details for your editor in the
 ### Step 3: evaluate some code {#step-3}
 
 To evaluate some code, move your cursor into a particular bit of code and hit
-<kbd>ctrl</kbd>+<kbd>return</kbd>. The code should flash orange, and you should
-see/hear the results (assuming that the code actually made some noise or printed
-the result somewhere).
+<kbd>ctrl</kbd>+<kbd>return</kbd> (<kbd>cmd</kbd>+<kbd>return</kbd> on macOS).
+The code should flash, its result should appear at the end of the line, and you
+should hear anything it plays.
 
 As a quick test, try and evaluate something like:
 
@@ -150,12 +249,11 @@ As a quick test, try and evaluate something like:
 (println "Hello, World!")
 ```
 
-If you can see `"Hello, World!"` at the bottom of the terminal, then you've just
-evaluated your first Extempore code! 🙌 🎉 🥳 🙌
+If you can see `"Hello, World!"` in the terminal, then you've just evaluated
+your first Extempore code! 🙌 🎉 🥳 🙌
 
 ```
 Loaded xtmbase in 1.63 s
-Accepted a connection to the primary process
 "Hello, World!"
 ```
 
@@ -174,12 +272,10 @@ represented as `#t` in Extempore).
 This is just a quickstart, so we won't go down the rabbit hole, but the rule of
 thumb is that when you call a print function (e.g. `println`)
 
-- the printed output will show up in the terminal
-- the _return value_ of the function will be shown (temporarily) at the bottom
-  of your VSCode window like so (notice the little white `#t` on the blue
-  background---I've added an orange arrow to point it out).
-
-![Extempore return value as shown in VSCode](../../../assets/images/vscode-hello-world-echo-area.png)
+- the printed output will show up in the terminal (and in VSCode's
+  "Extempore" output panel)
+- the _return value_ of the function will be shown at the end of the line you
+  evaluated (`=> #t`), until you next edit the file
 
 :::
 
@@ -188,8 +284,7 @@ thumb is that when you call a print function (e.g. `println`)
 If you want to stop the Extempore process, just <kbd
 class="nopretty">ctrl</kbd>+<kbd>c</kbd> in the terminal where `extempore` is
 running to kill it. If you want to start it up again, then go back to
-[step 1](#step-1) (you'll have to re-connect VSCode to the new Extempore process
-again as well).
+[step 1](#step-1). VSCode finds the new Extempore by itself.
 
 ## Simple examples
 

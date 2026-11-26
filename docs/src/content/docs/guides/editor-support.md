@@ -134,44 +134,25 @@ tree-sitter-extempore) follows the same rules as you type.
 
 ## Emacs {#emacs}
 
-[extempore-emacs-mode](https://github.com/extemporelang/extempore-emacs-mode) is
-the Emacs mode for working with Extempore code, and it's available from
-[MELPA](http://melpa.org/). If you're using `package.el` (i.e. if you're on a
-modern-ish Emacs) then just <kbd>M-x</kbd> `package-install` <kbd>RET</kbd>
-`extempore-mode` <kbd>RET</kbd> and you're done.
+[extempore-emacs-mode](https://github.com/extemporelang/extempore-emacs-mode)
+(Emacs 29.1 or later) is on [MELPA](https://melpa.org/): <kbd>M-x</kbd>
+`package-install` <kbd>RET</kbd> `extempore-mode` <kbd>RET</kbd>. It starts
+Eglot with the [language server](#language-server), so it finds a running
+extempore as `extempore send` does, and shows each result at the end of its
+form. Completion, eldoc and errors marked as diagnostics come from the server.
 
-If you encounter an error with `eldoc-beginning-of-sexp`, put this code in your
-init file to bind that name
+| command                                                      | keybinding         |
+| ------------------------------------------------------------ | ------------------ |
+| `extempore-send-dwim` (the region, or the top-level form)    | <kbd>C-M-x</kbd>   |
+| `extempore-send-buffer`                                      | <kbd>C-c C-k</kbd> |
+| `extempore-interrupt`                                        | <kbd>C-c C-b</kbd> |
+| `switch-to-extempore` (or start Extempore if it isn't running) | <kbd>C-c C-z</kbd> |
+| `extempore-repl` (`extempore repl` in a buffer)              | <kbd>C-c C-e</kbd> |
+| `extempore-format-buffer` (with `extempore fmt`)             |                    |
 
-```
-(unless (fboundp 'eldoc-beginning-of-sexp)
-  (defalias 'eldoc-beginning-of-sexp 'elisp--beginning-of-sexp))
-```
-
-If you don't want to get it from MELPA, just
-[download the file](https://github.com/extemporelang/extempore-emacs-mode/blob/master/extempore-mode.el)
-and put it in your load path.
-
-[Ben's](https://benswift.me) a Spacemacs user these days, and has created
-[an Extempore layer](https://github.com/benswift/.dotfiles/blob/master/spacemacs-layers/extempore/packages.el)
-(although he hasn't got around to getting it accepted in the main spacemacs
-layer repo or however that works, so you'll need to do a bit of downloading &
-manual setup stuff to get it working).
-
-| command                                                              | keybinding                                                |
-| -------------------------------------------------------------------- | --------------------------------------------------------- |
-| `switch-to-extempore` (or start Extempore if it's not running)       | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>Z</kbd> |
-| `extempore-connect-or-disconnect`                                    | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>J</kbd> |
-| `extempore-send-dwim` (to evaluate current top-level form or region) | <kbd>CTRL</kbd>+<kbd>META</kbd>+<kbd>X</kbd>              |
-| `extempore-send-region`                                              | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>R</kbd> |
-| `extempore-format-buffer` (with `extempore fmt`)                     |                                                           |
-|                                                                      |                                                           |
-
-To restart the Extempore process, just <kbd
-class="nopretty">CTRL</kbd>+<kbd>C</kbd> <kbd
-class="nopretty">CTRL</kbd>+<kbd>C</kbd> in the `*extempore*` buffer where
-`extempore` is running to kill it, then start it up again with
-`switch-to-extempore`.
+For an extempore older than the nREPL server, set `extempore-transport` to
+`legacy` and connect to its eval server with <kbd>C-c C-j</kbd>. The mode's
+README has the rest.
 
 ## Sublime Text {#sublime-text}
 
