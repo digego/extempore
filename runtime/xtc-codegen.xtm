@@ -126,14 +126,15 @@
   (lambda (ptr-type)
     (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth ptr-type))))
 
-;; VAL, a (name type) pair, as TO-TYPE under the name NAME. A cast from one
-;; pointer type to another does nothing in IR, so NAME then stands for the
-;; value itself; any other cast is a bitcast instruction.
+;; VAL, a (name type) pair, as TO-TYPE under the name NAME. A cast between
+;; types which are one type in IR (any two pointer types, or a type and
+;; itself) does nothing, so NAME then stands for the value itself; any other
+;; cast is a bitcast instruction.
 (define xtc:codegen:emit-bitcast
   (lambda (name val to-type os)
     (let ((from (xtc:codegen:ir-type (cadr val)))
           (to (xtc:codegen:ir-type to-type)))
-      (if (and (string=? from "ptr") (string=? to "ptr"))
+      (if (string=? from to)
           (xtc:codegen:ssa-temp name (car val) to-type)
           (emit (xtc:codegen:ssa-temp name to-type) " = bitcast " from " " (car val) " to " to "\n" os)))))
 
@@ -1815,23 +1816,13 @@
                    (emit (car value) os)
                    (emit value os))
 
-               ;; this bitcast should be the same type on both sides
                (emit "\n; let value assignment\n" os)
-               ; (emit "call ccc void @llvm_print_i32(i32 555)\n" os)
-
-               (emit (string-append "%" symstr " = select i1 true, " (xtc:codegen:ir-type typestr) " "
+               (emit (string-append "store " (xtc:codegen:ir-type typestr) " "
                                     (if (and (number? (ast:binding-expr p))
                                              (= *xtc:codegen:fp32* (xtc:codegen:get-type-from-str typestr)))
-                                        (llvm:convert-float (car e)) ;(xtc:codegen:ssa-temp)))
-                                        (car e)) ;(xtc:codegen:ssa-temp)))
-                                    ", " (xtc:codegen:ir-type typestr) " "
-                                    (if (and (number? (ast:binding-expr p))
-                                             (= *xtc:codegen:fp32* (xtc:codegen:get-type-from-str typestr)))
-                                        (llvm:convert-float (car e)) ; (xtc:codegen:ssa-temp)))
-                                        (car e)) ;(xtc:codegen:ssa-temp)))
-                                    "\n") os)
-               (emit (string-append "store " (xtc:codegen:ir-type typestr) " %" symstr ", "
-                                    "ptr %" symstr "Ptr\n\n") os)
+                                        (llvm:convert-float (car e))
+                                        (car e))
+                                    ", ptr %" symstr "Ptr\n\n") os)
                ;; #137/#140: fill this closure's environment immediately, rather
                ;; than deferring all env-fills until after the whole binding
                ;; list. A later sibling initializer in the same let may call an
@@ -2185,10 +2176,7 @@
                    (xtc:codegen:vector? type2)
                    (xtc:codegen:tuple? type2))
                (= (xtc:codegen:get-ptr-depth type2) 0))
-          (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str type))
-                " = select i1 true, "
-                (xtc:codegen:get-ir-type type) " @" (symbol->string var) ", "
-                (xtc:codegen:get-ir-type type) " @" (symbol->string var) "\n" os)
+          (xtc:codegen:ssa-temp "val" (string-append "@" (symbol->string var)) (xtc:codegen:get-type-str type))
           (emit (string-append (xtc:codegen:ssa-temp "val" typestr)
                                " = load " (xtc:codegen:ir-type typestr) ", ptr"
                                " @" (symbol->string var) "\n") os))
@@ -3726,7 +3714,7 @@
                ;; now convert i64 into correct final type
                (cond ((= to *xtc:codegen:fp64*) (emit (xtc:codegen:ssa-temp "val" type-str) " = sitofp i64 " (car (xtc:codegen:ssa-temp "val1")) " to double\n" os))
                      ((= to *xtc:codegen:fp32*) (emit (xtc:codegen:ssa-temp "val" type-str) " = sitofp i64 " (car (xtc:codegen:ssa-temp "val1")) " to float\n" os))
-                     ((= to *xtc:codegen:si64*) (emit (xtc:codegen:ssa-temp "val" type-str) " = bitcast i64 " (car (xtc:codegen:ssa-temp "val1")) " to i64\n" os))
+                     ((= to *xtc:codegen:si64*) (xtc:codegen:ssa-temp "val" (car (xtc:codegen:ssa-temp "val1")) type-str))
                      ((= to *xtc:codegen:si32*) (emit (xtc:codegen:ssa-temp "val" type-str) " = trunc i64 " (car (xtc:codegen:ssa-temp "val1")) " to i32\n" os))
                      ((= to *xtc:codegen:si16*) (emit (xtc:codegen:ssa-temp "val" type-str) " = trunc i64 " (car (xtc:codegen:ssa-temp "val1")) " to i16\n" os))
                      ((= to *xtc:codegen:si8*) (emit (xtc:codegen:ssa-temp "val" type-str) " = trunc i64 " (car (xtc:codegen:ssa-temp "val1")) " to i8\n" os))
@@ -3736,7 +3724,7 @@
                ;; first convert from to i64
                (cond ((= from *xtc:codegen:fp64*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = fptosi double " (car at) " to i64\n" os))
                      ((= from *xtc:codegen:fp32*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = fptosi float " (car at) " to i64\n" os))
-                     ((= from *xtc:codegen:si64*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = bitcast i64 " (car at) " to i64\n" os))
+                     ((= from *xtc:codegen:si64*) (xtc:codegen:ssa-temp "val1" (car at) "i64"))
                      ((= from *xtc:codegen:si32*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = sext i32 " (car at) " to i64\n" os))
                      ((= from *xtc:codegen:si16*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = sext i16 " (car at) " to i64\n" os))
                      ((= from *xtc:codegen:si8*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = sext i8 " (car at) " to i64\n" os))
@@ -3951,7 +3939,7 @@
       (emit (xtc:codegen:ssa-temp "dat1_" "i8*") " = call ccc ptr @malloc(" *xtc:codegen:size_t_str* " " (number->string total_size1) ")\n" os)
       (xtc:codegen:ssa-temp "struct1_" (car (xtc:codegen:ssa-temp "dat1_")) struct_type1)
       (if (null? args)
-          (emit (xtc:codegen:ssa-temp "dat2_" "i8*") " = select i1 true, ptr null, ptr null\n" os)
+          (xtc:codegen:ssa-temp "dat2_" "null" "i8*")
           (begin
             (emit (xtc:codegen:ssa-temp "dat2_" "i8*") " = call ccc ptr @malloc(" *xtc:codegen:size_t_str* " " (number->string total_size2) ")\n" os)
             (xtc:codegen:ssa-temp "struct2_" (car (xtc:codegen:ssa-temp "dat2_")) struct_type2)))
