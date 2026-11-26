@@ -491,7 +491,7 @@ class Startup(unittest.TestCase):
             blocker.listen()
             with Extempore(nrepl_port=None, wait_for_banner=False) as xtm:
                 xtm.wait_for("could not listen")
-                xtm.wait_for("Listening on TCP port")
+                xtm.wait_for("Ready: connect your editor to port")
                 with socket.create_connection(
                     ("127.0.0.1", xtm.eval_port), timeout=60
                 ) as s:
@@ -501,7 +501,7 @@ class Startup(unittest.TestCase):
 
     def test_no_nrepl(self) -> None:
         with Extempore("--no-nrepl", nrepl_port=None, wait_for_banner=False) as xtm:
-            xtm.wait_for("Listening on TCP port")
+            xtm.wait_for("Ready: connect your editor to port")
             self.assertNotIn("nREPL", xtm.console_text())
 
     def test_a_request_before_startup_finishes_is_answered_after_it(self) -> None:

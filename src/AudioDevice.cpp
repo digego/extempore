@@ -873,11 +873,13 @@ void AudioDevice::start() {
 
     const PaStreamInfo* info = Pa_GetStreamInfo(stream);
     std::string input;
-    if (UNIV::AUDIO_IN_DEVICE != unsigned(-1)) {
-        input = std::format(", input {} ({} ch)", Pa_GetDeviceInfo(inputDevice)->name,
-                            UNIV::IN_CHANNELS);
+    if (UNIV::IN_CHANNELS > 0) {
+        input = std::format(", {} in", UNIV::IN_CHANNELS);
+        if (UNIV::AUDIO_IN_DEVICE != unsigned(-1)) {
+            input += std::format(" from {}", Pa_GetDeviceInfo(inputDevice)->name);
+        }
     }
-    log::info(log::audio, "Audio: {} ({} ch){}, {} Hz, {} frames, {} ms latency",
+    log::info(log::audio, "Audio: {}, {} out{}, {} Hz, {} frames, {} ms latency",
               Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE)->name, UNIV::CHANNELS, input,
               UNIV::SAMPLE_RATE, UNIV::NUM_FRAMES, std::lround(info->outputLatency * 1000.0));
 }

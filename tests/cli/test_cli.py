@@ -222,14 +222,16 @@ class Session(Scratch):
         p = run(*self.QUIET_SESSION, "-e", "(begin (println 'ready) (quit 0))")
         self.assertEqual((p.returncode, p.stdout), (0, "ready\n"))
         # stderr isn't a terminal here, so each line has the time
-        self.assertRegex(p.stderr, r"^\d\d:\d\d:\d\d\.\d{3} Extempore v")
+        self.assertRegex(p.stderr, r"^\d\d:\d\d:\d\d\.\d{3} Extempore \d")
+        self.assertIn("Audio: none (--no-audio)", p.stderr)
         self.assertIn("Loaded xtmbase", p.stderr)
+        self.assertRegex(p.stderr, r"\d Ready\n")  # no servers to connect to
         p = run(*self.QUIET_SESSION, "-q", "-e", "(begin (println 'ready) (quit 0))")
         self.assertEqual((p.returncode, p.stdout, p.stderr), (0, "ready\n", ""))
 
     def test_timestamps_can_be_turned_off(self) -> None:
         p = run(*self.QUIET_SESSION, "--timestamps", "never", "-e", "(quit 0)")
-        self.assertTrue(p.stderr.startswith("Extempore v"), p.stderr)
+        self.assertTrue(p.stderr.startswith("Extempore "), p.stderr)
 
 
 class Devices(Scratch):

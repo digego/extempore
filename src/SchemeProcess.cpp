@@ -176,6 +176,22 @@ SchemeProcess* SchemeProcess::find(const std::string& Name) {
     return nullptr;
 }
 
+// The session's last startup line: where an editor can send code.
+static std::string readyMessage(int LegacyPort) {
+    const std::uint16_t nreplPort = nrepl::boundPort();
+    if (nreplPort != 0 && UNIV::LEGACY_SERVER) {
+        return std::format("Ready: connect your editor to nREPL port {} (or the legacy server on {})",
+                           nreplPort, LegacyPort);
+    }
+    if (nreplPort != 0) {
+        return std::format("Ready: connect your editor to nREPL port {}", nreplPort);
+    }
+    if (UNIV::LEGACY_SERVER) {
+        return std::format("Ready: connect your editor to port {}", LegacyPort);
+    }
+    return "Ready";
+}
+
 bool SchemeProcess::start(bool subsume) {
     const bool serve = UNIV::MODE == UNIV::Mode::Session && UNIV::LEGACY_SERVER;
     if (serve) {
@@ -201,11 +217,8 @@ bool SchemeProcess::start(bool subsume) {
             m_running = false;
             return false;
         }
-        // said once it is true: a client may connect the moment it reads this
-        if (m_name == "primary") {
-            log::info(log::server, "Listening on TCP port {}: connect your editor to send code",
-                      m_serverPort);
-        }
+        log::debug(log::server, "the {} process is listening on TCP port {}", m_name,
+                   m_serverPort);
     }
     if (subsume) {
         m_threadTask.setSubsume();
@@ -369,6 +382,12 @@ void* SchemeProcess::taskImpl() {
         if (extemp::UNIV::EXT_LOADBASE) {
             pushTask(SchemeTask(extemp::UNIV::TIME, startupBudget,
                                 new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"),
+                                "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
+        }
+        // the base library is in, and the servers are listening
+        if (UNIV::MODE == UNIV::Mode::Session) {
+            pushTask(SchemeTask(extemp::UNIV::TIME, startupBudget,
+                                new std::string("(log:info \"" + readyMessage(m_serverPort) + "\")"),
                                 "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
         if (!m_initExpr.empty()) {

@@ -190,6 +190,9 @@ void trace(Component C, std::format_string<Args...> Fmt, Args&&... A) noexcept {
 std::string colour_code(std::FILE* Stream, bool Bold, unsigned Foreground, unsigned Background);
 // Whether Stream gets escape sequences.
 bool coloured(std::FILE* Stream);
+// Text in bold, or dimmed, when messages are coloured.
+std::string bold(std::string_view Text);
+std::string dim(std::string_view Text);
 // Decide colour for stdout and stderr: When is "auto", "always" or "never";
 // auto colours a terminal unless NO_COLOR is set. On Windows, auto and always
 // switch the console to ANSI escape sequences.

@@ -1403,8 +1403,14 @@ void initLLVM() {
     MainJD.addGenerator(std::move(*DLSGOrErr));
 
     if (UNIV::MODE == UNIV::Mode::Session) {
-        log::info("Extempore {} ({}{}{}, LLVM {})", EXTEMPORE_VERSION, triple,
-                  cpu.empty() ? "" : ", ", cpu, LLVM_VERSION_STRING);
+        // a release's version is its tag, vN.N.N; a dev build's says how far past
+        std::string_view version = EXTEMPORE_VERSION;
+        if (version.starts_with('v')) {
+            version.remove_prefix(1);
+        }
+        log::info("{}{}", log::bold(std::format("Extempore {}", version)),
+                  log::dim(std::format(", LLVM {}, {}{}{}", LLVM_VERSION_STRING, triple,
+                                       cpu.empty() ? "" : " ", cpu.empty() ? "" : "(" + cpu + ")")));
     }
 
     // Register the runtime entry points with the JIT.

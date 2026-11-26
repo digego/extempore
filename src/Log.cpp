@@ -483,6 +483,14 @@ std::string colour_code(std::FILE* Stream, bool Bold, unsigned Foreground, unsig
     return std::format("\x1b[{};{};{}m", Bold ? 1 : 0, Foreground + 30, Background + 40);
 }
 
+std::string bold(std::string_view Text) {
+    return colour() ? std::format("\x1b[1m{}\x1b[0m", Text) : std::string(Text);
+}
+
+std::string dim(std::string_view Text) {
+    return colour() ? std::format("\x1b[2m{}\x1b[0m", Text) : std::string(Text);
+}
+
 bool coloured(std::FILE* Stream) {
     if (Stream == stderr) {
         return sColourErr.load(std::memory_order_relaxed);

@@ -79,11 +79,11 @@ open up a terminal, `cd` into your extempore folder, and start the Extempore
 running. If you see something like this, everything's working---nice one.
 
 ```
-Extempore v0.11.2 (arm64-apple-darwin23.6.0, apple-m1, LLVM 22.1.8)
-Audio: MacBook Pro Speakers (2 ch), 44100 Hz, 1024 frames, 23 ms latency
+Extempore 0.11.2, LLVM 22.1.8, arm64-apple-darwin23.6.0 (apple-m1)
+Audio: MacBook Pro Speakers, 2 out, 44100 Hz, 1024 frames, 23 ms latency
 nREPL server started on port 7888 on host 127.0.0.1 - nrepl://127.0.0.1:7888
-Listening on TCP port 7099: connect your editor to send code
 Loaded xtmbase in 1.63 s
+Ready: connect your editor to nREPL port 7888 (or the legacy server on 7099)
 ```
 
 :::note

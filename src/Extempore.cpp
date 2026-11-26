@@ -634,6 +634,8 @@ EXPORT int extempore_init(int argc, char** argv) {
     if (!extemp::UNIV::AUDIO_NONE) {
         extemp::AudioDevice* dev = extemp::AudioDevice::I();
         dev->start();
+    } else if (session) {
+        extemp::log::info(extemp::log::audio, "Audio: none (--no-audio)");
     }
 
     // The processes below live for the whole run and are never

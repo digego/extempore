@@ -202,7 +202,7 @@ class SessionRepl(unittest.TestCase):
         xtm = Extempore("--no-legacy-server", wait_for_banner=False, nrepl_port=0)
         try:
             port = int(xtm.wait_for(r"nREPL server started on port (\d+)", 120).group(1))
-            self.assertNotIn("Listening on TCP port", xtm.console_text())
+            xtm.wait_for(r"Ready: connect your editor to nREPL port \d+\n", 120)
             p = subprocess.run([str(BIN), "send", "--port", str(port), "(+ 1 2)"],
                                capture_output=True, text=True, timeout=60)
             self.assertEqual((p.returncode, p.stdout), (0, "3\n"))
