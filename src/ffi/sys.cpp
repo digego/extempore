@@ -290,7 +290,7 @@ static pointer getEnv(scheme* Scheme, pointer Args) {
     const char* var = argString(Scheme, Args, 1);
     const char* val = std::getenv(var);
 
-    if (val != NULL) {
+    if (val != nullptr) {
         return mk_string(Scheme, val);
     } else {
         return Scheme->F;

@@ -81,6 +81,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
+#include <algorithm>
 #include <bit>
 #include <charconv>
 #include <random>
@@ -685,8 +686,8 @@ void unlinkSymbol(const std::string& Name) {
 }
 
 bool unreferenced(const TrackedModule& M) {
-    return std::none_of(M.exports.begin(), M.exports.end(),
-                        [](const std::string& n) { return sImportRefs.count(n) != 0; });
+    return std::ranges::none_of(
+        M.exports, [](const std::string& n) { return sImportRefs.contains(n); });
 }
 
 // Unlink a module's symbols and retire its code and metadata. Modules that only
@@ -738,7 +739,7 @@ void flushPendingErasures() {
         }
         auto* M = it->second;
         M->erased.insert(name);
-        if (std::find(touched.begin(), touched.end(), M) == touched.end()) {
+        if (std::ranges::find(touched, M) == touched.end()) {
             touched.push_back(M);
         }
         sSymbolOwner.erase(it);
@@ -768,9 +769,8 @@ void releaseOrphans(const std::vector<std::string>& NewExports) {
             if (M->orphanedBy.empty()) {
                 continue;
             }
-            const bool replaced =
-                std::any_of(NewExports.begin(), NewExports.end(),
-                            [&](const std::string& n) { return M->orphanedBy.count(n); });
+            const bool replaced = std::ranges::any_of(
+                NewExports, [&](const std::string& n) { return M->orphanedBy.contains(n); });
             if (replaced) {
                 removeModule(M);  // invalidates the iteration
                 changed = true;
@@ -887,7 +887,7 @@ bool removeSymbol(const std::string& name) {
         return false;
     }
     const std::lock_guard<std::mutex> lock(sModulesMutex);
-    if (sSymbolOwner.count(name)) {
+    if (sSymbolOwner.contains(name)) {
         sPendingErase.push_back(name);
         return true;
     }
@@ -1201,7 +1201,7 @@ llvm::Error defineAbsoluteSymbol(std::string_view Name, void* Addr) {
     }
     const std::lock_guard<std::mutex> lock(sModulesMutex);
     const std::string name(Name);
-    if (sSymbolOwner.count(name)) {
+    if (sSymbolOwner.contains(name)) {
         sPendingErase.push_back(name);
         flushPendingErasures();
     }

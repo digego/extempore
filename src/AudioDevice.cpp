@@ -33,7 +33,7 @@
  *
  */
 
-#include <time.h>
+#include <algorithm>
 #include <iostream>
 #include <cstring>
 #include <cerrno>
@@ -234,7 +234,7 @@ void* audioCallbackMT(void* Args) {
         }
         sMtWorkComplete.release(1);
     }
-    return 0;
+    return nullptr;
 }
 
 void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
@@ -565,7 +565,7 @@ void FileAudioDriver::run() {
         }
         AudioDevice::REALTIME = getRealTime();
         UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
-        std::fill(m_outBuf.begin(), m_outBuf.end(), 0.0f);
+        std::ranges::fill(m_outBuf, 0.0f);
         m_dspSeen = m_dspSeen || AudioDevice::I()->getDspState()->closure != nullptr;
         AudioDevice::I()->renderFrames(m_inBuf.empty() ? nullptr : m_inBuf.data(), m_outBuf.data(),
                                        frames);

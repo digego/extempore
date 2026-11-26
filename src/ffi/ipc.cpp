@@ -69,7 +69,7 @@ static bool sendExpr(const std::string& Name, std::string&& Expr) {
 static pointer newSchemeProcess(scheme* Scheme, pointer Args) {
     const std::string proc_name(argString(Scheme, Args, 1));
     const int port = int(argInt(Scheme, Args, 2));
-    SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
+    SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, false);
     // A failed start means another process holds the port.
     if (!sp->start()) {
         delete sp;

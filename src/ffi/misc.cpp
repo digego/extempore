@@ -402,7 +402,7 @@ static pointer scmAddForeignFunc(scheme* sc, pointer Args) {
     return ffunc;
 }
 
-typedef std::pair<std::string, std::string> entry_type;
+using entry_type = std::pair<std::string, std::string>;
 // The codegen dictionary is written from whichever scheme process thread is
 // compiling, so every access takes the lock and copies out --- handing back a
 // pointer into the map would outlive the lock.

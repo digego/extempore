@@ -18,6 +18,7 @@
 #include <memory>
 #include <mutex>
 #include <random>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -680,17 +681,16 @@ s7_pointer toScheme(s7_scheme* S7, const Value& V) {
         return s7_make_string_with_length(S7, V.string.data(), s7_int(V.string.size()));
     case Value::Kind::ListValue: {
         s7_pointer result = s7_nil(S7);
-        for (auto it = V.list.rbegin(); it != V.list.rend(); ++it) {
-            result = s7_cons(S7, toScheme(S7, *it), result);
+        for (const auto& item : std::views::reverse(V.list)) {
+            result = s7_cons(S7, toScheme(S7, item), result);
         }
         return result;
     }
     case Value::Kind::DictValue: {
         s7_pointer result = s7_nil(S7);
-        for (auto it = V.dict.rbegin(); it != V.dict.rend(); ++it) {
-            s7_pointer key =
-                s7_make_string_with_length(S7, it->first.data(), s7_int(it->first.size()));
-            result = s7_cons(S7, s7_cons(S7, key, toScheme(S7, it->second)), result);
+        for (const auto& [name, value] : std::views::reverse(V.dict)) {
+            s7_pointer key = s7_make_string_with_length(S7, name.data(), s7_int(name.size()));
+            result = s7_cons(S7, s7_cons(S7, key, toScheme(S7, value)), result);
         }
         return result;
     }

@@ -71,7 +71,7 @@
 #include <vector>
 
 #ifndef _WIN32
-#include <signal.h>
+#include <csignal>
 #include <unistd.h>
 #else
 #undef min
@@ -260,7 +260,7 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
             }
         }
     }
-    std::sort(files.begin(), files.end());
+    std::ranges::sort(files);
     int status = 0;
     for (const auto& file : files) {
         std::ifstream in(file, std::ios::binary);
@@ -664,7 +664,7 @@ EXPORT int extempore_init(int argc, char** argv) {
     if (!session) {
         // every subcommand: a single process, no servers, no utility process
         auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name,
-                                                  primary_port, 0, settings.initexpr);
+                                                  primary_port, false, settings.initexpr);
         extemp::AudioDevice::startFileDriver();
         if (settings.exit_when_done) {
             std::thread([] {
@@ -679,14 +679,14 @@ EXPORT int extempore_init(int argc, char** argv) {
 
     // a session: utility + primary processes with server threads
     auto* utility =
-        new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
+        new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, false);
     if (!utility->start()) {
         extemp::log::error("the utility process failed to start");
         extemp::log::flush();
         exit(1);
     }
     auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port,
-                                              0, settings.initexpr);
+                                              false, settings.initexpr);
 
     // The default port being taken (usually by another extempore) costs only
     // the nREPL server; a port asked for by name is worth stopping for, and so

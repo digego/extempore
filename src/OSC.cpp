@@ -75,10 +75,10 @@ constexpr char SLIP_ESC_END = char(0334);  // ESC ESC_END means END data byte
 constexpr char SLIP_ESC_ESC = char(0335);  // ESC ESC_ESC means ESC data byte
 
 // for thread args (will be passed as void*)
-typedef struct scm_osc_pair {
+struct scm_osc_pair {
     extemp::SchemeProcess* scm_p;
     extemp::OSC* osc_p;
-} scm_osc_pair;
+};
 
 ///////////////////////////////////////////////
 //
@@ -680,9 +680,9 @@ pointer OSC::set_msg_include_netaddr(scheme* _sc, pointer args) {
     OSC* osc = osc_for_scheme(_sc);
 
     if (pair_car(args) == _sc->T) {
-        osc->msg_include_netaddr = 1;
+        osc->msg_include_netaddr = true;
     } else {
-        osc->msg_include_netaddr = 0;
+        osc->msg_include_netaddr = false;
     }
     return _sc->T;
 }

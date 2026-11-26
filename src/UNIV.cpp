@@ -54,8 +54,6 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <AppKit/AppKit.h>
 #include <mach-o/dyld.h>
-#else
-#include <time.h>
 #endif
 
 #ifdef _WIN32
@@ -500,7 +498,7 @@ struct dump_stack_frame {
 
 void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
                      bool stringquotes) {
-    if (val == 0) {
+    if (val == nullptr) {
         ss << "-ERROR BAD POINTER-";
         return;
     }

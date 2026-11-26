@@ -117,7 +117,7 @@ static std::string formatLLVMType(llvm::Type* Type) {
             if (dotPos != llvm::StringRef::npos) {
                 const llvm::StringRef suffix = name.substr(dotPos + 1);
                 const bool isNumericSuffix =
-                    !suffix.empty() && std::all_of(suffix.begin(), suffix.end(), ::isdigit);
+                    !suffix.empty() && std::ranges::all_of(suffix, ::isdigit);
                 if (isNumericSuffix) {
                     return "%" + name.substr(0, dotPos).str();
                 }
@@ -372,7 +372,7 @@ static pointer llvm_call_void_native(scheme* Scheme, pointer Args) {
             return Scheme->F;
         }
     }
-    auto p = reinterpret_cast<void (*)(void)>(addr);
+    auto p = reinterpret_cast<void (*)()>(addr);
     p();
     return Scheme->T;
 }
@@ -972,7 +972,7 @@ static long long llvm_emitcounter = 0;
 // Check if a symbol is an external library function (uses C calling convention).
 static bool isExternalLibFunction(const std::string& name) {
     const std::lock_guard<std::mutex> lock(sExternalLibFunctionNamesMutex);
-    return sExternalLibFunctionNames.find(name) != sExternalLibFunctionNames.end();
+    return sExternalLibFunctionNames.contains(name);
 }
 
 // Register a symbol as an external library function.
@@ -1098,7 +1098,8 @@ static llvm::Module* jitCompile(const std::string& irString) {
         // compilations can reference them. This handles both individual bind-lib
         // declarations (small IR) and AOT-cached .ll files (large IR).
         // We capture before optimization because LLVM may drop unused declarations.
-        const bool isBindLibDeclaration = (irString.find("declare") == 0 && irString.size() < 500);
+        const bool isBindLibDeclaration =
+            irString.starts_with("declare") && irString.size() < 500;
         {
             const std::lock_guard<std::mutex> lock(sPreambleMutex);
             for (const auto& func : mod->functions()) {
@@ -1106,7 +1107,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     continue;
 
                 const std::string name = func.getName().str();
-                if (sPreamble.funcDecls.count(name))
+                if (sPreamble.funcDecls.contains(name))
                     continue;
 
                 // For bind-lib declarations, register as external library function
@@ -1236,7 +1237,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 for (auto* structType : metadata->getIdentifiedStructTypes()) {
                     if (structType->hasName() && !structType->isOpaque()) {
                         const std::string name = structType->getName().str();
-                        if (sPreamble.types.count(name)) {
+                        if (sPreamble.types.contains(name)) {
                             continue;
                         }
 
@@ -1270,7 +1271,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                         continue;
 
                     const std::string name = func.getName().str();
-                    if (sPreamble.funcDecls.count(name)) {
+                    if (sPreamble.funcDecls.contains(name)) {
                         continue;
                     }
 
@@ -1282,7 +1283,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                         continue;
                     }
                     const std::string name = glob.getName().str();
-                    if (sPreamble.globals.count(name)) {
+                    if (sPreamble.globals.contains(name)) {
                         continue;
                     }
 
