@@ -104,6 +104,10 @@ class EXTThread {
     }
     int setPriority(int Priority, bool Realtime);
     int getPriority();  // doesn't say if it's realtime or not
+    // Gives the calling thread the realtime scheduling an audio thread needs
+    // (SCHED_RR, the time-constraint policy with a 10 ms period, or
+    // time-critical priority), and warns if the system won't allow it.
+    static bool makeCurrentRealtime();
 
     static EXTThread* activeThread() {
         return sm_current;

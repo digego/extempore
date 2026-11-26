@@ -61,59 +61,12 @@
 #include <cstdarg>
 #endif
 
-#ifdef __APPLE__
-#include <CoreAudio/HostTime.h>
-#include <mach/thread_act.h>
-#include <mach/thread_policy.h>
-#include <pthread.h>
-#endif
-
 #include <cstdlib>
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
 #include <atomic>
 #include <vector>
-
-// this functionality is duplicated in EXTThread::setPriority(), but
-// kep here to not mess with the MT audio stuff
-#ifdef __APPLE__
-int set_thread_realtime(thread_port_t threadport, float period, float computation,
-                        float constraint) {
-    struct thread_time_constraint_policy ttcpolicy;
-    int ret;
-
-    ttcpolicy.period = period;            // HZ/160
-    ttcpolicy.computation = computation;  // HZ/3300;
-    ttcpolicy.constraint = constraint;    // HZ/2200;
-    ttcpolicy.preemptible = 1;            // 1
-
-    if ((ret = thread_policy_set(threadport, THREAD_TIME_CONSTRAINT_POLICY,
-                                 (thread_policy_t)&ttcpolicy,
-                                 THREAD_TIME_CONSTRAINT_POLICY_COUNT)) != KERN_SUCCESS) {
-        extemp::log::warn(extemp::log::audio,
-                          "could not set realtime priority for the audio thread");
-        return 0;
-    }
-    return 1;
-}
-#elif __linux__
-// the arguments here on linux are a bit different to OSX, since the
-// semantics of a thread's "priority" are different
-int set_thread_realtime(pthread_t thread, int policy, int priority) {
-    int current_policy;  // currently we ignore this result
-    sched_param param;
-    pthread_getschedparam(thread, &current_policy, &param);
-    param.sched_priority = priority;
-    // policy should be SCHED_RR or SCHED_FIFO
-    const int res = pthread_setschedparam(thread, policy, &param);
-    if (res) {
-        extemp::log::warn(extemp::log::audio,
-                          "could not set realtime priority for the audio thread: {}", strerror(res));
-    }
-    return 1;
-}
-#endif
 
 // Tell the CPU to treat denormal floats as zero on the calling thread. A
 // filter or delay line decaying towards silence passes through denormal
@@ -219,17 +172,7 @@ static PaError initialisePortAudio() {
 void* audioCallbackMT(void* Args) {
     flush_denormals_to_zero();
     log::mark_realtime_thread();
-#ifdef __APPLE__
-    Float64 clockFrequency = AudioGetHostClockFrequency();
-    // set_thread_realtime(pthread_mach_thread_np(pthread_self()),
-    // sclockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
-    set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency * .01,
-                        clockFrequency * .007, clockFrequency * .007);
-#elif __linux__
-    set_thread_realtime(pthread_self(), SCHED_RR, 20);
-#elif _WIN32
-    SetThreadPriority(GetCurrentThread(), 15);  // 15 = THREAD_PRIORITY_TIME_CRITICAL
-#endif
+    EXTThread::makeCurrentRealtime();
     const unsigned idx = uintptr_t(Args);
     auto device(AudioDevice::I());
     // The wrapper, latency mode and buffers are fixed for the life of the
