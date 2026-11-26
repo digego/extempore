@@ -39,7 +39,6 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
-#include <regex>
 #include <string>
 #include <string_view>
 #include <sstream>
@@ -266,83 +265,6 @@ EXPORT unsigned char* base64_decode(const char* data, size_t input_length, size_
     }
 
     return decoded_data;
-}
-
-EXPORT bool rmatch(char* regex, const char* str) {
-    try {
-        const std::regex re(regex);
-        return std::regex_search(str, re);
-    } catch (const std::regex_error&) {
-        return false;
-    }
-}
-
-EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum) {
-    try {
-        std::string s(str);
-        const std::regex re(regex);
-        int64_t num = 0;
-        auto begin = std::sregex_iterator(s.begin(), s.end(), re);
-        auto end = std::sregex_iterator();
-        for (auto it = begin; it != end && num < maxnum; ++it) {
-            const std::string match = (*it)[0].str();
-            char* tmp = (char*)malloc(match.length() + 1);
-            strcpy(tmp, match.c_str());
-            results[num] = tmp;
-            num++;
-        }
-        return num;
-    } catch (const std::regex_error&) {
-        return 0;
-    }
-}
-
-EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b) {
-    // Callers in libs/core/adt.xtm allocate 2048-byte buffers for a and b.
-    // Bail rather than write past the buffer. A proper API with explicit
-    // capacity is tracked as a follow-up backlog task.
-    constexpr size_t kAssumedBufSize = 2048;
-    try {
-        const std::regex re(regex);
-        std::cmatch m;
-        if (!std::regex_search(str, m, re) || m.size() != 1)
-            return false;
-        const size_t range = static_cast<size_t>(m.position(0));
-        const size_t range2 = range + static_cast<size_t>(m.length(0));
-        const size_t length = strlen(str);
-        if (range >= kAssumedBufSize || (length - range2) >= kAssumedBufSize)
-            return false;
-        memcpy(a, str, range);
-        a[range] = '\0';
-        memcpy(b, str + range2, length - range2);
-        b[length - range2] = '\0';
-        return true;
-    } catch (const std::regex_error&) {
-        return false;
-    }
-}
-
-EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
-    // Callers (libs/core/adt.xtm) allocate a 4096-byte result buffer and read
-    // it directly, so always write a valid NUL-terminated string and never run
-    // past the buffer --- truncate rather than overflow. A capacity-aware API
-    // is tracked as a follow-up backlog task.
-    constexpr size_t kAssumedBufSize = 4096;
-    const char* out = str;  // fall back to the original on oversize / regex error
-    std::string res;
-    try {
-        const std::regex re(regex);
-        res = std::regex_replace(std::string(str), re, std::string(replacement),
-                                 std::regex_constants::format_first_only);
-        if (res.length() < kAssumedBufSize)
-            out = res.c_str();
-    } catch (const std::regex_error&) {  // NOLINT(bugprone-empty-catch)
-        // out stays pointed at str
-    }
-    const size_t n = strnlen(out, kAssumedBufSize - 1);
-    memcpy(result, out, n);
-    result[n] = '\0';
-    return result;
 }
 
 EXPORT const char* sys_sharedir() {

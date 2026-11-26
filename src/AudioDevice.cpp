@@ -38,10 +38,10 @@
 #include <cstring>
 #include <cerrno>
 #include <cinttypes>
-#include <regex>
 
 #include "AudioDevice.h"
 #include "Log.h"
+#include "Regex.h"
 #include "TaskScheduler.h"
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
@@ -685,27 +685,21 @@ AudioDevice::~AudioDevice() {
 }
 
 // --device / --indevice take a regex, but the user types it on a command
-// line: a pattern std::regex won't accept must not take the process down, so
-// fall back to a plain substring match.
+// line: a pattern which isn't a valid one is matched as plain text instead.
 static int findDevice(const std::string& Name) {
-    std::regex pattern;
-    bool usePattern = true;
-    try {
-        pattern = std::regex(Name);
-    } catch (const std::regex_error& e) {
+    const auto pattern = regex::compile(Name.c_str());
+    if (!pattern) {
         log::warn(log::audio, "'{}' is not a valid regex ({}); matching it as plain text", Name,
-                  e.what());
-        usePattern = false;
+                  pattern.error().message);
     }
     const int numDevices(Pa_GetDeviceCount());
     for (int i = 0; i < numDevices; ++i) {
-        const char* deviceName = Pa_GetDeviceInfo(i)->name;
-        if (usePattern) {
-            std::cmatch match;
-            if (std::regex_search(deviceName, match, pattern)) {
+        const std::string_view deviceName = Pa_GetDeviceInfo(i)->name;
+        if (pattern) {
+            if (regex::search(*pattern, regex::matchDataFor(*pattern), deviceName) > 0) {
                 return i;
             }
-        } else if (std::string_view(deviceName).contains(Name)) {
+        } else if (deviceName.contains(Name)) {
             return i;
         }
     }

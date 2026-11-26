@@ -102,6 +102,7 @@
 #include <ext/UdpSocket.h>
 #include <EXTClosureAddressTable.h>
 #include <EXTThread.h>
+#include <Regex.h>
 #include <UNIV.h>
 #include <SchemeFFI.h>
 #include <TaskScheduler.h>
@@ -1171,6 +1172,7 @@ static const std::pair<const char*, void*> kRuntimeSymbols[] = {
     {"unswap32f", (void*)&unswap32f},
     {"rsplit", (void*)&rsplit},
     {"rmatch", (void*)&rmatch},
+    {"rmatches", (void*)&rmatches},
     {"rreplace", (void*)&rreplace},
     {"r64value", (void*)&r64value},
     {"mk_double", (void*)&mk_double},

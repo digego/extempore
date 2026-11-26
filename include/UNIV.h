@@ -63,11 +63,6 @@ typedef struct s7_cell* pointer;
 
 extern "C" {
 
-EXPORT bool rmatch(char* regex, const char* str);
-EXPORT int64_t rmatches(char* regex, char* str, char** results,
-                        int64_t maxnum);  // struct regex_matched_buffer* result);
-EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b);
-EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result);
 EXPORT char* base64_encode(const unsigned char* data, size_t input_length, size_t* output_length);
 EXPORT unsigned char* base64_decode(const char* data, size_t input_length, size_t* output_length);
 EXPORT char* cname_encode(char* data, size_t input_length, size_t* output_length);

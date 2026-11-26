@@ -180,6 +180,14 @@ which reformatted it is in `.git-blame-ignore-revs`.
 `sys:mcjit-enabled` is gone. It has returned `#t` for as long as MCJIT, and then
 ORC, was the only JIT.
 
+The xtlang regex functions (`regex_match`, `regex_split`, `regex_replace`,
+`regex_replace_all` and `regex_matches`) and the `--device` and `--in-device`
+options now take PCRE patterns, as the Scheme `regex:` functions always have;
+they took `std::regex`'s ECMAScript ones. Ordinary patterns mean the same in
+both. In a replacement string `$1` is still the first group, but `$&` and `$$`
+are no longer special. A pattern which doesn't compile still matches nothing,
+and now a warning says why.
+
 ## v0.11.2
 
 A one-bug patch release, for a bug that made v0.11.0 and v0.11.1 close to
