@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -222,12 +223,8 @@ std::string newSessionId() {
     const std::lock_guard<std::mutex> lock(mutex);
     const std::uint64_t hi = rng();
     const std::uint64_t lo = rng();
-    char buf[40];
-    std::snprintf(buf, sizeof(buf), "%08x-%04x-4%03x-%04x-%012llx", unsigned(hi >> 32),
-                  unsigned((hi >> 16) & 0xffff), unsigned(hi & 0xfff),
-                  unsigned(0x8000 | ((lo >> 48) & 0x3fff)),
-                  static_cast<unsigned long long>(lo & 0xffffffffffffULL));
-    return buf;
+    return std::format("{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}", hi >> 32, (hi >> 16) & 0xffff,
+                       hi & 0xfff, 0x8000 | ((lo >> 48) & 0x3fff), lo & 0xffffffffffffULL);
 }
 
 }  // namespace

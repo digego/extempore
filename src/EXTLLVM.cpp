@@ -82,6 +82,7 @@
 #include "llvm/Target/TargetOptions.h"
 
 #include <bit>
+#include <charconv>
 #include <random>
 #include <fstream>
 #include <mutex>
@@ -224,7 +225,7 @@ EXPORT void* llvm_get_function_ptr(char* fname) {
 // again (two extitoa results in one expression alias each other).
 EXPORT char* extitoa(int64_t val) {
     static thread_local char buf[32];
-    snprintf(buf, sizeof(buf), "%" PRId64, val);
+    *std::to_chars(buf, buf + sizeof(buf) - 1, val).ptr = '\0';
     return buf;
 }
 

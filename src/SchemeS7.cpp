@@ -2,6 +2,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <format>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -655,9 +656,8 @@ pointer mk_foreign_func(scheme* sc, foreign_func f) {
     }
     // Not declared with FFI_DEF: no arity to enforce, and nothing but the
     // address to key the slot on.
-    char key[40];
-    snprintf(key, sizeof(key), "#<foreign %p>", reinterpret_cast<void*>(f));
-    return makeFFIFunction(sc, f, key, 0, 0, true);
+    return makeFFIFunction(sc, f, std::format("#<foreign {}>", reinterpret_cast<void*>(f)), 0, 0,
+                           true);
 }
 
 pointer mk_foreign_func_named(scheme* sc, foreign_func f, const char* name) {

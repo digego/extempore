@@ -85,6 +85,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -1050,8 +1051,7 @@ static std::string trimTrailingNewlines(std::string Text) {
 static llvm::Module* jitCompile(const std::string& irString) {
     using namespace llvm;
 
-    char modname[256];
-    snprintf(modname, sizeof(modname), "xtmmodule_%lld", ++llvm_emitcounter);
+    const std::string modname = std::format("xtmmodule_{}", ++llvm_emitcounter);
 
     Module* modulePtr = nullptr;
 

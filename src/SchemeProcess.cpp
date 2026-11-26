@@ -55,6 +55,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <format>
 #include <thread>
 #include <vector>
 
@@ -480,11 +481,8 @@ void* SchemeProcess::taskImpl() {
                             auto minutes(time / UNIV::MINUTE());
                             time -= minutes * UNIV::MINUTE();
                             auto seconds(time / UNIV::SECOND());
-                            char prompt[64];
-                            snprintf(prompt, sizeof(prompt),
-                                     "\n[extempore %.2u:%.2u:%.2u]: ", unsigned(hours % 100),
-                                     unsigned(minutes % 60), unsigned(seconds % 60));
-                            ss << prompt;
+                            ss << std::format("\n[extempore {:02}:{:02}:{:02}]: ", hours % 100,
+                                              minutes % 60, seconds % 60);
                         }
                         UNIV::printSchemeCell(m_scheme, ss, m_scheme->value);
                         if (write_reply) {
@@ -656,11 +654,8 @@ void* SchemeProcess::serverImpl() {
                     auto minutes(time / UNIV::MINUTE());
                     time -= minutes * UNIV::MINUTE();
                     auto seconds(time / UNIV::SECOND());
-                    char prompt[64];
-                    snprintf(prompt, sizeof(prompt),
-                             "[extempore %.2u:%.2u:%.2u]: ", unsigned(hours % 100),
-                             unsigned(minutes % 60), unsigned(seconds % 60));
-                    outString += prompt;
+                    outString += std::format("[extempore {:02}:{:02}:{:02}]: ", hours % 100,
+                                             minutes % 60, seconds % 60);
                 } else {
                     outString += "Welcome to extempore!";
                 }
@@ -698,11 +693,9 @@ void* SchemeProcess::serverImpl() {
                     std::string::size_type pos = 0;
                     for (auto end = client.buffer.find("\r\n", pos); end != std::string::npos;
                          pos = end + 2, end = client.buffer.find("\r\n", pos)) {
-                        char c[24];
-                        snprintf(c, sizeof(c), "%lld", static_cast<long long>(client.fd));
                         auto* s = new std::string(client.buffer.substr(pos, end - pos + 1));
-                        pushTask(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c,
-                                            SchemeTask::Type::REPL));
+                        pushTask(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s,
+                                            std::to_string(client.fd), SchemeTask::Type::REPL));
                     }
                     client.buffer.erase(0, pos);
                     if (client.buffer.size() > MAX_PENDING) [[unlikely]] {
