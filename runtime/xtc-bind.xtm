@@ -39,12 +39,12 @@
     (let* ((stub-type (xtc:codegen:get-closure-type-from-str closure-type))
            (scheme-stub-valid? #t)
            (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str closure-type))))
-           (ir (string-append "define dllexport ccc i8* "
-                              " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
+           (ir (string-append "define dllexport ccc ptr "
+                              " @" (string-append symname-string "_scheme(ptr %_sc, ptr %args) nounwind\n"
                                                   "{\nentry:\n"
                                                   (apply string-append
                                                          (map (lambda (t n idx)
-                                                                (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                                                (string-append n "_val = call ccc ptr @list_ref(ptr %_sc, i32 " (number->string idx) ",ptr %args)\n"
                                                                                (cond ((and (not (number? t))
                                                                                            (not (xtc:codegen:pointer? t)))
                                                                                       (set! scheme-stub-valid? #f)
@@ -54,60 +54,60 @@
                                                                                                    (xtc:codegen:void? t))))
                                                                                       (if (and (number? t)
                                                                                                (= t (+ *xtc:codegen:pointer* *xtc:codegen:si8*)))
-                                                                                          (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                                          (string-append n "_rt_check = call i32 @is_cptr_or_str(ptr " n "_val)\n"
                                                                                                          (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                         n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
-                                                                                          (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                                                         n " = call ccc ptr  @cptr_value(ptr " n "_val)\n")
+                                                                                          (string-append n "_rt_check = call i32 @is_cptr(ptr " n "_val)\n"
                                                                                                          (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                         "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
-                                                                                                         n " = bitcast i8* %ttv_" (number->string idx) " to " (xtc:codegen:get-type-str t) "\n")))
-                                                                                     ((= t *xtc:codegen:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                         "%ttv_" (number->string idx) " = call ccc ptr @cptr_value(ptr " n "_val)\n"
+                                                                                                         n " = bitcast ptr %ttv_" (number->string idx) " to " (xtc:codegen:get-ir-type t) "\n")))
+                                                                                     ((= t *xtc:codegen:fp64*) (string-append n "_rt_check = call i32 @is_real(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc double @r64value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc double @r64value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:fp32*) (string-append n "_rt_check = call i32 @is_real(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc float  @r32value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc float  @r32value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si64*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc i64  @i64value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui64*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc i64  @i64value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si32*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc i32  @i32value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui32*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc i32  @i32value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si16*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc i16  @i16value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui16*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              n " = call ccc i16  @i16value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si8*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                             n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                             n " = call ccc i8  @i8value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui8*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                             n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                             n " = call ccc i8  @i8value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:i1*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                             (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                            n " = call ccc i1  @i1value(i8* " n "_val)\n"))
-                                                                                     ((= t *xtc:codegen:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                                                            n " = call ccc i1  @i1value(ptr " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:char*) (string-append n "_rt_check = call i32 @is_string(ptr " n "_val)\n"
                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                              n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                                                                                                              n " = call ccc ptr  @string_value(ptr " n "_val)\n"))
                                                                                      (else (xtc:diagnostics:print-compiler-error "bad type in scheme stub")))))
                                                               (cdr stub-type)
                                                               (make-list-with-proc (length (cdr stub-type))
                                                                                    (lambda (i) (string-append "%arg_" (atom->string i))))
                                                               (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
                                                   (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                  "call ccc " (xtc:codegen:get-type-str (car stub-type)) " @" symname-string "(" ;; " %ff("
+                                                  "call ccc " (xtc:codegen:get-ir-type (car stub-type)) " @" symname-string "(" ;; " %ff("
 
                                                   (string-join
                                                    (map (lambda (t n)
-                                                          (string-append (xtc:codegen:get-type-str t) " " n))
+                                                          (string-append (xtc:codegen:get-ir-type t) " " n))
                                                         (cdr stub-type)
                                                         (make-list-with-proc (length (cdr stub-type))
                                                                              (lambda (i) (string-append "%arg_" (atom->string i))))) ", ")
@@ -121,24 +121,24 @@
                                                           ((or (not (number? t))
                                                                (not (or (xtc:codegen:number? t)
                                                                         (xtc:codegen:void? t))))
-                                                           (string-append "%tmpres = bitcast " (xtc:codegen:get-type-str t) " %result to i8*\n"
-                                                                          "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
-                                                          ((= t *xtc:codegen:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
-                                                          ((= t *xtc:codegen:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
-                                                          ((= t *xtc:codegen:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
-                                                          ((= t *xtc:codegen:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-                                                          ((= t *xtc:codegen:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-                                                          ((= t *xtc:codegen:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-                                                          ((= t *xtc:codegen:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-                                                          ((= t *xtc:codegen:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
-                                                          ((= t *xtc:codegen:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
-                                                          ((= t *xtc:codegen:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-                                                          ((= t *xtc:codegen:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-                                                          ((= t *xtc:codegen:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
-                                                          ((= t *xtc:codegen:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                                                           (string-append "%tmpres = bitcast " (xtc:codegen:get-ir-type t) " %result to ptr\n"
+                                                                          "%res = call ccc ptr @mk_cptr(ptr %_sc, ptr %tmpres)\n"))
+                                                          ((= t *xtc:codegen:void*) "%res = call ccc ptr @mk_i1(ptr %_sc, i1 1)\n") ;; don't do anything for void
+                                                          ((= t *xtc:codegen:fp64*) "%res = call ccc ptr @mk_double(ptr %_sc, double %result)\n")
+                                                          ((= t *xtc:codegen:fp32*) "%res = call ccc ptr @mk_float(ptr %_sc, float %result)\n")
+                                                          ((= t *xtc:codegen:si64*) "%res = call ccc ptr @mk_i64(ptr %_sc, i64 %result)\n")
+                                                          ((= t *xtc:codegen:ui64*) "%res = call ccc ptr @mk_i64(ptr %_sc, i64 %result)\n")
+                                                          ((= t *xtc:codegen:si32*) "%res = call ccc ptr @mk_i32(ptr %_sc, i32 %result)\n")
+                                                          ((= t *xtc:codegen:ui32*) "%res = call ccc ptr @mk_i32(ptr %_sc, i32 %result)\n")
+                                                          ((= t *xtc:codegen:si16*) "%res = call ccc ptr @mk_i16(ptr %_sc, i16 %result)\n")
+                                                          ((= t *xtc:codegen:ui16*) "%res = call ccc ptr @mk_i16(ptr %_sc, i16 %result)\n")
+                                                          ((= t *xtc:codegen:si8*) "%res = call ccc ptr @mk_i8(ptr %_sc, i8 %result)\n")
+                                                          ((= t *xtc:codegen:ui8*) "%res = call ccc ptr @mk_i8(ptr %_sc, i8 %result)\n")
+                                                          ((= t *xtc:codegen:i1*) "%res = call ccc ptr @mk_i1(ptr %_sc, i1 %result)\n")
+                                                          ((= t *xtc:codegen:char*) "%res = call ccc ptr @mk_string(ptr %_sc, ptr %result\n")
                                                           (else (xtc:diagnostics:print-compiler-error "return type error in scheme stub"))))
 
-                                                  "ret i8* %res\n"
+                                                  "ret ptr %res\n"
                                                   "}\n\n"))))
       (if scheme-stub-valid? ir #f))))
 
@@ -763,7 +763,7 @@
                               (let ((typelist (cons *xtc:codegen:tuple* (xtc:codegen:get-type-from-pretty-tuple ,(symbol->string type)
                                                                                                                 ,(symbol->string symbol)))))
                                 (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
-                                                                    (xtc:codegen:get-type-str typelist)))
+                                                                    (xtc:codegen:get-ir-type typelist)))
                                     (begin (xtc:cache:register-new-namedtype ,(symbol->string symbol) typelist ,docstring)
                                            (xtc:diagnostics:print-binding-details-to-log "DataType:" ',symbol ',type))
                                     (xtc:diagnostics:print-compiler-error "could not compile IR for type" ',type)))))
@@ -815,7 +815,7 @@
           (string-literal?
            `(begin
               (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                              " = dllexport global i8* zeroinitializer"))
+                                              " = dllexport global ptr zeroinitializer"))
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
               (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
@@ -835,7 +835,7 @@
            `(begin
               (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                               " = dllexport global "
-                                              ,(xtc:codegen:get-type-str t) " "
+                                              ,(xtc:codegen:get-ir-type t) " "
                                               ,(if (number? value)
                                                    ;; can we serialise the value straight into the
                                                    ;;  IR? (e.g. i32/i64/float/double)
@@ -867,7 +867,7 @@
                `(begin
                   (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                                   " = dllexport global "
-                                                  ,(xtc:codegen:get-type-str t)
+                                                  ,(xtc:codegen:get-ir-type t)
                                                   " zeroinitializer"))
                   (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
                   (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
@@ -890,8 +890,8 @@
                    `(begin
                       (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                                       " = dllexport global "
-                                                      ,(xtc:codegen:get-type-str t)
-                                                      "zeroinitializer"))
+                                                      ,(xtc:codegen:get-ir-type t)
+                                                      " zeroinitializer"))
                       (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
                       (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
                                                                 ,(symbol->string symbol)
@@ -912,7 +912,7 @@
                (string-append
                 "@" ,(symbol->string symbol)
                 " = dllexport global "
-                ,(xtc:codegen:get-type-str t) " zeroinitializer"))
+                ,(xtc:codegen:get-ir-type t) " zeroinitializer"))
               (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
               (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
                                                         ,(symbol->string symbol)
@@ -938,7 +938,7 @@
           (type-list (xtc:codegen:get-type-from-pretty-str type-str))
           (ds ,(if (null? docstring) "" (car docstring))))
      (llvm:compile-ir
-      (string-append "@" ,(symbol->string symname) " = external global " (xtc:codegen:get-type-str type-list)))
+      (string-append "@" ,(symbol->string symname) " = external global " (xtc:codegen:get-ir-type type-list)))
      (xtc:cache:register-new-globalvar ,(symbol->string symname) type-list ds)
      (xtc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
      (xtc:diagnostics:print-binding-details-to-log "bind-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
@@ -1085,7 +1085,7 @@ e.g.
 ;; unless the declaration says zeroext.
 (define xtc:bind:c-arg-type-str
   (lambda (type)
-    (let ((str (xtc:codegen:get-type-str type)))
+    (let ((str (xtc:codegen:get-ir-type type)))
       (if (string=? str "i1") "i1 zeroext" str))))
 
 ;; this was previously called __dynamic-bind
@@ -1103,7 +1103,7 @@ e.g.
                    (ir-string (string-append "declare "
                                              "cc " (atom->string calling-convention)
                                              " "
-                                             (xtc:codegen:get-type-str (car ctype))
+                                             (xtc:codegen:get-ir-type (car ctype))
                                              " @"
                                              (symbol->string symname)
                                              "("
@@ -1141,7 +1141,7 @@ e.g.
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
     `(begin
-       (if (llvm:compile-ir ,(string-append "%" namestr " = type " (xtc:codegen:get-type-str (xtc:codegen:get-type-from-pretty-str typestr namestr))))
+       (if (llvm:compile-ir ,(string-append "%" namestr " = type " (xtc:codegen:get-ir-type (xtc:codegen:get-type-from-pretty-str typestr namestr))))
            (xtc:cache:register-new-namedtype ,namestr
                                              ',(xtc:codegen:get-type-from-pretty-str typestr namestr)
                                              ,docstring)
@@ -1176,8 +1176,8 @@ e.g.
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
        ,(string->symbol (string-append "[" (symbol->string type) ",i8*]*")))
      (if (not (llvm:compile-ir
-               (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
-                              "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
+               (string-append "@" ,(symbol->string symname) "_var = external global [1 x ptr]\n\n"
+                              "@" ,(symbol->string symname) "_var_zone = external global [1 x ptr]\n\n")))
          (xtc:diagnostics:print-compiler-error "failed to compile IR in bind-lib-func" ,symname))
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
@@ -1220,7 +1220,7 @@ e.g.
           (ds ,(if (null? docstring) "" (car docstring))))
      (if (and (llvm:compile-ir
                (string-append "@" ,(symbol->string symname) " = external global "
-                              (xtc:codegen:get-type-str type-list)))
+                              (xtc:codegen:get-ir-type type-list)))
               (llvm:bind-symbol ,library ,(symbol->string symname)))
          (begin
            (xtc:cache:register-new-globalvar ,(symbol->string symname)
@@ -1426,7 +1426,7 @@ e.g.
              (if (regex:match? t ":")
                  (set! t (cadr (regex:type-split t ":"))))
              (let ((newname (string-append sym "_poly_" (cname-encode t))))
-               (if (llvm:compile-ir (string-append "%" newname " = type " (xtc:codegen:get-type-str (xtc:codegen:get-type-from-pretty-str t))))
+               (if (llvm:compile-ir (string-append "%" newname " = type " (xtc:codegen:get-ir-type (xtc:codegen:get-type-from-pretty-str t))))
                    (xtc:bind:compile-type-dataconstructors (string->symbol newname) t #f #t #t #t)
                    (xtc:diagnostics:print-compiler-error "failed to compile IR in xtc:bind:specialize-generictype" sym))))
            types)

@@ -2,61 +2,61 @@
 ;; TYPE DEFINITIONS
 
 ; Zone and closure variable table types (for ORC JIT symbol resolution)
-%mzone = type {i8*, i64, i64, i64, i8*, %mzone*}
-%clsvar = type {i8*, i32, i8*, %clsvar*}
+%mzone = type {ptr, i64, i64, i64, ptr, ptr}
+%clsvar = type {ptr, i32, ptr, ptr}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; EXTERNAL RUNTIME FUNCTION DECLARATIONS
 
 ; Closure address table functions (implemented in C++)
-declare %clsvar* @add_address_table(%mzone*, i8*, i32, i8*, i32, %clsvar*) nounwind
-declare %clsvar* @get_address_table(i8*, %clsvar*) nounwind
-declare i32 @get_address_offset(i64, %clsvar*) nounwind
-declare i1 @check_address_type(i64, %clsvar*, i8*) nounwind
-declare i1 @check_address_exists(i64, %clsvar*) nounwind
+declare ptr @add_address_table(ptr, ptr, i32, ptr, i32, ptr) nounwind
+declare ptr @get_address_table(ptr, ptr) nounwind
+declare i32 @get_address_offset(i64, ptr) nounwind
+declare i1 @check_address_type(i64, ptr, ptr) nounwind
+declare i1 @check_address_exists(i64, ptr) nounwind
 
 ; Zone memory management functions (implemented in C++)
-declare %mzone* @llvm_zone_callback_setup() nounwind
-declare %mzone* @llvm_pop_zone_stack() nounwind
-declare void @llvm_zone_destroy(%mzone*) nounwind
-declare void @llvm_zone_print(%mzone*) nounwind
-declare i8* @llvm_zone_malloc(%mzone*, i64) nounwind
-declare i8* @llvm_zone_malloc_from_current_zone(i64) nounwind
-declare i1 @llvm_ptr_in_zone(%mzone*, i8*) nounwind
-declare i1 @llvm_zone_copy_ptr(i8*, i8*) nounwind
-declare i64 @llvm_zone_ptr_size(i8*) nounwind
-declare i1 @llvm_ptr_in_current_zone(i8*) nounwind
-declare void @llvm_destroy_zone_after_delay(%mzone*, i64)
+declare ptr @llvm_zone_callback_setup() nounwind
+declare ptr @llvm_pop_zone_stack() nounwind
+declare void @llvm_zone_destroy(ptr) nounwind
+declare void @llvm_zone_print(ptr) nounwind
+declare ptr @llvm_zone_malloc(ptr, i64) nounwind
+declare ptr @llvm_zone_malloc_from_current_zone(i64) nounwind
+declare i1 @llvm_ptr_in_zone(ptr, ptr) nounwind
+declare i1 @llvm_zone_copy_ptr(ptr, ptr) nounwind
+declare i64 @llvm_zone_ptr_size(ptr) nounwind
+declare i1 @llvm_ptr_in_current_zone(ptr) nounwind
+declare void @llvm_destroy_zone_after_delay(ptr, i64)
 
 ; Scheme value constructor functions (implemented in C++)
 ; The narrow integers carry the C ABI's extension: without it the bits above
 ; the value are undefined, and C++ reads a true i1 as whatever byte it gets.
-declare i8* @mk_i64(i8*, i64)
-declare i8* @mk_i32(i8*, i32)
-declare i8* @mk_i16(i8*, i16 signext)
-declare i8* @mk_i8(i8*, i8 signext)
-declare i8* @mk_i1(i8*, i1 zeroext)
-declare i8* @mk_double(i8*, double)
-declare i8* @mk_float(i8*, float)
-declare i8* @mk_string(i8*, i8*)
-declare i8* @mk_cptr(i8*, i8*)
+declare ptr @mk_i64(ptr, i64)
+declare ptr @mk_i32(ptr, i32)
+declare ptr @mk_i16(ptr, i16 signext)
+declare ptr @mk_i8(ptr, i8 signext)
+declare ptr @mk_i1(ptr, i1 zeroext)
+declare ptr @mk_double(ptr, double)
+declare ptr @mk_float(ptr, float)
+declare ptr @mk_string(ptr, ptr)
+declare ptr @mk_cptr(ptr, ptr)
 
 ; Scheme value accessor functions (implemented in C++)
-declare i64 @i64value(i8*)
-declare i32 @i32value(i8*)
-declare i16 @i16value(i8*)
-declare i8 @i8value(i8*)
-declare i1 @i1value(i8*)
-declare double @r64value(i8*)
-declare float @r32value(i8*)
-declare i8* @string_value(i8*)
-declare i8* @cptr_value(i8*)
+declare i64 @i64value(ptr)
+declare i32 @i32value(ptr)
+declare i16 @i16value(ptr)
+declare i8 @i8value(ptr)
+declare i1 @i1value(ptr)
+declare double @r64value(ptr)
+declare float @r32value(ptr)
+declare ptr @string_value(ptr)
+declare ptr @cptr_value(ptr)
 
 ; Encoding/decoding utility functions (implemented in C++)
-declare i8* @base64_encode(i8*, i64, i64*) nounwind
-declare i8* @base64_decode(i8*, i64, i64*) nounwind
-declare i8* @cname_encode(i8*, i64, i64*) nounwind
-declare i8* @cname_decode(i8*, i64, i64*) nounwind
+declare ptr @base64_encode(ptr, i64, ptr) nounwind
+declare ptr @base64_decode(ptr, i64, ptr) nounwind
+declare ptr @cname_encode(ptr, i64, ptr) nounwind
+declare ptr @cname_decode(ptr, i64, ptr) nounwind
 
 ; Standard C library math functions
 declare i64 @llabs(i64) nounwind
@@ -65,37 +65,37 @@ declare float @tanf(float) nounwind
 declare float @tanhf(float) nounwind
 
 ; Standard C library file I/O functions
-declare i32 @remove(i8*) nounwind
+declare i32 @remove(ptr) nounwind
 
-declare i8* @list_ref(i8*, i32, i8*)
+declare ptr @list_ref(ptr, i32, ptr)
 
 ; System functions
-declare i8* @sys_sharedir() nounwind
-declare i8* @sys_slurp_file(i8*) nounwind
+declare ptr @sys_sharedir() nounwind
+declare ptr @sys_slurp_file(ptr) nounwind
 
 ; Standard C library functions
-declare i8* @malloc(i64) nounwind
-declare i8* @realloc(i8*, i64) nounwind
-declare void @free(i8*) nounwind
-declare i8* @memset(i8*, i32, i64) nounwind
-declare i8* @memcpy(i8*, i8*, i64) nounwind
-declare i32 @memcmp(i8*, i8*, i64) nounwind
+declare ptr @malloc(i64) nounwind
+declare ptr @realloc(ptr, i64) nounwind
+declare void @free(ptr) nounwind
+declare ptr @memset(ptr, i32, i64) nounwind
+declare ptr @memcpy(ptr, ptr, i64) nounwind
+declare i32 @memcmp(ptr, ptr, i64) nounwind
 declare i32 @putchar(i32) nounwind
-declare i64 @strlen(i8*) nounwind
-declare i8* @strcpy(i8*, i8*) nounwind
-declare i8* @strncpy(i8*, i8*, i64) nounwind
-declare i8* @strcat(i8*, i8*) nounwind
-declare i8* @strncat(i8*, i8*, i64) nounwind
-declare i32 @strcmp(i8*, i8*) nounwind
-declare i32 @strncmp(i8*, i8*, i64) nounwind
-declare i8* @strchr(i8*, i32) nounwind
-declare i8* @strstr(i8*, i8*) nounwind
+declare i64 @strlen(ptr) nounwind
+declare ptr @strcpy(ptr, ptr) nounwind
+declare ptr @strncpy(ptr, ptr, i64) nounwind
+declare ptr @strcat(ptr, ptr) nounwind
+declare ptr @strncat(ptr, ptr, i64) nounwind
+declare i32 @strcmp(ptr, ptr) nounwind
+declare i32 @strncmp(ptr, ptr, i64) nounwind
+declare ptr @strchr(ptr, i32) nounwind
+declare ptr @strstr(ptr, ptr) nounwind
 
 ; Extempore runtime functions (implemented in C++)
-declare i1 @rmatch(i8*, i8*) nounwind
-declare i64 @rmatches(i8*, i8*, i8**, i64) nounwind
-declare i1 @rsplit(i8*, i8*, i8*, i8*, i64) nounwind
-declare i8* @rreplace(i8*, i8*, i8*, i8*, i64) nounwind
+declare i1 @rmatch(ptr, ptr) nounwind
+declare i64 @rmatches(ptr, ptr, ptr, i64) nounwind
+declare i1 @rsplit(ptr, ptr, ptr, ptr, i64) nounwind
+declare ptr @rreplace(ptr, ptr, ptr, ptr, i64) nounwind
 
 ; Random number generators (implemented in C++)
 declare double @xtc_randd() nounwind
@@ -115,39 +115,39 @@ declare float @atan2f(float, float) nounwind
 
 ; Additional Extempore runtime functions (implemented in C++)
 ; Note: Many zone/inline functions are defined in inline.ll or later in this file
-declare i8* @llvm_get_function_ptr(i8*) nounwind
-declare void @llvm_runtime_error(i64, i8*) nounwind
-declare void @llvm_print_pointer(i8*) nounwind
+declare ptr @llvm_get_function_ptr(ptr) nounwind
+declare void @llvm_runtime_error(i64, ptr) nounwind
+declare void @llvm_print_pointer(ptr) nounwind
 declare void @llvm_print_i32(i32) nounwind
 declare void @llvm_print_i64(i64) nounwind
 declare void @llvm_print_f32(float) nounwind
 declare void @llvm_print_f64(double) nounwind
-declare void @log_error(i8*) nounwind
-declare void @log_warn(i8*) nounwind
-declare void @log_info(i8*) nounwind
-declare void @log_debug(i8*) nounwind
-declare i8* @extitoa(i64) nounwind
-declare i64 @string_hash(i8*) nounwind
-declare void @llvm_schedule_callback(i64, i8*) nounwind
-declare void @llvm_send_udp(i8*, i32, i8*, i32) nounwind
+declare void @log_error(ptr) nounwind
+declare void @log_warn(ptr) nounwind
+declare void @log_info(ptr) nounwind
+declare void @log_debug(ptr) nounwind
+declare ptr @extitoa(i64) nounwind
+declare i64 @string_hash(ptr) nounwind
+declare void @llvm_schedule_callback(i64, ptr) nounwind
+declare void @llvm_send_udp(ptr, i32, ptr, i32) nounwind
 declare i64 @next_prime(i64) nounwind
-declare void @free_after_delay(i8*, double) nounwind
-declare i8* @llvm_disassemble(i8*, i32) nounwind
+declare void @free_after_delay(ptr, double) nounwind
+declare ptr @llvm_disassemble(ptr, i32) nounwind
 
 ; Thread functions
-declare i8* @thread_fork(i8*, i8*) nounwind
-declare void @thread_destroy(i8*) nounwind
-declare i32 @thread_join(i8*) nounwind
-declare i32 @thread_kill(i8*) nounwind
-declare i8* @thread_self() nounwind
-declare i32 @thread_equal_self(i8*) nounwind
-declare i32 @thread_equal(i8*, i8*) nounwind
+declare ptr @thread_fork(ptr, ptr) nounwind
+declare void @thread_destroy(ptr) nounwind
+declare i32 @thread_join(ptr) nounwind
+declare i32 @thread_kill(ptr) nounwind
+declare ptr @thread_self() nounwind
+declare i32 @thread_equal_self(ptr) nounwind
+declare i32 @thread_equal(ptr, ptr) nounwind
 declare i64 @thread_sleep(i64, i64) nounwind
-declare i8* @mutex_create() nounwind
-declare i32 @mutex_destroy(i8*) nounwind
-declare i32 @mutex_lock(i8*) nounwind
-declare i32 @mutex_unlock(i8*) nounwind
-declare i32 @mutex_trylock(i8*) nounwind
+declare ptr @mutex_create() nounwind
+declare i32 @mutex_destroy(ptr) nounwind
+declare i32 @mutex_lock(ptr) nounwind
+declare i32 @mutex_unlock(ptr) nounwind
+declare i32 @mutex_trylock(ptr) nounwind
 
 ; Clock functions
 declare double @clock_clock() nounwind
@@ -169,8 +169,8 @@ declare i32 @unswap32i(i32) nounwind
 declare i32 @register_for_window_events() nounwind
 
 ; 16-byte aligned memory
-declare i8* @malloc16(i64) nounwind
-declare void @free16(i8*) nounwind
+declare ptr @malloc16(i64) nounwind
+declare void @free16(ptr) nounwind
 
 ; Standard C library - math
 declare double @acos(double) nounwind
@@ -196,7 +196,7 @@ declare double @fmod(double, double) nounwind
 declare double @hypot(double, double) nounwind
 declare double @lgamma(double) nounwind
 declare double @log1p(double) nounwind
-declare double @nan(i8*) nounwind
+declare double @nan(ptr) nounwind
 declare double @nextafter(double, double) nounwind
 declare double @remainder(double, double) nounwind
 declare double @scalbn(double, i32) nounwind
@@ -221,7 +221,7 @@ declare float @hypotf(float, float) nounwind
 declare float @lgammaf(float) nounwind
 declare float @log1pf(float) nounwind
 declare float @log2f(float) nounwind
-declare float @nanf(i8*) nounwind
+declare float @nanf(ptr) nounwind
 declare float @nextafterf(float, float) nounwind
 declare float @remainderf(float, float) nounwind
 declare float @scalbnf(float, i32) nounwind
@@ -233,56 +233,56 @@ declare i64 @llround(double) nounwind
 declare i64 @llroundf(float) nounwind
 
 ; Standard C library - string/memory
-declare i8* @strdup(i8*) nounwind
-declare i8* @strrchr(i8*, i32) nounwind
-declare i8* @strpbrk(i8*, i8*) nounwind
-declare i8* @strtok(i8*, i8*) nounwind
-declare i8* @strerror(i32) nounwind
-declare i64 @strcspn(i8*, i8*) nounwind
-declare i64 @strspn(i8*, i8*) nounwind
-declare i8* @memmove(i8*, i8*, i64) nounwind
-declare i8* @memchr(i8*, i32, i64) nounwind
+declare ptr @strdup(ptr) nounwind
+declare ptr @strrchr(ptr, i32) nounwind
+declare ptr @strpbrk(ptr, ptr) nounwind
+declare ptr @strtok(ptr, ptr) nounwind
+declare ptr @strerror(i32) nounwind
+declare i64 @strcspn(ptr, ptr) nounwind
+declare i64 @strspn(ptr, ptr) nounwind
+declare ptr @memmove(ptr, ptr, i64) nounwind
+declare ptr @memchr(ptr, i32, i64) nounwind
 
 ; Standard C library - conversion
-declare double @atof(i8*) nounwind
-declare i32 @atoi(i8*) nounwind
-declare i64 @atol(i8*) nounwind
+declare double @atof(ptr) nounwind
+declare i32 @atoi(ptr) nounwind
+declare i64 @atol(ptr) nounwind
 
 ; Standard C library - file I/O
-declare i8* @fopen(i8*, i8*) nounwind
-declare i32 @fclose(i8*) nounwind
-declare i64 @fread(i8*, i64, i64, i8*) nounwind
-declare i64 @fwrite(i8*, i64, i64, i8*) nounwind
-declare i8* @fgets(i8*, i32, i8*) nounwind
-declare i32 @fputc(i32, i8*) nounwind
-declare i32 @fputs(i8*, i8*) nounwind
-declare i32 @fgetc(i8*) nounwind
-declare i32 @feof(i8*) nounwind
-declare i32 @ferror(i8*) nounwind
-declare i32 @fflush(i8*) nounwind
-declare i32 @fseek(i8*, i64, i32) nounwind
-declare i64 @ftell(i8*) nounwind
-declare void @rewind(i8*) nounwind
-declare i32 @fileno(i8*) nounwind
+declare ptr @fopen(ptr, ptr) nounwind
+declare i32 @fclose(ptr) nounwind
+declare i64 @fread(ptr, i64, i64, ptr) nounwind
+declare i64 @fwrite(ptr, i64, i64, ptr) nounwind
+declare ptr @fgets(ptr, i32, ptr) nounwind
+declare i32 @fputc(i32, ptr) nounwind
+declare i32 @fputs(ptr, ptr) nounwind
+declare i32 @fgetc(ptr) nounwind
+declare i32 @feof(ptr) nounwind
+declare i32 @ferror(ptr) nounwind
+declare i32 @fflush(ptr) nounwind
+declare i32 @fseek(ptr, i64, i32) nounwind
+declare i64 @ftell(ptr) nounwind
+declare void @rewind(ptr) nounwind
+declare i32 @fileno(ptr) nounwind
 
 ; Standard C library - process/system
 declare void @abort() nounwind
 declare void @exit(i32) nounwind
-declare i32 @system(i8*) nounwind
-declare i8* @getenv(i8*) nounwind
-declare i32 @setenv(i8*, i8*, i32) nounwind
+declare i32 @system(ptr) nounwind
+declare ptr @getenv(ptr) nounwind
+declare i32 @setenv(ptr, ptr, i32) nounwind
 declare i32 @raise(i32) nounwind
 declare i32 @rand() nounwind
-declare i8* @calloc(i64, i64) nounwind
-declare i8* @dlsym(i8*, i8*) nounwind
-declare i32 @puts(i8*) nounwind
+declare ptr @calloc(i64, i64) nounwind
+declare ptr @dlsym(ptr, ptr) nounwind
+declare i32 @puts(ptr) nounwind
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SCHEME STUFF
 
-define private i8* @impc_null() nounwind alwaysinline
+define private ptr @impc_null() nounwind alwaysinline
 {
-ret i8* null
+ret ptr null
 }
 
 define private i1 @impc_true() nounwind alwaysinline
@@ -303,15 +303,15 @@ ret i1 0
 ;; single-writer, single-reader ring buffer: the writer fills a slot and then
 ;; stores the index, and a reader which loads that index sees the slot filled.
 
-define private i64 @atomic_load_i64(i64* %p) nounwind alwaysinline
+define private i64 @atomic_load_i64(ptr %p) nounwind alwaysinline
 {
-%v = load atomic i64, i64* %p acquire, align 8
+%v = load atomic i64, ptr %p acquire, align 8
 ret i64 %v
 }
 
-define private void @atomic_store_i64(i64* %p, i64 %v) nounwind alwaysinline
+define private void @atomic_store_i64(ptr %p, i64 %v) nounwind alwaysinline
 {
-store atomic i64 %v, i64* %p release, align 8
+store atomic i64 %v, ptr %p release, align 8
 ret void
 }
 
@@ -742,84 +742,84 @@ entry:
 ret double %return
 }
 
-define private i64 @ptrtoi64(i8* %a) alwaysinline
+define private i64 @ptrtoi64(ptr %a) alwaysinline
 {
 entry:
-%return = ptrtoint i8* %a to i64
+%return = ptrtoint ptr %a to i64
 ret i64 %return
 }
 
-define private i8* @i64toptr(i64 %a) alwaysinline
+define private ptr @i64toptr(i64 %a) alwaysinline
 {
 entry:
-%return = inttoptr i64 %a to i8*
-ret i8* %return
+%return = inttoptr i64 %a to ptr
+ret ptr %return
 }
 
-define private i32 @ptrtoi32(i8* %a) alwaysinline
+define private i32 @ptrtoi32(ptr %a) alwaysinline
 {
 entry:
-%return = ptrtoint i8* %a to i32
+%return = ptrtoint ptr %a to i32
 ret i32 %return
 }
 
-define private i16 @ptrtoi16(i8* %a) alwaysinline
+define private i16 @ptrtoi16(ptr %a) alwaysinline
 {
 entry:
-%return = ptrtoint i8* %a to i16
+%return = ptrtoint ptr %a to i16
 ret i16 %return
 }
 
-define private i8* @i32toptr(i32 %a) alwaysinline
+define private ptr @i32toptr(i32 %a) alwaysinline
 {
-%return = inttoptr i32 %a to i8*
-ret i8* %return
+%return = inttoptr i32 %a to ptr
+ret ptr %return
 }
 
-define private i8* @i16toptr(i16 %a) alwaysinline
+define private ptr @i16toptr(i16 %a) alwaysinline
 {
-%return = inttoptr i16 %a to i8*
-ret i8* %return
+%return = inttoptr i16 %a to ptr
+ret ptr %return
 }
 
 ; Portable 80-bit extended precision to double conversion
 ; Works on both x86_64 and ARM64 by manually parsing IEEE 754 extended format
 ; The 80-bit format is: 1 sign bit, 15 exponent bits, 64 mantissa bits (explicit integer bit)
 ; Input is big-endian (as used in AIFF files)
-declare double @fp80_to_double_portable(i8*) nounwind
+declare double @fp80_to_double_portable(ptr) nounwind
 
-define private double @fp80ptrtod(i8* %fp80ptr)
+define private double @fp80ptrtod(ptr %fp80ptr)
 {
 entry:
-%result = call double @fp80_to_double_portable(i8* %fp80ptr)
+%result = call double @fp80_to_double_portable(ptr %fp80ptr)
 ret double %result
 }
 
-declare i32 @printf(i8* noalias nocapture, ...)
-declare i32 @sprintf(i8*, i8* noalias nocapture, ...)
-declare i32 @sscanf(i8*, i8* noalias nocapture, ...)
-declare i32 @fprintf(i8*, i8* noalias nocapture, ...)
-declare i32 @fscanf(i8*, i8* noalias nocapture, ...)
+declare i32 @printf(ptr noalias nocapture, ...)
+declare i32 @sprintf(ptr, ptr noalias nocapture, ...)
+declare i32 @sscanf(ptr, ptr noalias nocapture, ...)
+declare i32 @fprintf(ptr, ptr noalias nocapture, ...)
+declare i32 @fscanf(ptr, ptr noalias nocapture, ...)
 
 ;; scheme helpers
 
-declare i32 @is_string(i8*) nounwind
-declare i32 @is_real(i8*) nounwind
-declare i32 @is_cptr(i8*) nounwind
-declare i32 @is_cptr_or_str(i8*) nounwind
+declare i32 @is_string(ptr) nounwind
+declare i32 @is_real(ptr) nounwind
+declare i32 @is_cptr(ptr) nounwind
+declare i32 @is_cptr_or_str(ptr) nounwind
 
-define private void @llvm_zone_ptr_set_size(i8* %zone, i64 %size) nounwind alwaysinline
+define private void @llvm_zone_ptr_set_size(ptr %zone, i64 %size) nounwind alwaysinline
 {
-%ptr = bitcast i8* %zone to i64*
-%size_ptr = getelementptr i64, i64* %ptr, i32 -1
-store i64 %size, i64* %size_ptr
+%ptr = bitcast ptr %zone to ptr
+%size_ptr = getelementptr i64, ptr %ptr, i32 -1
+store i64 %size, ptr %size_ptr
 ret void
 }
 
 @TIME = external global i64 ; extemp::UNIV::TIME
 define private i64 @llvm_now() nounwind alwaysinline
 {
-%res = load i64, i64* @TIME
+%res = load i64, ptr @TIME
 ret i64 %res
 }
 
@@ -834,57 +834,57 @@ ret void
 ;; ZONE MANAGEMENT INLINE FUNCTIONS
 ;; (merged from inline.ll)
 
-define private %clsvar* @new_address_table() nounwind alwaysinline
+define private ptr @new_address_table() nounwind alwaysinline
 {
-ret %clsvar* null
+ret ptr null
 }
 
-declare %mzone* @llvm_peek_zone_stack_extern() nounwind
-define private %mzone* @llvm_peek_zone_stack() nounwind alwaysinline "thunk"
+declare ptr @llvm_peek_zone_stack_extern() nounwind
+define private ptr @llvm_peek_zone_stack() nounwind alwaysinline "thunk"
 {
-%zone = call %mzone* @llvm_peek_zone_stack_extern()
-ret %mzone* %zone
+%zone = call ptr @llvm_peek_zone_stack_extern()
+ret ptr %zone
 }
 
-declare void @llvm_push_zone_stack_extern(%mzone*) nounwind
-define private void @llvm_push_zone_stack(%mzone* %zone) nounwind alwaysinline "thunk"
+declare void @llvm_push_zone_stack_extern(ptr) nounwind
+define private void @llvm_push_zone_stack(ptr %zone) nounwind alwaysinline "thunk"
 {
-call void @llvm_push_zone_stack_extern(%mzone* %zone)
+call void @llvm_push_zone_stack_extern(ptr %zone)
 ret void
 }
 
-declare %mzone* @llvm_zone_create_extern(i64) nounwind
-define private %mzone* @llvm_zone_create(i64 %size) nounwind alwaysinline "thunk"
+declare ptr @llvm_zone_create_extern(i64) nounwind
+define private ptr @llvm_zone_create(i64 %size) nounwind alwaysinline "thunk"
 {
-%zone = call %mzone* @llvm_zone_create_extern(i64 %size)
-ret %mzone* %zone
+%zone = call ptr @llvm_zone_create_extern(i64 %size)
+ret ptr %zone
 }
 
-define private void @llvm_zone_mark(%mzone* %zone) nounwind alwaysinline
+define private void @llvm_zone_mark(ptr %zone) nounwind alwaysinline
 {
-%offset_ptr = getelementptr inbounds %mzone, %mzone* %zone, i32 0, i32 1
-%offset_val = load i64, i64* %offset_ptr
-%mark_ptr = getelementptr %mzone, %mzone* %zone, i32 0, i32 2
-store i64 %offset_val, i64* %mark_ptr
+%offset_ptr = getelementptr inbounds %mzone, ptr %zone, i32 0, i32 1
+%offset_val = load i64, ptr %offset_ptr
+%mark_ptr = getelementptr %mzone, ptr %zone, i32 0, i32 2
+store i64 %offset_val, ptr %mark_ptr
 ret void
 }
 
-define private i64 @llvm_zone_mark_size(%mzone* %zone) nounwind alwaysinline
+define private i64 @llvm_zone_mark_size(ptr %zone) nounwind alwaysinline
 {
-%offset_ptr = getelementptr inbounds %mzone, %mzone* %zone, i32 0, i32 1
-%offset_val = load i64, i64* %offset_ptr
-%mark_ptr = getelementptr %mzone, %mzone* %zone, i32 0, i32 2
-%mark_val = load i64, i64* %mark_ptr
+%offset_ptr = getelementptr inbounds %mzone, ptr %zone, i32 0, i32 1
+%offset_val = load i64, ptr %offset_ptr
+%mark_ptr = getelementptr %mzone, ptr %zone, i32 0, i32 2
+%mark_val = load i64, ptr %mark_ptr
 %res = sub i64 %offset_val, %mark_val
 ret i64 %res
 }
 
-define private %mzone* @llvm_zone_reset(%mzone* %zone) nounwind alwaysinline
+define private ptr @llvm_zone_reset(ptr %zone) nounwind alwaysinline
 {
-%offset_ptr = getelementptr inbounds %mzone, %mzone* %zone, i32 0, i32 1
-store i64 0, i64* %offset_ptr
-ret %mzone* %zone
+%offset_ptr = getelementptr inbounds %mzone, ptr %zone, i32 0, i32 1
+store i64 0, ptr %offset_ptr
+ret ptr %zone
 }
 
-declare i32 @is_integer_extern(i8*)
-declare i32 @is_integer(i8*) nounwind
+declare i32 @is_integer_extern(ptr)
+declare i32 @is_integer(ptr) nounwind

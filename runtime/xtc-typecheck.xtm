@@ -542,7 +542,7 @@ xtlang's `let' syntax is the same as Scheme"
                (t3d (xtc:codegen:get-type-str t3c)))
           ;; (println 'newspec name basename t3c t3d)
           ;; (println 'compile:
-          (if (llvm:compile-ir (string-append "%" basename " = type " t3d))
+          (if (llvm:compile-ir (string-append "%" basename " = type " (xtc:codegen:ir-type t3d)))
               (begin
                 (xtc:cache:register-new-polytype name
                                                  basename
@@ -662,9 +662,9 @@ xtlang's `let' syntax is the same as Scheme"
       (emit "br label " n "_continue\n" os)
       (emit "\n" n1 "_false:\n" os)
       (emit name-str os)
-      (emit "call i32 (i8*, ...) @printf(i8* " (car name) ")\n" os)
-      (emit n "_errret = call ccc i8* @mk_i64(i8* %_sc, i64 0)\n" os)
-      (emit "ret i8* " n "_errret\n" os)
+      (emit "call i32 (ptr, ...) @printf(ptr " (car name) ")\n" os)
+      (emit n "_errret = call ccc ptr @mk_i64(ptr %_sc, i64 0)\n" os)
+      (emit "ret ptr " n "_errret\n" os)
       (emit "\n" n1 "_continue:\n" os)
       ;;(emit n " = call ccc double @r64value(i8* " n "_val)\n" os)
       (xtc:codegen:strip-space os))))

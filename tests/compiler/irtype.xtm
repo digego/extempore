@@ -1,0 +1,40 @@
+;;; tests/compiler/irtype.xtm -- the IR spelling of the compiler's type strings
+;;;
+;;; The compiler's own type strings carry what a pointer points to (i8*,
+;;; %String**); LLVM's pointers are opaque, so every one of them is `ptr` in
+;;; the IR. xtc:codegen:ir-type is where the one becomes the other.
+
+(sys:load "libs/core/test.xtm")
+
+;; a type with no pointer in it is spelt as it is
+(xtmtest-result (xtc:codegen:ir-type "i64") "i64" "scalar")
+(xtmtest-result (xtc:codegen:ir-type "%String") "%String" "named-type")
+(xtmtest-result (xtc:codegen:ir-type "<4 x float>") "<4 x float>" "vector")
+(xtmtest-result (xtc:codegen:ir-type "{i64, double}") "{i64, double}" "tuple")
+
+;; a pointer is ptr, whatever it points to and however deep
+(xtmtest-result (xtc:codegen:ir-type "i8*") "ptr" "pointer")
+(xtmtest-result (xtc:codegen:ir-type "%String**") "ptr" "pointer-to-pointer")
+(xtmtest-result (xtc:codegen:ir-type "[256 x i8]*") "ptr" "pointer-to-array")
+(xtmtest-result (xtc:codegen:ir-type "void ()*") "ptr" "function-pointer")
+(xtmtest-result (xtc:codegen:ir-type "{i8*, i8*, void (i8*, i8*)*}**") "ptr" "closure")
+
+;; a pointer inside an aggregate or a function type is rewritten in place
+(xtmtest-result (xtc:codegen:ir-type "{i8*, i8*, void (i8*, i8*)*}") "{ptr, ptr, ptr}" "closure-struct")
+(xtmtest-result (xtc:codegen:ir-type "{ void(i8*, %mzone*)*, i8*, %mzone*}") "{ptr, ptr, ptr}" "callback-struct")
+(xtmtest-result (xtc:codegen:ir-type "[1 x i8*]") "[1 x ptr]" "array-of-pointers")
+(xtmtest-result (xtc:codegen:ir-type "<4 x float*>") "<4 x ptr>" "vector-of-pointers")
+(xtmtest-result (xtc:codegen:ir-type "<{i8, i32*}>") "<{i8, ptr}>" "packed-struct")
+(xtmtest-result (xtc:codegen:ir-type "i1 (i8*, i8*)") "i1 (ptr, ptr)" "function-type")
+(xtmtest-result (xtc:codegen:ir-type "i8* (i8*, ...)") "ptr (ptr, ...)" "vararg-function-type")
+(xtmtest-result (xtc:codegen:ir-type "{i64,[4 x %Foo*],<2 x double>}") "{i64, [4 x ptr], <2 x double>}" "nested")
+(xtmtest-result (xtc:codegen:ir-type "{i8*, {i8*, [2 x i8*]}, i8* (i8*)*}") "{ptr, {ptr, [2 x ptr]}, ptr}" "nested-struct")
+
+;; what a pointer type points to: the type a load through it yields
+(xtmtest-result (xtc:codegen:ir-pointee "double*") "double" "pointee-scalar")
+(xtmtest-result (xtc:codegen:ir-pointee "%String**") "ptr" "pointee-pointer")
+(xtmtest-result (xtc:codegen:ir-pointee "{i64, i8*}*") "{i64, ptr}" "pointee-struct")
+
+;; and from a type in the compiler's numeric form
+(xtmtest-result (xtc:codegen:get-ir-type *xtc:codegen:si64*) "i64" "from-type-code")
+(xtmtest-result (xtc:codegen:get-ir-type (+ *xtc:codegen:si8* *xtc:codegen:pointer*)) "ptr" "from-pointer-type-code")

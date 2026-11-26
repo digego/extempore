@@ -37,69 +37,69 @@
 ;; available when this file is compiled, so we only define what's unique here.
 
 ;; DSP wrapper function pointer types
-%wt = type double (i8*, i8*, double, i64, i64, double*)
-%wts = type double (i8*, i8*, double*, i64, i64, double*)
-%wt_f = type float (i8*, i8*, float, i64, i64, float*)
-%wts_f = type float (i8*, i8*, float*, i64, i64, float*)
+%wt = type double (ptr, ptr, double, i64, i64, ptr)
+%wts = type double (ptr, ptr, ptr, i64, i64, ptr)
+%wt_f = type float (ptr, ptr, float, i64, i64, ptr)
+%wts_f = type float (ptr, ptr, ptr, i64, i64, ptr)
 
 ;; Double-precision sample DSP wrapper
-define dllexport double @imp_dsp_wrapper(i8* %_zonei8, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data)
+define dllexport double @imp_dsp_wrapper(ptr %_zonei8, ptr %closure, double %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast i8* %closure to { i8*, i8*, %wt* }*
-  %fPtr = getelementptr { i8*, i8*, %wt* }, { i8*, i8*, %wt* }* %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { i8*, i8*, %wt* }, { i8*, i8*, %wt* }* %closureVal, i32 0, i32 1
-  %f = load %wt*, %wt** %fPtr
-  %e = load i8*, i8** %ePtr
-  %result = tail call fastcc double %f(i8* %_zonei8, i8* %e, double %sample, i64 %time, i64 %channel, double* %data)
+  %closureVal = bitcast ptr %closure to ptr
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %f = load ptr, ptr %fPtr
+  %e = load ptr, ptr %ePtr
+  %result = tail call fastcc double %f(ptr %_zonei8, ptr %e, double %sample, i64 %time, i64 %channel, ptr %data)
   ret double %result
 }
 
 ;; Double-precision multi-channel sum DSP wrapper
-define dllexport double @imp_dsp_sum_wrapper(i8* %_zonei8, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data)
+define dllexport double @imp_dsp_sum_wrapper(ptr %_zonei8, ptr %closure, ptr %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast i8* %closure to { i8*, i8*, %wts* }*
-  %fPtr = getelementptr { i8*, i8*, %wts* }, { i8*, i8*, %wts* }* %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { i8*, i8*, %wts* }, { i8*, i8*, %wts* }* %closureVal, i32 0, i32 1
-  %f = load %wts*, %wts** %fPtr
-  %e = load i8*, i8** %ePtr
-  %result = tail call fastcc double %f(i8* %_zonei8, i8* %e, double* %sample, i64 %time, i64 %channel, double* %data)
+  %closureVal = bitcast ptr %closure to ptr
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %f = load ptr, ptr %fPtr
+  %e = load ptr, ptr %ePtr
+  %result = tail call fastcc double %f(ptr %_zonei8, ptr %e, ptr %sample, i64 %time, i64 %channel, ptr %data)
   ret double %result
 }
 
 ;; Single-precision sample DSP wrapper
-define dllexport float @imp_dspf_wrapper(i8* %_zonei8, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data)
+define dllexport float @imp_dspf_wrapper(ptr %_zonei8, ptr %closure, float %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast i8* %closure to { i8*, i8*, %wt_f* }*
-  %fPtr = getelementptr { i8*, i8*, %wt_f* }, { i8*, i8*, %wt_f* }* %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { i8*, i8*, %wt_f* }, { i8*, i8*, %wt_f* }* %closureVal, i32 0, i32 1
-  %f = load %wt_f*, %wt_f** %fPtr
-  %e = load i8*, i8** %ePtr
-  %result = tail call fastcc float %f(i8* %_zonei8, i8* %e, float %sample, i64 %time, i64 %channel, float* %data)
+  %closureVal = bitcast ptr %closure to ptr
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %f = load ptr, ptr %fPtr
+  %e = load ptr, ptr %ePtr
+  %result = tail call fastcc float %f(ptr %_zonei8, ptr %e, float %sample, i64 %time, i64 %channel, ptr %data)
   ret float %result
 }
 
 ;; Single-precision multi-channel sum DSP wrapper
-define dllexport float @imp_dspf_sum_wrapper(i8* %_zonei8, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data)
+define dllexport float @imp_dspf_sum_wrapper(ptr %_zonei8, ptr %closure, ptr %sample, i64 %time, i64 %channel, ptr %data)
 {
 entry:
-  %closureVal = bitcast i8* %closure to { i8*, i8*, %wts_f* }*
-  %fPtr = getelementptr { i8*, i8*, %wts_f* }, { i8*, i8*, %wts_f* }* %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { i8*, i8*, %wts_f* }, { i8*, i8*, %wts_f* }* %closureVal, i32 0, i32 1
-  %f = load %wts_f*, %wts_f** %fPtr
-  %e = load i8*, i8** %ePtr
-  %result = tail call fastcc float %f(i8* %_zonei8, i8* %e, float* %sample, i64 %time, i64 %channel, float* %data)
+  %closureVal = bitcast ptr %closure to ptr
+  %fPtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %f = load ptr, ptr %fPtr
+  %e = load ptr, ptr %ePtr
+  %result = tail call fastcc float %f(ptr %_zonei8, ptr %e, ptr %sample, i64 %time, i64 %channel, ptr %data)
   ret float %result
 }
 
 ;; Get the environment pointer from a closure
-define dllexport i8* @impc_get_env(i8* %impz, i8* %closure)
+define dllexport ptr @impc_get_env(ptr %impz, ptr %closure)
 {
 entry:
-  %closureVal = bitcast i8* %closure to { i8*, i8*, i8* }*
-  %ePtr = getelementptr { i8*, i8*, i8* }, { i8*, i8*, i8* }* %closureVal, i32 0, i32 1
-  %e = load i8*, i8** %ePtr
-  ret i8* %e
+  %closureVal = bitcast ptr %closure to ptr
+  %ePtr = getelementptr { ptr, ptr, ptr }, ptr %closureVal, i32 0, i32 1
+  %e = load ptr, ptr %ePtr
+  ret ptr %e
 }

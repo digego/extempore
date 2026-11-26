@@ -147,30 +147,29 @@
     (let* ((rettype (xtc:codegen:get-type-str (car stub-type)))
            (argtypes (cdr stub-type))
            (argnames (make-list-with-proc (length argtypes)
-                                          (lambda (i) (string-append "%arg_" (atom->string i)))))
-           (ftype (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")))
+                                          (lambda (i) (string-append "%arg_" (atom->string i))))))
       ;; zeroext: a C caller reads a returned bool as a whole byte
-      (string-append "define dllexport " cc " " (if (string=? rettype "i1") "zeroext " "") rettype " @" symname-string suffix "("
-                     (string-join (map (lambda (t n) (string-append (xtc:codegen:get-type-str t) " " n))
+      (string-append "define dllexport " cc " " (if (string=? rettype "i1") "zeroext " "") (xtc:codegen:ir-type rettype) " @" symname-string suffix "("
+                     (string-join (map (lambda (t n) (string-append (xtc:codegen:get-ir-type t) " " n))
                                        argtypes argnames)
                                   ",")
                      ") alwaysinline nounwind \n"
                      "{\nentry:\n"
-                     "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                     "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
-                     "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                     "%ptrvar = load i8*, i8** %ptr\n"
-                     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                     "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                     "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                     "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
-                     "%ff = load " ftype ", " ftype "* %fPtr\n"
-                     "%ee = load i8*, i8** %ePtr\n"
+                     "%_zone = call ccc ptr @llvm_peek_zone_stack()\n"
+                     "%_zonei8 = bitcast ptr %_zone to ptr\n"
+                     "%ptr = getelementptr [1 x ptr], ptr @" symname-string "_var, i32 0, i32 0\n"
+                     "%ptrvar = load ptr, ptr %ptr\n"
+                     "%closure_tmp = bitcast ptr %ptrvar to ptr\n"
+                     "%closure = load ptr, ptr %closure_tmp \n"
+                     "%fPtr = getelementptr " (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth closure-type--)) ", ptr %closure, i32 0, i32 2\n"
+                     "%ePtr = getelementptr " (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth closure-type--)) ", ptr %closure, i32 0, i32 1\n"
+                     "%ff = load ptr, ptr %fPtr\n"
+                     "%ee = load ptr, ptr %ePtr\n"
                      (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                     "call fastcc " rettype " %ff(i8* %_zonei8, i8* %ee"
-                     (apply string-append (map (lambda (t n) (string-append ", " (xtc:codegen:get-type-str t) " " n))
+                     "call fastcc " (xtc:codegen:ir-type rettype) " %ff(ptr %_zonei8, ptr %ee"
+                     (apply string-append (map (lambda (t n) (string-append ", " (xtc:codegen:get-ir-type t) " " n))
                                                argtypes argnames))
-                     ")\nret " rettype
+                     ")\nret " (xtc:codegen:ir-type rettype)
                      (if (xtc:codegen:void? (car stub-type)) "\n" " %result\n")
                      "}\n\n"))))
 
@@ -301,47 +300,46 @@
                               (llvm:erase-function (string-append symname-string "_setter"))
                               (llvm:erase-function (string-append symname-string "_maker"))))
                         #f))
-                 (maker-ir (string-append "define dllexport ccc " closure-type " @" symname-string "_maker"
-                                          "(i8* %_zonei8) nounwind {\nentry:\n"
-                                          ;; "%_zone = bitcast i8* %_zonei8 to %mzone*\n"
+                 (maker-ir (string-append "define dllexport ccc ptr @" symname-string "_maker"
+                                          "(ptr %_zonei8) nounwind {\nentry:\n"
+                                          ;; "%_zone = bitcast ptr %_zonei8 to ptr\n"
                                           ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                           ;; ;; new lines for impz
-                                          "%_zonei8Ptr = alloca i8*\n"
-                                          "store i8* %_zonei8, i8** %_zonei8Ptr\n"
+                                          "%_zonei8Ptr = alloca ptr\n"
+                                          "store ptr %_zonei8, ptr %_zonei8Ptr\n"
                                           ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                           fstr "}\n\n"))
                  (setter-ir (string-append (if compile-stub?
-                                               (string-append "@" symname-string "_var = dllexport global [1 x i8*] [ i8* null ]\n\n"
-                                                              "@" symname-string "_var_zone = dllexport global [1 x i8*] [ i8* null ]\n\n")
+                                               (string-append "@" symname-string "_var = dllexport global [1 x ptr] [ ptr null ]\n\n"
+                                                              "@" symname-string "_var_zone = dllexport global [1 x ptr] [ ptr null ]\n\n")
                                                "")
                                            "define dllexport ccc void @" (string-append symname-string "_setter")
                                            "() alwaysinline nounwind {\nentry:\n"
-                                           "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                           "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
-                                           "%oldzone1 = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var_zone, i32 0, i32 0\n"
-                                           "%oldzone2 = load i8*, i8** %oldzone1\n"
-                                           "%oldzone3 = bitcast i8* %oldzone2 to %mzone*\n"
-                                           "store i8* %_zonei8, i8** %oldzone1\n"
+                                           "%_zone = call ccc ptr @llvm_peek_zone_stack()\n"
+                                           "%_zonei8 = bitcast ptr %_zone to ptr\n"
+                                           "%oldzone1 = getelementptr [1 x ptr], ptr @" symname-string "_var_zone, i32 0, i32 0\n"
+                                           "%oldzone2 = load ptr, ptr %oldzone1\n"
+                                           "%oldzone3 = bitcast ptr %oldzone2 to ptr\n"
+                                           "store ptr %_zonei8, ptr %oldzone1\n"
                                            ; existing code
-                                           "%closure = call ccc " (cadr (xtc:codegen:ssa-temp))
-                                           " @" symname-string "_maker" "(i8* %_zonei8)\n"
-                                           "%ptr = bitcast " (cadr (xtc:codegen:ssa-temp)) " %closure to i8*\n"
-                                           "%varptr = bitcast [1 x i8*]* @" symname-string "_var to i8**\n"
-                                           "store i8* %ptr, i8** %varptr\n"
+                                           "%closure = call ccc ptr @" symname-string "_maker" "(ptr %_zonei8)\n"
+                                           "%ptr = bitcast ptr %closure to ptr\n"
+                                           "%varptr = bitcast ptr @" symname-string "_var to ptr\n"
+                                           "store ptr %ptr, ptr %varptr\n"
                                            ;; new code
                                            "; destroy oldzone if not null\n"
-                                           "%test = icmp ne %mzone* %oldzone3, null\n"
+                                           "%test = icmp ne ptr %oldzone3, null\n"
                                            "br i1 %test, label %then, label %cont\n"
-                                           ;"then:\ncall ccc void @llvm_zone_destroy(%mzone* %oldzone3)\nbr label %cont\n"
-                                           "then:\ncall ccc void @llvm_destroy_zone_after_delay(%mzone* %oldzone3, i64 441000)\nbr label %cont\n"
+                                           ;"then:\ncall ccc void @llvm_zone_destroy(ptr %oldzone3)\nbr label %cont\n"
+                                           "then:\ncall ccc void @llvm_destroy_zone_after_delay(ptr %oldzone3, i64 441000)\nbr label %cont\n"
                                            "cont:\n"
                                            "ret void\n}\n\n"))
                  (stub-type (xtc:codegen:get-closure-type-from-str closure-type))
-                 (getter-ir (string-append "define dllexport ccc i8* @" symname-string "_getter() alwaysinline nounwind {\n"
+                 (getter-ir (string-append "define dllexport ccc ptr @" symname-string "_getter() alwaysinline nounwind {\n"
                                            "entry:\n"
-                                           "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                           "%func = load i8*, i8** %ptr\n"
-                                           "ret i8* %func\n}\n\n"))
+                                           "%ptr = getelementptr [1 x ptr], ptr @" symname-string "_var, i32 0, i32 0\n"
+                                           "%func = load ptr, ptr %ptr\n"
+                                           "ret ptr %func\n}\n\n"))
                  (cb-struct-type (if (null? (cdr stub-type))
                                      '()
                                      (string-append ;"{void(i8*)*"
@@ -352,64 +350,61 @@
                                                     (string-append ", " (xtc:codegen:get-type-str a)))
                                                   (cddr stub-type)))
                                       "}*")))
-                 (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat, %mzone* %inzone) alwaysinline nounwind {\n"
+                 (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(ptr %dat, ptr %inzone) alwaysinline nounwind {\n"
                                                                                           "entry:\n"
                                                                                           (if (null? cb-struct-type)
-                                                                                              "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
-                                                                                              (string-append "%fstruct = bitcast i8* %dat to " cb-struct-type "\n"))
+                                                                                              "%fstruct = select i1 true, ptr %dat, ptr %dat\n"
+                                                                                              "%fstruct = bitcast ptr %dat to ptr\n")
                                                                                           (apply string-append (map (lambda (n t ap a)
-                                                                                                                      (string-append ap " = getelementptr " (xtc:codegen:strip-ptr-depth cb-struct-type) ", " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
-                                                                                                                                     a " = load " (xtc:codegen:get-type-str t) ", " (xtc:codegen:get-type-str t) "* " ap "\n"))
+                                                                                                                      (string-append ap " = getelementptr " (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth cb-struct-type)) ", ptr %fstruct, i32 0, i32 " (number->string n) "\n"
+                                                                                                                                     a " = load " (xtc:codegen:get-ir-type t) ", ptr " ap "\n"))
                                                                                                                     (make-list-with-proc (- (length stub-type) 1) (lambda (i) i)) ;(+ i 1)))
                                                                                                                     (cdr stub-type)
                                                                                                                     (make-list-with-proc (- (length stub-type) 1)
                                                                                                                                          (lambda (i) (string-append "%arg_p_" (atom->string i))))
                                                                                                                     (make-list-with-proc (- (length stub-type) 1)
                                                                                                                                          (lambda (i) (string-append "%arg_" (atom->string i))))))
-                                                                                          ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                                          ;"%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
-                                                                                          ;"%_zonei8 = bitcast %mzone* %_zone to i8*\n"
-                                                                                          "call ccc void @llvm_push_zone_stack(%mzone* %inzone)\n"
-                                                                                          "%_zonei8 = bitcast %mzone* %inzone to i8*\n"
-                                                                                          "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                                                          "%ptrvar = load i8*, i8** %ptr\n"
-                                                                                          "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                                                          "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                                                          "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                                                          "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
-                                                                                          "%ff = load "
-                                                                                          (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
-                                                                                          (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
-                                                                                          "* %fPtr\n"
-                                                                                          "%ee = load i8*, i8** %ePtr\n"
+                                                                                          ;"%_zone = call ccc ptr @llvm_peek_zone_stack()\n"
+                                                                                          ;"%_zone = call ccc ptr @llvm_zone_callback_setup()\n"
+                                                                                          ;"%_zonei8 = bitcast ptr %_zone to ptr\n"
+                                                                                          "call ccc void @llvm_push_zone_stack(ptr %inzone)\n"
+                                                                                          "%_zonei8 = bitcast ptr %inzone to ptr\n"
+                                                                                          "%ptr = getelementptr [1 x ptr], ptr @" symname-string "_var, i32 0, i32 0\n"
+                                                                                          "%ptrvar = load ptr, ptr %ptr\n"
+                                                                                          "%closure_tmp = bitcast ptr %ptrvar to ptr\n"
+                                                                                          "%closure = load ptr, ptr %closure_tmp \n"
+                                                                                          "%fPtr = getelementptr " (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth closure-type--)) ", ptr %closure, i32 0, i32 2\n"
+                                                                                          "%ePtr = getelementptr " (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth closure-type--)) ", ptr %closure, i32 0, i32 1\n"
+                                                                                          "%ff = load ptr, ptr %fPtr\n"
+                                                                                          "%ee = load ptr, ptr %ePtr\n"
                                                                                           (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                                                          "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
-                                                                                          ;;"call ccc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
+                                                                                          "call fastcc " (xtc:codegen:get-ir-type (car stub-type)) " %ff(ptr %_zonei8, ptr %ee"
+                                                                                          ;;"call ccc " (xtc:codegen:get-type-str (car stub-type)) " %ff(ptr %_zonei8, ptr %ee"
                                                                                           (apply string-append (map (lambda (t n)
                                                                                                                       (string-append ", "
-                                                                                                                                     (xtc:codegen:get-type-str t)
+                                                                                                                                     (xtc:codegen:get-ir-type t)
                                                                                                                                      " " n))
                                                                                                                     (cdr stub-type)
                                                                                                                     (make-list-with-proc (length (cdr stub-type))
                                                                                                                                          (lambda (i) (string-append "%arg_" (atom->string i))))))
                                                                                           ")\n"
-                                                                                          "%_nowoldzone = call ccc %mzone* @llvm_pop_zone_stack()\n"
-                                                                                          "call ccc void @llvm_zone_destroy(%mzone* %_nowoldzone)\n"
+                                                                                          "%_nowoldzone = call ccc ptr @llvm_pop_zone_stack()\n"
+                                                                                          "call ccc void @llvm_zone_destroy(ptr %_nowoldzone)\n"
                                                                                           "ret void\n"
                                                                                           "}\n\n")))
                  (scheme-stub-valid? #t)
-                 (scheme-stub-ir (string-append "define dllexport ccc i8* " ;(xtc:codegen:get-type-str (car stub-type))
-                                                " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
+                 (scheme-stub-ir (string-append "define dllexport ccc ptr " ;(xtc:codegen:get-type-str (car stub-type))
+                                                " @" (string-append symname-string "_scheme(ptr %_sc, ptr %args) nounwind\n"
                                                                     "{\nentry:\n"
-                                                                    "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                    "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
+                                                                    "%_zone = call ccc ptr @llvm_peek_zone_stack()\n"
+                                                                    "%_zonei8 = bitcast ptr %_zone to ptr\n"
 
                                                                     ;(begin (println 'aaaaa) "")
 
                                                                     (apply string-append
                                                                            (map (lambda (t n idx)
                                                                                   ;(println 't: t 'n: n 'idx: idx)
-                                                                                  (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                                                                  (string-append n "_val = call ccc ptr @list_ref(ptr %_sc, i32 " (number->string idx) ",ptr %args)\n"
                                                                                                  (cond ((and (not (number? t))
                                                                                                              (not (xtc:codegen:pointer? t)))
                                                                                                         (set! scheme-stub-valid? #f)
@@ -419,49 +414,49 @@
                                                                                                                      (xtc:codegen:void? t))))
                                                                                                         (if (and (number? t)
                                                                                                                  (= t (+ *xtc:codegen:pointer* *xtc:codegen:si8*)))
-                                                                                                            (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                                                            (string-append n "_rt_check = call i32 @is_cptr_or_str(ptr " n "_val)\n"
                                                                                                                            (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                           n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
-                                                                                                            (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                                                                           n " = call ccc ptr  @cptr_value(ptr " n "_val)\n")
+                                                                                                            (string-append n "_rt_check = call i32 @is_cptr(ptr " n "_val)\n"
                                                                                                                            (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                           "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
-                                                                                                                           n " = bitcast i8* %ttv_" (number->string idx) " to " (xtc:codegen:get-type-str t) "\n")))
-                                                                                                       ((= t *xtc:codegen:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                           "%ttv_" (number->string idx) " = call ccc ptr @cptr_value(ptr " n "_val)\n"
+                                                                                                                           n " = bitcast ptr %ttv_" (number->string idx) " to " (xtc:codegen:get-ir-type t) "\n")))
+                                                                                                       ((= t *xtc:codegen:fp64*) (string-append n "_rt_check = call i32 @is_real(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc double @r64value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc double @r64value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:fp32*) (string-append n "_rt_check = call i32 @is_real(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc float  @r32value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc float  @r32value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:si64*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc i64  @i64value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:ui64*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc i64  @i64value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:si32*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc i32  @i32value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:ui32*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc i32  @i32value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:si16*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc i16  @i16value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:ui16*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                                n " = call ccc i16  @i16value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:si8*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                               n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                               n " = call ccc i8  @i8value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:ui8*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                                (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                               n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                               n " = call ccc i8  @i8value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:i1*) (string-append n "_rt_check = call i32 @is_integer(ptr " n "_val)\n"
                                                                                                                                               (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                              n " = call ccc i1  @i1value(i8* " n "_val)\n"))
-                                                                                                       ((= t *xtc:codegen:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                                                                              n " = call ccc i1  @i1value(ptr " n "_val)\n"))
+                                                                                                       ((= t *xtc:codegen:char*) (string-append n "_rt_check = call i32 @is_string(ptr " n "_val)\n"
                                                                                                                                                 (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                                                                                n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                                                                                                                                n " = call ccc ptr  @string_value(ptr " n "_val)\n"))
                                                                                                        (else (xtc:diagnostics:print-compiler-error "bad type in scheme stub")))))
                                                                                 (cdr stub-type)
                                                                                 (make-list-with-proc (length (cdr stub-type))
@@ -470,23 +465,20 @@
 
                                                                     ;(begin (println 'bbbbb) "")
 
-                                                                    "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                                    "%ptrvar = load i8*, i8** %ptr\n"
-                                                                    "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                                    "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                                    "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                                    "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
-                                                                    "%ff = load "
-                                                                    (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
-                                                                    (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
-                                                                    "* %fPtr\n"
-                                                                    "%ee = load i8*, i8** %ePtr\n"
+                                                                    "%ptr = getelementptr [1 x ptr], ptr @" symname-string "_var, i32 0, i32 0\n"
+                                                                    "%ptrvar = load ptr, ptr %ptr\n"
+                                                                    "%closure_tmp = bitcast ptr %ptrvar to ptr\n"
+                                                                    "%closure = load ptr, ptr %closure_tmp \n"
+                                                                    "%fPtr = getelementptr " (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth closure-type--)) ", ptr %closure, i32 0, i32 2\n"
+                                                                    "%ePtr = getelementptr " (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth closure-type--)) ", ptr %closure, i32 0, i32 1\n"
+                                                                    "%ff = load ptr, ptr %fPtr\n"
+                                                                    "%ee = load ptr, ptr %ePtr\n"
                                                                     (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                                    "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
+                                                                    "call fastcc " (xtc:codegen:get-ir-type (car stub-type)) " %ff(ptr %_zonei8, ptr %ee"
 
                                                                     (apply string-append
                                                                            (map (lambda (t n)
-                                                                                  (string-append ", " (xtc:codegen:get-type-str t) " " n))
+                                                                                  (string-append ", " (xtc:codegen:get-ir-type t) " " n))
                                                                                 (cdr stub-type)
                                                                                 (make-list-with-proc (length (cdr stub-type))
                                                                                                      (lambda (i) (string-append "%arg_" (atom->string i))))))
@@ -502,24 +494,24 @@
                                                                             ((or (not (number? t))
                                                                                  (not (or (xtc:codegen:number? t)
                                                                                           (xtc:codegen:void? t))))
-                                                                             (string-append "%tmpres = bitcast " (xtc:codegen:get-type-str t) " %result to i8*\n"
-                                                                                            "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
-                                                                            ((= t *xtc:codegen:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
-                                                                            ((= t *xtc:codegen:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
-                                                                            ((= t *xtc:codegen:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
-                                                                            ((= t *xtc:codegen:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-                                                                            ((= t *xtc:codegen:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-                                                                            ((= t *xtc:codegen:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-                                                                            ((= t *xtc:codegen:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-                                                                            ((= t *xtc:codegen:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
-                                                                            ((= t *xtc:codegen:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
-                                                                            ((= t *xtc:codegen:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-                                                                            ((= t *xtc:codegen:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-                                                                            ((= t *xtc:codegen:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
-                                                                            ((= t *xtc:codegen:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                                                                             (string-append "%tmpres = bitcast " (xtc:codegen:get-ir-type t) " %result to ptr\n"
+                                                                                            "%res = call ccc ptr @mk_cptr(ptr %_sc, ptr %tmpres)\n"))
+                                                                            ((= t *xtc:codegen:void*) "%res = call ccc ptr @mk_i1(ptr %_sc, i1 1)\n") ;; don't do anything for void
+                                                                            ((= t *xtc:codegen:fp64*) "%res = call ccc ptr @mk_double(ptr %_sc, double %result)\n")
+                                                                            ((= t *xtc:codegen:fp32*) "%res = call ccc ptr @mk_float(ptr %_sc, float %result)\n")
+                                                                            ((= t *xtc:codegen:si64*) "%res = call ccc ptr @mk_i64(ptr %_sc, i64 %result)\n")
+                                                                            ((= t *xtc:codegen:ui64*) "%res = call ccc ptr @mk_i64(ptr %_sc, i64 %result)\n")
+                                                                            ((= t *xtc:codegen:si32*) "%res = call ccc ptr @mk_i32(ptr %_sc, i32 %result)\n")
+                                                                            ((= t *xtc:codegen:ui32*) "%res = call ccc ptr @mk_i32(ptr %_sc, i32 %result)\n")
+                                                                            ((= t *xtc:codegen:si16*) "%res = call ccc ptr @mk_i16(ptr %_sc, i16 %result)\n")
+                                                                            ((= t *xtc:codegen:ui16*) "%res = call ccc ptr @mk_i16(ptr %_sc, i16 %result)\n")
+                                                                            ((= t *xtc:codegen:si8*) "%res = call ccc ptr @mk_i8(ptr %_sc, i8 %result)\n")
+                                                                            ((= t *xtc:codegen:ui8*) "%res = call ccc ptr @mk_i8(ptr %_sc, i8 %result)\n")
+                                                                            ((= t *xtc:codegen:i1*) "%res = call ccc ptr @mk_i1(ptr %_sc, i1 %result)\n")
+                                                                            ((= t *xtc:codegen:char*) "%res = call ccc ptr @mk_string(ptr %_sc, ptr %result\n")
                                                                             (else (xtc:diagnostics:print-compiler-error "return type error in scheme stub"))))
 
-                                                                    "ret i8* %res\n"
+                                                                    "ret ptr %res\n"
                                                                     "}\n\n")))
                  (stub-ir (xtc:driver:emit-thunk-ir symname-string "" "fastcc"
                                                     stub-type closure-type closure-type--))

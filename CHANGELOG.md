@@ -75,6 +75,10 @@ machine. A sum carried from one iteration to the next (a dot product) is still
 scalar, since vectorising it would change the rounding. A true `i1` handed to
 a C function is now always 1, where it could arrive as any non-zero byte.
 
+The IR the compiler emits spells every pointer `ptr`, as LLVM itself has since
+17, where it wrote the typed pointers (`i8*`, `%String**`) that LLVM's parser
+still reads for old IR's sake.
+
 The FFTs are now written in xtlang, so kissfft is no longer a dependency. Load
 `libs/core/fft.xtm` instead of `libs/external/fft.xtm`: `fft_config`,
 `fftr_config`, `ifft_config`, `ifftr_config`, `fft` and `ifft` keep their

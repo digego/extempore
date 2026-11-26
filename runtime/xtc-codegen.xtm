@@ -97,6 +97,114 @@
   (lambda ()
     (sys:compile-ll "init.ll")))
 
+;; The IR spelling of a type string. LLVM's pointers are opaque: every one is
+;; `ptr`, whatever it points to. The compiler's own type strings keep their
+;; pointees (i8*, %String**, {i8*, i8*, void (i8*, i8*)*}*), which is how it
+;; knows what a load or a getelementptr yields, so a type goes through here on
+;; its way into IR and nowhere else.
+(define xtc:codegen:ir-type
+  (let ((cache (make-hashtable 256)))
+    (lambda (t)
+      (let ((len (string-length t)))
+        (cond ((= len 0) t)
+              ((char=? (string-ref t (- len 1)) #\*) "ptr")
+              ((not (char-position #\* t)) t)
+              ;; a struct, array or function type with a pointer inside it
+              (else (or (hashtable-ref cache t)
+                        (let ((ir (xtc:codegen:ir-type-rewrite t)))
+                          (hashtable-set! cache t ir)
+                          ir))))))))
+
+;; the IR spelling of a type in any of the compiler's forms
+(define xtc:codegen:get-ir-type
+  (lambda (type)
+    (xtc:codegen:ir-type (xtc:codegen:get-type-str type))))
+
+;; the IR spelling of what a pointer type string points to: the type a load
+;; through it yields, and the element type of a getelementptr on it
+(define xtc:codegen:ir-pointee
+  (lambda (ptr-type)
+    (xtc:codegen:ir-type (xtc:codegen:strip-ptr-depth ptr-type))))
+
+;; ir-type's slow path, a recursive descent over the type:
+;;   type  := base suffix*
+;;   base  := word | '{' types '}' | '<{' types '}>' | '[' N 'x' type ']' | '<' N 'x' type '>'
+;;   suffix := '*' | '(' types ')'
+;; A type with a `*` suffix is `ptr`, and what came before the star is dropped.
+(define xtc:codegen:ir-type-rewrite
+  (lambda (t)
+    (let ((len (string-length t))
+          (i 0))
+      (letrec ((peek (lambda () (if (< i len) (string-ref t i) #\null)))
+               (next! (lambda () (set! i (+ i 1))))
+               (skip-spaces! (lambda () (if (char=? (peek) #\space) (begin (next!) (skip-spaces!)))))
+               (expect! (lambda (c)
+                          (skip-spaces!)
+                          (if (char=? (peek) c)
+                              (next!)
+                              (xtc:diagnostics:print-compiler-error
+                               (string-append "malformed type (expected " (string c) ")") t))))
+               (word (lambda ()
+                       (let ((start i))
+                         (let loop ()
+                           (if (and (< i len) (not (memv (peek) '(#\space #\, #\( #\) #\{ #\} #\[ #\] #\< #\> #\*))))
+                               (begin (next!) (loop))))
+                         (substring t start i))))
+               ;; comma-separated types up to (not including) the closing char
+               (types (lambda (close)
+                        (skip-spaces!)
+                        (if (char=? (peek) close)
+                            '()
+                            (let loop ((acc (list (type))))
+                              (skip-spaces!)
+                              (if (char=? (peek) #\,)
+                                  (begin (next!) (loop (cons (type) acc)))
+                                  (reverse acc))))))
+               (struct (lambda ()
+                         (next!) ;; {
+                         (let ((elts (types #\})))
+                           (expect! #\})
+                           (string-append "{" (string-join elts ", ") "}"))))
+               (sized (lambda (open close)
+                        (next!) ;; [ or <
+                        (skip-spaces!)
+                        (let ((n (word)))
+                          (skip-spaces!)
+                          (next!) ;; x
+                          (let ((elt (type)))
+                            (expect! close)
+                            (string-append (string open) n " x " elt (string close))))))
+               (base (lambda ()
+                       (skip-spaces!)
+                       (let ((c (peek)))
+                         (cond ((char=? c #\{) (struct))
+                               ((char=? c #\[) (sized #\[ #\]))
+                               ((and (char=? c #\<) (< (+ i 1) len) (char=? (string-ref t (+ i 1)) #\{))
+                                (next!) ;; <
+                                (let ((s (struct)))
+                                  (expect! #\>)
+                                  (string-append "<" s ">")))
+                               ((char=? c #\<) (sized #\< #\>))
+                               (else (word))))))
+               (type (lambda ()
+                       (let loop ((ir (base)))
+                         (let ((mark i))
+                           (skip-spaces!)
+                           (cond ((char=? (peek) #\*)
+                                  (next!)
+                                  (loop "ptr"))
+                                 ((char=? (peek) #\()
+                                  (next!)
+                                  (let ((params (types #\))))
+                                    (expect! #\))
+                                    (loop (string-append ir " (" (string-join params ", ") ")"))))
+                                 (else (set! i mark) ir)))))))
+        (let ((ir (type)))
+          (skip-spaces!)
+          (if (< i len)
+              (xtc:diagnostics:print-compiler-error "malformed type (trailing text)" t))
+          ir)))))
+
 ;; GCHANGE
 ;; does not remove %b when returning base types (i.e. !head%b returns !head%b
 (define xtc:codegen:get-base-type
@@ -578,7 +686,7 @@
                ;; (println 'make-new-type: (string-append "%" name1 " = type " type))
                ;; (llvm:compile-ir (string-append "%" name1 " = type " type))
                (if (not *xtc:globals:suppress-ir-generation*)
-                   (if (llvm:compile-ir (string-append "%" name1 " = type " type))
+                   (if (llvm:compile-ir (string-append "%" name1 " = type " (xtc:codegen:ir-type type)))
                        (xtc:cache:register-new-namedtype name1 (xtc:codegen:get-type-from-str type) "")
                        (xtc:diagnostics:print-compiler-error "could not compile new type" (cons name type))))
                (if *xtc:codegen:get-type-callback-off*
@@ -1227,7 +1335,7 @@
         (if (> i 0) (emit ", " os))
         (let ((arg (list-ref args i)))
           ;(print 'arg: arg)
-          (emit (xtc:codegen:get-type-str (cdr arg)) os)
+          (emit (xtc:codegen:get-ir-type (cdr arg)) os)
           (if (car with-symbol?)
               (emit  " %" (symbol->string (car arg)) os))))
       (xtc:codegen:strip-space os))))
@@ -1237,19 +1345,19 @@
   (lambda (ast)
     (let* ((os (xtc:emit:new-buffer))
            (cnt 0))
-      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-            (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+            (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
             os)
       ;(emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
-      (emit (xtc:codegen:ssa-temp "string" "i8*") " = call i8* @llvm_zone_malloc(%mzone* "
+      (emit (xtc:codegen:ssa-temp "string" "i8*") " = call ptr @llvm_zone_malloc(ptr "
             (car (xtc:codegen:ssa-temp "zone")) ", i64 " (number->string (+ 1 (string-length ast))) ")\n" os)
       (define strname (car (xtc:codegen:ssa-temp)))
       (for-each (lambda (char)
                   (emit (string-append (xtc:codegen:ssa-temp "val" "i8*") " = "
-                                       "getelementptr i8, i8* " strname
+                                       "getelementptr i8, ptr " strname
                                        ", i32 " (number->string cnt) "\n") os)
                   (emit (string-append "store i8 " (number->string (char->integer char))
-                                       ", i8* " (car (xtc:codegen:ssa-temp)) "\n") os)
+                                       ", ptr " (car (xtc:codegen:ssa-temp)) "\n") os)
                   (set! cnt (+ cnt 1)))
                 (append (string->list ast) (list (integer->char 0))))
       (xtc:codegen:ssa-temp "string" (car (xtc:codegen:ssa-temp "string")) (cadr (xtc:codegen:ssa-temp "string")))
@@ -1263,7 +1371,6 @@
                          (regex:replace-all lgthstr1 "[\n]" "x") ;(if (string=? (sys:platform) "Windows") "xx" "x"))
                          lgthstr1))
            (lgth (number->string (+ (string-length lgthstr2) 1))) ;; unix & windows above just used to determine string length
-           (strtyp (string-append "[" lgth " x i8]*"))
            (strname (string-append "@gs" (if (string? *xtc:globals:global-module-name*) *xtc:globals:global-module-name* "")
                                    (if #f ;;(< (string-length ast) 1024)
                                        (cname-encode ast)
@@ -1279,7 +1386,7 @@
             (if #t ;; (>= (string-length ast) 1024)
                 (set! *xtc:codegen:gstrcnt* (+ *xtc:codegen:gstrcnt* 1))))
           (set! strsym (llvm:get-llvm-alias ast)))
-      (emit (string-append (xtc:codegen:ssa-temp "var" "i8*") " = bitcast " strtyp " " strsym " to i8*\n") os)
+      (emit (string-append (xtc:codegen:ssa-temp "var" "i8*") " = bitcast ptr " strsym " to ptr\n") os)
       (xtc:codegen:strip-space os))))
 
 
@@ -1303,51 +1410,51 @@
       (define closure-struct-str
         (string-append "{ i8*, i8*, " func-type-str "*}"))
 
-      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-            (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+            (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
             os2)
       ;; (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os2)
-      (emit "call void @llvm_zone_mark(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ")\n" os2)
+      (emit "call void @llvm_zone_mark(ptr " (car (xtc:codegen:ssa-temp "zone")) ")\n" os2)
       ;; malloc closure structure
       (emit "; malloc closure structure\n" os2)
       (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
-             (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call i8* @malloc("
+             (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call ptr @malloc("
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size closure-struct-str)) ")\n" os2))
             ((eq? (ast:closure-tag ast) '__make-closure-s)
              (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = alloca i8, "
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size closure-struct-str))
                    ", align 16\n" os2))
             (else
-             (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
-                   "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
+             (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call ptr @llvm_zone_malloc("
+                   "ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
                    (number->string (xtc:codegen:get-type-size closure-struct-str)) ")\n" os2)))
 
       (emit (xtc:codegen:ssa-temp "closure" (string-append closure-struct-str "*"))
-            " = bitcast i8* " (car (xtc:codegen:ssa-temp "clsptr"))
-            " to " closure-struct-str "*\n" os2)
+            " = bitcast ptr " (car (xtc:codegen:ssa-temp "clsptr"))
+            " to ptr\n" os2)
       ;; malloc evironment structure
       (emit "\n; malloc environment structure\n" os2)
       (define estruct (xtc:codegen:make-struct-str-env env))
       (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
-             (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call i8* @malloc("
+             (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call ptr @malloc("
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2))
             ((eq? (ast:closure-tag ast) '__make-closure-s)
              (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = alloca i8, "
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size estruct))
                    ", align 16\n" os2))
             (else
-             (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call i8* @llvm_zone_malloc("
-                   "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", i64 " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2)))
+             (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call ptr @llvm_zone_malloc("
+                   "ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2)))
       ;; Every field of the environment is a pointer, so it is addressed as an
       ;; array of pointers: a getelementptr through the struct type would spell
       ;; out the whole struct (every captured variable's type) once per
       ;; variable, which made the IR quadratic in the environment's size.
       (emit (xtc:codegen:ssa-temp "environment" "i8**")
-            " = bitcast i8* " (car (xtc:codegen:ssa-temp "envptr"))
-            " to i8**\n" os2)
+            " = bitcast ptr " (car (xtc:codegen:ssa-temp "envptr"))
+            " to ptr\n" os2)
       ;; make new closure_address_table
       (emit "\n; malloc closure address table\n" os2)
-      (emit (xtc:codegen:ssa-temp "addytable" "%clsvar*") " = call %clsvar* @new_address_table()\n" os2)
+      (emit (xtc:codegen:ssa-temp "addytable" "%clsvar*") " = call ptr @new_address_table()\n" os2)
       (define table (xtc:codegen:ssa-temp))
       (define ptridx 0)
       (dotimes (i (length env))
@@ -1364,19 +1471,19 @@
           (emit name-str os2)
           (emit type-str os2)
           (emit (xtc:codegen:ssa-temp "addytable" "%clsvar*")
-                " = call %clsvar* @add_address_table("
-                "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
-                (cadr name) " " (car name) ", "
+                " = call ptr @add_address_table("
+                "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
+                "ptr " (car name) ", "
                 "i32 " (number->string ptridx) ", "
-                (cadr type) " " (car type) ", "
+                "ptr " (car type) ", "
                 (cond ((eq? (ast:closure-tag ast) '__make-closure-h) "i32 1, ")
                       ((eq? (ast:closure-tag ast) '__make-closure-s) "i32 2, ")
                       (else "i32 3, "))
-                "%clsvar* " (car table) ")\n"
+                "ptr " (car table) ")\n"
                 os2)
           (set! table (xtc:codegen:ssa-temp))
           (set! ptridx (+ ptridx (/ (sys:pointer-size) 8))))) ; need it as bytes
-      (emit (xtc:codegen:ssa-temp "address-table" "i8*") " = bitcast %clsvar* " (car table) " to i8*\n" os2)
+      (emit (xtc:codegen:ssa-temp "address-table" "i8*") " = bitcast ptr " (car table) " to ptr\n" os2)
       ;; add data to environment structure
       (emit "; add data to environment\n" os1)
       (let loop ((es env) (i 0))
@@ -1388,52 +1495,52 @@
                                              (cdr e))))
               (let ((ptrtype (string-append (xtc:codegen:get-type-str (cdr e)) "*")))
                 (emit "; don't need to alloc for env var " (symbol->string (car e)) "\n" os1)
-                (emit (xtc:codegen:ssa-temp "tmp_envslot" "i8**") " = getelementptr i8*, i8** "
+                (emit (xtc:codegen:ssa-temp "tmp_envslot" "i8**") " = getelementptr ptr, ptr "
                       (car (xtc:codegen:ssa-temp "environment")) ", i32 " (number->string i) "\n" os1)
-                (emit (xtc:codegen:ssa-temp "tmp_envptr" (string-append ptrtype "*")) " = bitcast i8** "
-                      (car (xtc:codegen:ssa-temp "tmp_envslot")) " to " ptrtype "*\n" os1)
-                (emit "store " ptrtype " %" (symbol->string (car e)) "Ptr, "
-                      ptrtype "* " (car (xtc:codegen:ssa-temp "tmp_envptr")) "\n\n" os1))
+                (emit (xtc:codegen:ssa-temp "tmp_envptr" (string-append ptrtype "*")) " = bitcast ptr "
+                      (car (xtc:codegen:ssa-temp "tmp_envslot")) " to ptr\n" os1)
+                (emit "store ptr %" (symbol->string (car e)) "Ptr, "
+                      "ptr " (car (xtc:codegen:ssa-temp "tmp_envptr")) "\n\n" os1))
               (loop (cdr es) (+ i 1)))))
 
       (emit "\n" os1)
 
       ;; insert stuff into closure
       (emit "\n; insert table, function and environment into closure struct\n" os2)
-      (emit (xtc:codegen:ssa-temp "closure.table" "i8**") " = getelementptr " closure-struct-str ", " closure-struct-str "* "
+      (emit (xtc:codegen:ssa-temp "closure.table" "i8**") " = getelementptr " (xtc:codegen:ir-type closure-struct-str) ", ptr "
             (car (xtc:codegen:ssa-temp "closure")) ", i32 0, i32 0\n" os2)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "address-table")) ", i8** "
+      (emit "store ptr " (car (xtc:codegen:ssa-temp "address-table")) ", ptr "
             (car (xtc:codegen:ssa-temp)) "\n" os2)
-      (emit (xtc:codegen:ssa-temp "closure.env" "i8**") " = getelementptr " closure-struct-str ", " closure-struct-str "* "
+      (emit (xtc:codegen:ssa-temp "closure.env" "i8**") " = getelementptr " (xtc:codegen:ir-type closure-struct-str) ", ptr "
             (car (xtc:codegen:ssa-temp "closure")) ", i32 0, i32 1\n" os2)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "envptr")) ", i8** "
+      (emit "store ptr " (car (xtc:codegen:ssa-temp "envptr")) ", ptr "
             (car (xtc:codegen:ssa-temp)) "\n" os2)
       (emit (xtc:codegen:ssa-temp "closure.func" (string-append func-type-str "**"))
-            " = getelementptr " closure-struct-str ", " closure-struct-str "* " (car (xtc:codegen:ssa-temp "closure"))
+            " = getelementptr " (xtc:codegen:ir-type closure-struct-str) ", ptr " (car (xtc:codegen:ssa-temp "closure"))
             ", i32 0, i32 2\n" os2)
-      (emit "store " func-type-str "* @" name ", " func-type-str "** " (car (xtc:codegen:ssa-temp)) "\n" os2)
+      (emit "store ptr @" name ", ptr " (car (xtc:codegen:ssa-temp)) "\n" os2)
       (xtc:codegen:ssa-temp "closure" (car (xtc:codegen:ssa-temp "closure")) (cadr (xtc:codegen:ssa-temp "closure")))
       ;; force set size of clsptr to the complete size of the closure!
       ;; this allows us to easily copy the entire closure
-      (emit (xtc:codegen:ssa-temp "closure_size" "i64") " = call i64 @llvm_zone_mark_size(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ")\n" os2)
-      (emit "call void @llvm_zone_ptr_set_size(i8* " (car (xtc:codegen:ssa-temp "clsptr")) ", i64 " (car (xtc:codegen:ssa-temp)) ")\n" os2)
+      (emit (xtc:codegen:ssa-temp "closure_size" "i64") " = call i64 @llvm_zone_mark_size(ptr " (car (xtc:codegen:ssa-temp "zone")) ")\n" os2)
+      (emit "call void @llvm_zone_ptr_set_size(ptr " (car (xtc:codegen:ssa-temp "clsptr")) ", i64 " (car (xtc:codegen:ssa-temp)) ")\n" os2)
 
       (xtc:codegen:ssa-temp "closure" (car (xtc:codegen:ssa-temp "closure")) (cadr (xtc:codegen:ssa-temp "closure")))
       ;; add an additional pointer wrapper for closure
       (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
-             (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call i8* @malloc(" *xtc:codegen:size_t_str* " "
+             (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call ptr @malloc(" *xtc:codegen:size_t_str* " "
                    *xtc:codegen:pointer_size_bytes_str* ")\n" os2))
             ((eq? (ast:closure-tag ast) '__make-closure-s)
              (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = alloca i8, "
                    " i32 " *xtc:codegen:pointer_size_bytes_str*
                    ", align 16\n" os2))
             (else
-             (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
+             (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call ptr @llvm_zone_malloc(ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
                    *xtc:codegen:pointer_size_bytes_str* ")\n" os2)))
       (emit (xtc:codegen:ssa-temp "closure_wrapper" (string-append (cadr (xtc:codegen:ssa-temp "closure")) "*"))
-            " = bitcast i8* " (car (xtc:codegen:ssa-temp "wrapper_ptr")) " to " (cadr (xtc:codegen:ssa-temp "closure")) "*\n" os2)
-      (emit "store " (cadr (xtc:codegen:ssa-temp "closure")) " " (car (xtc:codegen:ssa-temp "closure")) ", "
-            (cadr (xtc:codegen:ssa-temp "closure")) "* " (car (xtc:codegen:ssa-temp "closure_wrapper")) "\n" os2)
+            " = bitcast ptr " (car (xtc:codegen:ssa-temp "wrapper_ptr")) " to ptr\n" os2)
+      (emit "store ptr " (car (xtc:codegen:ssa-temp "closure")) ", "
+            "ptr " (car (xtc:codegen:ssa-temp "closure_wrapper")) "\n" os2)
       ;; last gname should be closure_wrapper (a pointer to a closure - i.e. [double,double]**)
       (cons (xtc:codegen:strip-space os2)
             (xtc:codegen:strip-space os1)))))
@@ -1458,10 +1565,10 @@
       ;;(println 'code: code)
       ;; first we make the function code
       ;; define fastcc function with return type
-      (emit  "define dllexport fastcc " (xtc:codegen:get-type-str rettype) " @" name "(" os)
+      (emit  "define dllexport fastcc " (xtc:codegen:get-ir-type rettype) " @" name "(" os)
       ;(if (not (null? env)) (emit "i8* %_impenv" os))
-      (emit "i8* %_zonei8," os)
-      (emit "i8* %_impenv" os)
+      (emit "ptr %_zonei8," os)
+      (emit "ptr %_impenv" os)
       (if (not (null? args)) (emit  ", " (xtc:codegen:make-arglist-str args #t) os))
       ;; close off function opening
       (emit ") nounwind {\n" os)
@@ -1471,12 +1578,12 @@
 
       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; ;; new for impz stuff
-      (emit "%_zonei8Ptr = alloca i8*\n" os)
-      (emit "store i8* %_zonei8, i8** %_zonei8Ptr\n" os)
+      (emit "%_zonei8Ptr = alloca ptr\n" os)
+      (emit "store ptr %_zonei8, ptr %_zonei8Ptr\n" os)
       ;; (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* %_zonei8 to %mzone*\n" os)
       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-      (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* %_zonei8 to %mzone*\n" os)
+      (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr %_zonei8 to ptr\n" os)
       ;; (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
 
       ;; first we need to pull evironment values
@@ -1484,7 +1591,7 @@
           (begin
             ;; the environment as an array of pointers (see make-closureenv)
             (emit "; setup environment\n" os)
-            (emit "%impenv = bitcast i8* %_impenv to i8**\n" os)
+            (emit "%impenv = bitcast ptr %_impenv to ptr\n" os)
             (let loop ((es env) (i 0))
               (if (pair? es)
                   (let ((e (car es)))
@@ -1492,14 +1599,14 @@
                     (if (regex:match? (symbol->string (car e)) "__sub$")
                         (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
                                       (cdr e))))
-                    (emit (string-append "%" (symbol->string (car e)) "Slot_ = getelementptr i8*, i8** %impenv, i32 "
+                    (emit (string-append "%" (symbol->string (car e)) "Slot_ = getelementptr ptr, ptr %impenv, i32 "
                                          (number->string i) "\n"
-                                         "%" (symbol->string (car e)) "Ptr_ = bitcast i8** %"
+                                         "%" (symbol->string (car e)) "Ptr_ = bitcast ptr %"
                                          (symbol->string (car e)) "Slot_ to "
-                                         (xtc:codegen:get-type-str (cdr e)) "**\n") os)
+                                         "ptr\n") os)
                     (emit (string-append "%" (symbol->string (car e)) "Ptr = load "
-                                         (xtc:codegen:get-type-str (cdr e)) "*, "
-                                         (xtc:codegen:get-type-str (cdr e)) "** %"
+                                         "ptr, "
+                                         "ptr %"
                                          (symbol->string (car e)) "Ptr_\n") os)
                     (loop (cdr es) (+ i 1)))))))
       ;; next we pull the function arguments
@@ -1511,19 +1618,19 @@
               (begin ;; (println 'yes: allocate-mem? 'mem: ast)
                 ;; figure out type size
                 (cond ((= allocate-mem? 1)
-                       (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
+                       (emit "%dat_" (symbol->string (car a)) " = call ptr @malloc("
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))
                       ((= allocate-mem? 2)
                        (emit "%dat_" (symbol->string (car a)) " = alloca i8, "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ", align 16\n" os))
                       (else
-                       (emit "%dat_" (symbol->string (car a)) " = call i8* @llvm_zone_malloc("
-                             "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
+                       (emit "%dat_" (symbol->string (car a)) " = call ptr @llvm_zone_malloc("
+                             "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os)))
-                (emit "%" (symbol->string (car a)) "Ptr = bitcast i8* %dat_" (symbol->string (car a)) " to " (xtc:codegen:get-type-str (cdr a)) "*\n" os))
-              (emit  "%" (symbol->string (car a)) "Ptr = alloca " (xtc:codegen:get-type-str (cdr a)) "\n" os))
-          (emit (string-append "store " (xtc:codegen:get-type-str (cdr a)) " %" (symbol->string (car a))
-                               ", " (xtc:codegen:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
+                (emit "%" (symbol->string (car a)) "Ptr = bitcast ptr %dat_" (symbol->string (car a)) " to ptr\n" os))
+              (emit  "%" (symbol->string (car a)) "Ptr = alloca " (xtc:codegen:get-ir-type (cdr a)) "\n" os))
+          (emit (string-append "store " (xtc:codegen:get-ir-type (cdr a)) " %" (symbol->string (car a))
+                               ", ptr %" (symbol->string (car a)) "Ptr\n") os)))
       (emit "\n" os)
       ;; compile body
       ;; (println '_compin: *xtc:codegen:sym-name-stack*)
@@ -1533,11 +1640,11 @@
       ;(println '*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
       (if (not (null? (car *xtc:codegen:ls_var*)))
           (begin (emit "; promote local stack var allocations\n" os)
-                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-                       (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+                       (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
                        os)
                  (map (lambda (v)
-                        (emit (car v) " = alloca " (cdr v) "\n" os))
+                        (emit (car v) " = alloca " (xtc:codegen:ir-type (cdr v)) "\n" os))
                       (car *xtc:codegen:ls_var*))))
       (set! *xtc:codegen:ls_var* (cdr *xtc:codegen:ls_var*))
       (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length args)))
@@ -1581,17 +1688,17 @@
       ;; zeroext: a C caller reads a returned bool as a whole byte
       (emit  "define dllexport ccc "
              (if (string=? (xtc:codegen:get-type-str rettype) "i1") "zeroext " "")
-             (xtc:codegen:get-type-str rettype) " @" name "(" os)
+             (xtc:codegen:get-ir-type rettype) " @" name "(" os)
       (if (not (null? args)) (emit (xtc:codegen:make-arglist-str args #t) os))
       ;; close off function opening
       (emit ") nounwind inlinehint {\n" os)
       (emit "entry:\n" os)
 
       ;; mem zone
-      (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call ccc %mzone* @llvm_peek_zone_stack()\n" os)
-      (emit "%_zonei8 = bitcast %mzone* " (car (xtc:codegen:ssa-temp "zone")) " to i8*\n" os)
-      (emit "%_zonei8Ptr = alloca i8*\n" os)
-      (emit "store i8* %_zonei8, i8** %_zonei8Ptr\n" os)
+      (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call ccc ptr @llvm_peek_zone_stack()\n" os)
+      (emit "%_zonei8 = bitcast ptr " (car (xtc:codegen:ssa-temp "zone")) " to ptr\n" os)
+      (emit "%_zonei8Ptr = alloca ptr\n" os)
+      (emit "store ptr %_zonei8, ptr %_zonei8Ptr\n" os)
 
       ;; next we pull the function arguments
       (emit "\n; setup arguments\n" os)
@@ -1602,19 +1709,19 @@
               (begin ;; (println 'yes: allocate-mem? 'mem: ast)
                 ;; figure out type size
                 (cond ((= allocate-mem? 1)
-                       (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
+                       (emit "%dat_" (symbol->string (car a)) " = call ptr @malloc("
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os))
                       ((= allocate-mem? 2)
                        (emit "%dat_" (symbol->string (car a)) " = alloca i8, "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ", align 16\n" os))
                       (else
-                       (emit "%dat_" (symbol->string (car a)) " = call i8* @llvm_zone_malloc("
-                             "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
+                       (emit "%dat_" (symbol->string (car a)) " = call ptr @llvm_zone_malloc("
+                             "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
                              *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cdr a))) ")\n" os)))
-                (emit "%" (symbol->string (car a)) "Ptr = bitcast i8* %dat_" (symbol->string (car a)) " to " (xtc:codegen:get-type-str (cdr a)) "*\n" os))
-              (emit  "%" (symbol->string (car a)) "Ptr = alloca " (xtc:codegen:get-type-str (cdr a)) "\n" os))
-          (emit (string-append "store " (xtc:codegen:get-type-str (cdr a)) " %" (symbol->string (car a))
-                               ", " (xtc:codegen:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
+                (emit "%" (symbol->string (car a)) "Ptr = bitcast ptr %dat_" (symbol->string (car a)) " to ptr\n" os))
+              (emit  "%" (symbol->string (car a)) "Ptr = alloca " (xtc:codegen:get-ir-type (cdr a)) "\n" os))
+          (emit (string-append "store " (xtc:codegen:get-ir-type (cdr a)) " %" (symbol->string (car a))
+                               ", ptr %" (symbol->string (car a)) "Ptr\n") os)))
       (emit "\n" os)
       ;; compile body
       ;; (println '_compin: *xtc:codegen:sym-name-stack*)
@@ -1624,11 +1731,11 @@
       ;(println '*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
       (if (not (null? (car *xtc:codegen:ls_var*)))
           (begin (emit "; promote local stack var allocations\n" os)
-                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-                       (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+                       (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
                        os)
                  (map (lambda (v)
-                        (emit (car v) " = alloca " (cdr v) "\n" os))
+                        (emit (car v) " = alloca " (xtc:codegen:ir-type (cdr v)) "\n" os))
                       (car *xtc:codegen:ls_var*))))
       (set! *xtc:codegen:ls_var* (cdr *xtc:codegen:ls_var*))
       (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length args)))
@@ -1677,8 +1784,8 @@
                      ;(println 'value: value 'typestr: typestr) ;'cadrp (ast:binding-expr p))
                      ;(emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
                      ;(emit "call ccc void @llvm_print_i32(i32 111)\n" os)
-                     (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-                           (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+                     (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+                           (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
                            os)
                      (emit  "\n; let assign value to symbol " symstr "\n" os)
                      ;; (emit "call ccc void @llvm_print_i32(i32 222)\n" os)
@@ -1686,19 +1793,19 @@
                      (if (= (ast:env-alloc ast) 3)
                          (begin
                            ;(emit "call ccc void @llvm_print_i32(i32 2222)\n" os)
-                           (emit "%dat_" symstr " = call i8* @llvm_zone_malloc("
-                                 "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
+                           (emit "%dat_" symstr " = call ptr @llvm_zone_malloc("
+                                 "ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
                                  *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size (cadr e))) ")\n" os)
                            ;(emit "call ccc void @llvm_print_i32(i32 22222)\n" os)
 
-                           (emit "%" symstr "Ptr = bitcast i8* %dat_" symstr " to " typestr "*\n" os))
+                           (emit "%" symstr "Ptr = bitcast ptr %dat_" symstr " to ptr\n" os))
                          (begin
 
                            ;(emit "%dat_" symstr " = call i8* @win_alloc(i64 "
                            ;      (number->string (xtc:codegen:get-type-size (xtc:codegen:get-type-from-str (cadr e)))) ")\n" os)
                            ;(emit "%" symstr "Ptr = bitcast i8* %dat_" symstr "Ptr to " typestr "*\n" os)
                            ; (println 'typestr: typestr)
-                           (emit "%" symstr "Ptr = alloca " typestr "\n" os)
+                           (emit "%" symstr "Ptr = alloca " (xtc:codegen:ir-type typestr) "\n" os)
                            ))
 
                      ;(emit "call ccc void @llvm_print_i32(i32 333)\n" os)
@@ -1722,19 +1829,19 @@
                (emit "\n; let value assignment\n" os)
                ; (emit "call ccc void @llvm_print_i32(i32 555)\n" os)
 
-               (emit (string-append "%" symstr " = select i1 true, " typestr " "
+               (emit (string-append "%" symstr " = select i1 true, " (xtc:codegen:ir-type typestr) " "
                                     (if (and (number? (ast:binding-expr p))
                                              (= *xtc:codegen:fp32* (xtc:codegen:get-type-from-str typestr)))
                                         (llvm:convert-float (car e)) ;(xtc:codegen:ssa-temp)))
                                         (car e)) ;(xtc:codegen:ssa-temp)))
-                                    ", " typestr " "
+                                    ", " (xtc:codegen:ir-type typestr) " "
                                     (if (and (number? (ast:binding-expr p))
                                              (= *xtc:codegen:fp32* (xtc:codegen:get-type-from-str typestr)))
                                         (llvm:convert-float (car e)) ; (xtc:codegen:ssa-temp)))
                                         (car e)) ;(xtc:codegen:ssa-temp)))
                                     "\n") os)
-               (emit (string-append "store " typestr " %" symstr ", "
-                                    typestr "* %" symstr "Ptr\n\n") os)
+               (emit (string-append "store " (xtc:codegen:ir-type typestr) " %" symstr ", "
+                                    "ptr %" symstr "Ptr\n\n") os)
                ;; #137/#140: fill this closure's environment immediately, rather
                ;; than deferring all env-fills until after the whole binding
                ;; list. A later sibling initializer in the same let may call an
@@ -1755,11 +1862,11 @@
       ;(println '*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
       (if (not (null? (car *xtc:codegen:ls_var*)))
           (begin (emit "; promote local stack var allocations\n" os)
-                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-                       (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+                       (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
                        os)
                  (map (lambda (v)
-                        (emit (car v) " = alloca " (cdr v) "\n" os))
+                        (emit (car v) " = alloca " (xtc:codegen:ir-type (cdr v)) "\n" os))
                       (car *xtc:codegen:ls_var*))))
       (set! *xtc:codegen:ls_var* (cdr *xtc:codegen:ls_var*))
       (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length (ast:env-bindings ast))))
@@ -1777,9 +1884,9 @@
                (type (cons (+ *xtc:codegen:pointer* *xtc:codegen:pointer* *xtc:codegen:closure*)
                            (map (lambda (x) (xtc:codegen:get-type-from-str x))
                                 (xtc:cache:get-closure-arg-types name)))))
-          (emit  (xtc:codegen:ssa-temp "closure" "i8*") " = call i8* @" name "_getter()\n" os)
-          (emit (string-append (xtc:codegen:ssa-temp "closure" (xtc:codegen:get-type-str type)) " = bitcast i8* "
-                               (car (xtc:codegen:ssa-temp 1)) " to " (xtc:codegen:get-type-str type) "\n") os)
+          (emit  (xtc:codegen:ssa-temp "closure" "i8*") " = call ptr @" name "_getter()\n" os)
+          (emit (string-append (xtc:codegen:ssa-temp "closure" (xtc:codegen:get-type-str type)) " = bitcast ptr "
+                               (car (xtc:codegen:ssa-temp 1)) " to ptr\n") os)
           (xtc:codegen:strip-space os)))))
 
 
@@ -1815,57 +1922,57 @@
 
       ;; first deref closure
       (emit (xtc:codegen:ssa-temp "closure" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str (cadr closure)))))
-            " = load " (xtc:codegen:strip-ptr-depth (cadr closure)) ", " (cadr closure) " " (car closure) "\n" os)
+            " = load " (xtc:codegen:ir-pointee (cadr closure)) ", ptr " (car closure) "\n" os)
       (set! closure (xtc:codegen:ssa-temp "closure"))
 
       ;; get address table
       (emit (string-append (xtc:codegen:ssa-temp "tablePtr" (cadr closure)) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr closure)) ", "
-                           (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)
-      (emit (string-append (xtc:codegen:ssa-temp "tmp" "%clsvar**") " = bitcast i8** "
-                           (car (xtc:codegen:ssa-temp 1)) " to %clsvar**\n") os)
+                           (xtc:codegen:ir-pointee (cadr closure)) ", "
+                           "ptr " (car closure) ", i32 0, i32 0\n") os)
+      (emit (string-append (xtc:codegen:ssa-temp "tmp" "%clsvar**") " = bitcast ptr "
+                           (car (xtc:codegen:ssa-temp 1)) " to ptr\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "table" "%clsvar*")
-                           " = load %clsvar*, %clsvar** " (car (xtc:codegen:ssa-temp 1)) "\n") os)
+                           " = load ptr, ptr " (car (xtc:codegen:ssa-temp 1)) "\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "ePtr" "i8**") " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr closure)) ", "
-                           (cadr closure) " " (car closure) ", i32 0, i32 1\n") os)
+                           (xtc:codegen:ir-pointee (cadr closure)) ", "
+                           "ptr " (car closure) ", i32 0, i32 1\n") os)
 
       ;; get closure environment
       (define ePtr (xtc:codegen:ssa-temp))
-      (emit (xtc:codegen:ssa-temp "e" "i8*") " = load i8*, i8** " (car (xtc:codegen:ssa-temp "ePtr")) "\n" os)
+      (emit (xtc:codegen:ssa-temp "e" "i8*") " = load ptr, ptr " (car (xtc:codegen:ssa-temp "ePtr")) "\n" os)
       (define e (xtc:codegen:ssa-temp))
       (emit (xtc:codegen:ssa-temp "offset" "i32") " = call i32 @get_address_offset(i64 "
-            (number->string (string-hash (caddr ast))) ", %clsvar* " (car (xtc:codegen:ssa-temp "table")) ")\n" os)
+            (number->string (string-hash (caddr ast))) ", ptr " (car (xtc:codegen:ssa-temp "table")) ")\n" os)
       (define offset (xtc:codegen:ssa-temp))
 
       (emit (xtc:codegen:ssa-temp "valPtr" "i8*") " = getelementptr "
-            (xtc:codegen:strip-ptr-depth (cadr e)) ", "
-            (cadr e) " " (car e) ", i32 " (car offset) "\n" os)
-      (emit  (xtc:codegen:ssa-temp "val" "i8**") " = bitcast i8* " (car (xtc:codegen:ssa-temp 1)) " to i8**\n" os)
-      (emit  (xtc:codegen:ssa-temp "val" "i8*") " = load i8*, i8** " (car (xtc:codegen:ssa-temp 1)) "\n" os)
+            (xtc:codegen:ir-pointee (cadr e)) ", "
+            "ptr " (car e) ", i32 " (car offset) "\n" os)
+      (emit  (xtc:codegen:ssa-temp "val" "i8**") " = bitcast ptr " (car (xtc:codegen:ssa-temp 1)) " to ptr\n" os)
+      (emit  (xtc:codegen:ssa-temp "val" "i8*") " = load ptr, ptr " (car (xtc:codegen:ssa-temp 1)) "\n" os)
       ;; (emit "call ccc void @llvm_print_pointer(i8* " (car (xtc:codegen:ssa-temp)) ")\n" os)
-      (emit (xtc:codegen:ssa-temp "val" (string-append valtype "*")) " = bitcast i8* " (car (xtc:codegen:ssa-temp 1)) " to "
-            (string-append valtype "*\n") os)
+      (emit (xtc:codegen:ssa-temp "val" (string-append valtype "*")) " = bitcast ptr " (car (xtc:codegen:ssa-temp 1)) " to "
+            "ptr\n" os)
 
 
       ;; type check
-      (emit (xtc:codegen:ssa-temp "check" "i1") " = call i1 @check_address_type(i64 " (number->string (string-hash (caddr ast))) ", %clsvar* " (car (xtc:codegen:ssa-temp "table")) ", i8* " (car type) ")\n" os)
+      (emit (xtc:codegen:ssa-temp "check" "i1") " = call i1 @check_address_type(i64 " (number->string (string-hash (caddr ast))) ", ptr " (car (xtc:codegen:ssa-temp "table")) ", ptr " (car type) ")\n" os)
       (emit  "br i1 " (car (xtc:codegen:ssa-temp "check")) ", label %then" num ", label %else" num "\n" os)
 
       ;; do then
       (emit "\nthen" num ":\n" os)
-      (emit  (xtc:codegen:ssa-temp "then_result" valtype) " = load " (xtc:codegen:strip-ptr-depth (cadr (xtc:codegen:ssa-temp "val"))) ", " (cadr (xtc:codegen:ssa-temp "val")) " " (car (xtc:codegen:ssa-temp "val")) "\n" os)
+      (emit  (xtc:codegen:ssa-temp "then_result" valtype) " = load " (xtc:codegen:ir-pointee (cadr (xtc:codegen:ssa-temp "val"))) ", ptr " (car (xtc:codegen:ssa-temp "val")) "\n" os)
       (emit  "br label %cont" num "\n" os)
 
       ;; do else
       (emit "\nelse" num ":\n" os)
-      (emit  (xtc:codegen:ssa-temp "else_result" valtype) " = load " (xtc:codegen:strip-ptr-depth (cadr (xtc:codegen:ssa-temp "val"))) ", " (cadr (xtc:codegen:ssa-temp "val")) " " (car (xtc:codegen:ssa-temp "val")) "\n" os)
+      (emit  (xtc:codegen:ssa-temp "else_result" valtype) " = load " (xtc:codegen:ir-pointee (cadr (xtc:codegen:ssa-temp "val"))) ", ptr " (car (xtc:codegen:ssa-temp "val")) "\n" os)
       (emit "br label %cont" num "\n" os)
 
       ;; continue
       (emit "\ncont" num ":\n" os)
       ;(xtc:codegen:ssa-temp "val" (car val) (cadr val))
-      (emit (xtc:codegen:ssa-temp "result" valtype) " = phi " valtype
+      (emit (xtc:codegen:ssa-temp "result" valtype) " = phi " (xtc:codegen:ir-type valtype)
             " [ " (car (xtc:codegen:ssa-temp "then_result")) ", %then" num " ], "
             " [ " (car (xtc:codegen:ssa-temp "else_result")) ", %else" num " ]\n" os)
       ;;(emit "call ccc void @llvm_print_i32(i32 1234567)\n" os)
@@ -1905,46 +2012,46 @@
 
       ;; first deref closure
       (emit (xtc:codegen:ssa-temp "closure" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str (cadr closure)))))
-            " = load " (xtc:codegen:strip-ptr-depth (cadr closure)) ", " (cadr closure) " " (car closure) "\n" os)
+            " = load " (xtc:codegen:ir-pointee (cadr closure)) ", ptr " (car closure) "\n" os)
       (set! closure (xtc:codegen:ssa-temp "closure"))
 
 
       ;; get address table
       (emit (string-append (xtc:codegen:ssa-temp "tablePtr" (cadr closure)) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr closure)) ", "
-                           (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)
-      (emit (string-append (xtc:codegen:ssa-temp "tmp" "%clsvar**") " = bitcast i8** "
-                           (car (xtc:codegen:ssa-temp 1)) " to %clsvar**\n") os)
+                           (xtc:codegen:ir-pointee (cadr closure)) ", "
+                           "ptr " (car closure) ", i32 0, i32 0\n") os)
+      (emit (string-append (xtc:codegen:ssa-temp "tmp" "%clsvar**") " = bitcast ptr "
+                           (car (xtc:codegen:ssa-temp 1)) " to ptr\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "table" "%clsvar*")
-                           " = load %clsvar*, %clsvar** " (car (xtc:codegen:ssa-temp 1)) "\n") os)
+                           " = load ptr, ptr " (car (xtc:codegen:ssa-temp 1)) "\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "ePtr" "i8**") " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr closure)) ", "
-                           (cadr closure) " " (car closure) ", i32 0, i32 1\n") os)
+                           (xtc:codegen:ir-pointee (cadr closure)) ", "
+                           "ptr " (car closure) ", i32 0, i32 1\n") os)
 
       ;; get closure environment
       (define ePtr (xtc:codegen:ssa-temp))
-      (emit (xtc:codegen:ssa-temp "e" "i8*") " = load i8*, i8** " (car (xtc:codegen:ssa-temp "ePtr")) "\n" os)
+      (emit (xtc:codegen:ssa-temp "e" "i8*") " = load ptr, ptr " (car (xtc:codegen:ssa-temp "ePtr")) "\n" os)
       (define e (xtc:codegen:ssa-temp))
       (emit (xtc:codegen:ssa-temp "offset" "i32") " = call i32 @get_address_offset(i64 "
-            (number->string (string-hash (caddr ast))) ", %clsvar* " (car (xtc:codegen:ssa-temp "table")) ")\n" os)
+            (number->string (string-hash (caddr ast))) ", ptr " (car (xtc:codegen:ssa-temp "table")) ")\n" os)
       (define offset (xtc:codegen:ssa-temp))
 
 
       (emit (xtc:codegen:ssa-temp "valPtr" "i8*") " = getelementptr "
-            (xtc:codegen:strip-ptr-depth (cadr e)) ", "
-            (cadr e) " " (car e) ", i32 " (car offset) "\n" os)
-      (emit  (xtc:codegen:ssa-temp "val" "i8**") " = bitcast i8* " (car (xtc:codegen:ssa-temp 1)) " to i8**\n" os)
-      (emit  (xtc:codegen:ssa-temp "val" "i8*") " = load i8*, i8** " (car (xtc:codegen:ssa-temp 1)) "\n" os)
-      (emit (xtc:codegen:ssa-temp "val" (string-append (cadr val) "*")) " = bitcast i8* " (car (xtc:codegen:ssa-temp 1)) " to "
-            (string-append (cadr val) "*\n") os)
+            (xtc:codegen:ir-pointee (cadr e)) ", "
+            "ptr " (car e) ", i32 " (car offset) "\n" os)
+      (emit  (xtc:codegen:ssa-temp "val" "i8**") " = bitcast ptr " (car (xtc:codegen:ssa-temp 1)) " to ptr\n" os)
+      (emit  (xtc:codegen:ssa-temp "val" "i8*") " = load ptr, ptr " (car (xtc:codegen:ssa-temp 1)) "\n" os)
+      (emit (xtc:codegen:ssa-temp "val" (string-append (cadr val) "*")) " = bitcast ptr " (car (xtc:codegen:ssa-temp 1)) " to "
+            "ptr\n" os)
 
       ;; type check
-      (emit (xtc:codegen:ssa-temp "check" "i1") " = call i1 @check_address_type(i64 " (number->string (string-hash (caddr ast))) ", %clsvar* " (car (xtc:codegen:ssa-temp "table")) ", i8* " (car type) ")\n" os)
+      (emit (xtc:codegen:ssa-temp "check" "i1") " = call i1 @check_address_type(i64 " (number->string (string-hash (caddr ast))) ", ptr " (car (xtc:codegen:ssa-temp "table")) ", ptr " (car type) ")\n" os)
       (emit  "br i1 " (car (xtc:codegen:ssa-temp "check")) ", label %then" num ", label %else" num "\n" os)
 
       ;; do then
       (emit "\nthen" num ":\n" os)
-      (emit  "store " (cadr val) " " (car val) ", " (cadr (xtc:codegen:ssa-temp "val")) " " (car (xtc:codegen:ssa-temp "val")) "\n" os)
+      (emit  "store " (xtc:codegen:ir-type (cadr val)) " " (car val) ", ptr " (car (xtc:codegen:ssa-temp "val")) "\n" os)
       (emit  "br label %cont" num "\n" os)
 
       ;; do else
@@ -1979,19 +2086,19 @@
 
       ;; first deref closure
       (emit (xtc:codegen:ssa-temp "closure" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str (cadr closure)))))
-            " = load " (xtc:codegen:strip-ptr-depth (cadr closure)) ", " (cadr closure) " " (car closure) "\n" os)
+            " = load " (xtc:codegen:ir-pointee (cadr closure)) ", ptr " (car closure) "\n" os)
       (set! closure (xtc:codegen:ssa-temp "closure"))
 
       ;; get address table
       (emit (string-append (xtc:codegen:ssa-temp "tablePtr" (cadr closure)) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr closure)) ", "
-                           (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)
-      (emit (string-append (xtc:codegen:ssa-temp "tmp" "%clsvar**") " = bitcast i8** "
-                           (car (xtc:codegen:ssa-temp 1)) " to %clsvar**\n") os)
+                           (xtc:codegen:ir-pointee (cadr closure)) ", "
+                           "ptr " (car closure) ", i32 0, i32 0\n") os)
+      (emit (string-append (xtc:codegen:ssa-temp "tmp" "%clsvar**") " = bitcast ptr "
+                           (car (xtc:codegen:ssa-temp 1)) " to ptr\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "table" "%clsvar*")
-                           " = load %clsvar*, %clsvar** " (car (xtc:codegen:ssa-temp 1)) "\n") os)
+                           " = load ptr, ptr " (car (xtc:codegen:ssa-temp 1)) "\n") os)
       (emit (xtc:codegen:ssa-temp "val" "i1") " = call i1 @check_address_exists(i64 "
-            (number->string (string-hash (caddr ast))) ", %clsvar* " (car (xtc:codegen:ssa-temp "table")) ")\n" os)
+            (number->string (string-hash (caddr ast))) ", ptr " (car (xtc:codegen:ssa-temp "table")) ")\n" os)
 
       (xtc:codegen:strip-space os))))
 
@@ -2007,7 +2114,7 @@
       (if (not (xtc:codegen:pointer? val))
           (xtc:diagnostics:print-bad-type-error-with-ast val "ptrdef must take a pointer argument" ast))
       (emit val-str os)
-      (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str type)) " = load " (xtc:codegen:strip-ptr-depth (cadr val)) ", " (cadr val) " " (car val) "\n" os)
+      (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str type)) " = load " (xtc:codegen:ir-pointee (cadr val)) ", ptr " (car val) "\n" os)
       (xtc:codegen:strip-space os))))
 
 
@@ -2019,8 +2126,8 @@
            (val (xtc:codegen:ssa-temp)))
       (emit val-str os)
       (emit (xtc:codegen:ssa-temp "val" (string-append (cadr val) "*"))
-            " = alloca " (cadr val) "\n" os)
-      (emit "store " (cadr val) " " (car val) ", " (cadr val) "* " (car (xtc:codegen:ssa-temp)))
+            " = alloca " (xtc:codegen:ir-type (cadr val)) "\n" os)
+      (emit "store " (xtc:codegen:ir-type (cadr val)) " " (car val) ", ptr " (car (xtc:codegen:ssa-temp)))
       (xtc:codegen:strip-space os))))
 
 ;; (xtc:codegen:gcnt [increment])
@@ -2080,8 +2187,8 @@
     (let* ((os (xtc:emit:new-buffer)))
       (let ((typestr (xtc:codegen:get-type-str t)))
         (emit (xtc:codegen:ssa-temp "val" typestr)
-              " = load " typestr ", " typestr
-              "* %" (symbol->string var) "Ptr\n" os)
+              " = load " (xtc:codegen:ir-type typestr) ", ptr"
+              " %" (symbol->string var) "Ptr\n" os)
         (xtc:codegen:strip-space os)))))
 
 
@@ -2097,11 +2204,11 @@
                (= (xtc:codegen:get-ptr-depth type2) 0))
           (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str type))
                 " = select i1 true, "
-                (xtc:codegen:get-type-str type) " @" (symbol->string var) ", "
-                (xtc:codegen:get-type-str type) " @" (symbol->string var) "\n" os)
+                (xtc:codegen:get-ir-type type) " @" (symbol->string var) ", "
+                (xtc:codegen:get-ir-type type) " @" (symbol->string var) "\n" os)
           (emit (string-append (xtc:codegen:ssa-temp "val" typestr)
-                               " = load " typestr ", " typestr
-                               "* @" (symbol->string var) "\n") os))
+                               " = load " (xtc:codegen:ir-type typestr) ", ptr"
+                               " @" (symbol->string var) "\n") os))
       (xtc:codegen:strip-space os))))
 
 
@@ -2117,10 +2224,10 @@
       (emit size-str os) ;; write size str
 
       (emit (xtc:codegen:ssa-temp "zone" "%mzone*")
-            " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
-      (emit "call void @llvm_push_zone_stack(%mzone* " (car (xtc:codegen:ssa-temp)) ")\n" os)
-      (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast %mzone* " (car (xtc:codegen:ssa-temp "zone")) " to i8*\n" os)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_zonei8Ptr\n" os)
+            " = call ptr @llvm_zone_create(i64 " (car size) ")\n" os)
+      (emit "call void @llvm_push_zone_stack(ptr " (car (xtc:codegen:ssa-temp)) ")\n" os)
+      (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "zone")) " to ptr\n" os)
+      (emit "store ptr " (car (xtc:codegen:ssa-temp "zone_ptr")) ", ptr %_zonei8Ptr\n" os)
 
       (let ((zone (xtc:codegen:ssa-temp "zone")))
         (xtc:codegen:ssa-temp "ret" (car zone) (cadr zone)))
@@ -2132,9 +2239,9 @@
            (zone-str (xtc:codegen:compiler (cadr ast) types))
            (zone (xtc:codegen:ssa-temp)))
       (emit zone-str os)
-      (emit "call void @llvm_push_zone_stack(%mzone* " (car zone) ")\n" os)
-      (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast %mzone* " (car zone) " to i8*\n" os)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_zonei8Ptr\n" os)
+      (emit "call void @llvm_push_zone_stack(ptr " (car zone) ")\n" os)
+      (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast ptr " (car zone) " to ptr\n" os)
+      (emit "store ptr " (car (xtc:codegen:ssa-temp "zone_ptr")) ", ptr %_zonei8Ptr\n" os)
       (xtc:codegen:ssa-temp "voidmark" (xtc:codegen:get-type-str *xtc:codegen:void*))
       (xtc:codegen:strip-space os))))
 
@@ -2148,16 +2255,16 @@
           (xtc:diagnostics:print-needs-zone-size-error 'create_zone))
       (emit size-str os) ;; write size str
       (emit (xtc:codegen:ssa-temp "ret" "%mzone*")
-            " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
+            " = call ptr @llvm_zone_create(i64 " (car size) ")\n" os)
       (xtc:codegen:strip-space os))))
 
 (define xtc:codegen:compile:pop_zone
   (lambda (ast types)
     (let* ((os (xtc:emit:new-buffer)))
-      (emit (xtc:codegen:ssa-temp "oldzone" "%mzone*") " = call %mzone* @llvm_pop_zone_stack()\n" os)
-      (emit (xtc:codegen:ssa-temp "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n" os)
-      (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast %mzone* " (car (xtc:codegen:ssa-temp "newzone")) " to i8*\n" os)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_zonei8Ptr\n" os)
+      (emit (xtc:codegen:ssa-temp "oldzone" "%mzone*") " = call ptr @llvm_pop_zone_stack()\n" os)
+      (emit (xtc:codegen:ssa-temp "newzone" "%mzone") " = call ptr @llvm_peek_zone_stack()\n" os)
+      (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "newzone")) " to ptr\n" os)
+      (emit "store ptr " (car (xtc:codegen:ssa-temp "zone_ptr")) ", ptr %_zonei8Ptr\n" os)
       (let ((zone (xtc:codegen:ssa-temp "oldzone")))
         (xtc:codegen:ssa-temp "ret" (car zone) (cadr zone)))
       (xtc:codegen:strip-space os))))
@@ -2190,28 +2297,28 @@
       (define v '())
       (if ftype-provided?
           (begin (emit (xtc:codegen:ssa-temp "val" clstype)
-                       " = load " clstype "," clstype "* " (caar (car args)) "\n" os)
+                       " = load ptr, ptr " (caar (car args)) "\n" os)
                  (set! v (car (xtc:codegen:ssa-temp "val"))))
           (begin (emit (xtc:codegen:ssa-temp "vval" (string-append clstype "*"))
-                       " = load " clstype "*, " clstype "** %"
+                       " = load ptr, ptr %"
                        (symbol->string (ast:call-head ast)) "Ptr\n" os)
                  (emit (xtc:codegen:ssa-temp "val" clstype)
-                       " = load " clstype "," clstype "* " (car (xtc:codegen:ssa-temp 1)) "\n" os)
+                       " = load ptr, ptr " (car (xtc:codegen:ssa-temp 1)) "\n" os)
                  (set! v (car (xtc:codegen:ssa-temp "val")))))
       (emit (string-append (xtc:codegen:ssa-temp "fPtr" clstype)
-                           " = getelementptr " (xtc:codegen:strip-ptr-depth clstype) ", " clstype " " v ", i32 0, i32 2\n") os)
+                           " = getelementptr " (xtc:codegen:ir-pointee clstype) ", ptr " v ", i32 0, i32 2\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "ePtr" clstype) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth clstype) ", " clstype " " v ", i32 0, i32 1\n") os)
+                           (xtc:codegen:ir-pointee clstype) ", ptr " v ", i32 0, i32 1\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "f" (string-append ftype "*"))
-                           " = load " ftype "*, " ftype "** " (car (xtc:codegen:ssa-temp "fPtr")) "\n") os)
+                           " = load ptr, ptr " (car (xtc:codegen:ssa-temp "fPtr")) "\n") os)
       (emit (string-append (xtc:codegen:ssa-temp "e" "i8*")
-                           " = load i8*, i8** " (car (xtc:codegen:ssa-temp "ePtr")) "\n") os)
+                           " = load ptr, ptr " (car (xtc:codegen:ssa-temp "ePtr")) "\n") os)
 
-      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-            (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+            (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
             os)
       ;(emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
-      (emit  (xtc:codegen:ssa-temp "z" "i8*") " = bitcast %mzone* " (car (xtc:codegen:ssa-temp "zone")) " to i8*\n" os)
+      (emit  (xtc:codegen:ssa-temp "z" "i8*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "zone")) " to ptr\n" os)
       (define zone (car (xtc:codegen:ssa-temp)))
       (emit (string-append (if (xtc:codegen:void? (car functiontype))
                                (begin (xtc:codegen:ssa-temp "result" "void") "")
@@ -2219,11 +2326,11 @@
                            (if recursive-call "tail " "")
                            ;;"tail call fastcc "
                            "call fastcc "
-                           (xtc:codegen:get-type-str (car functiontype)) " "
-                           (car (xtc:codegen:ssa-temp "f")) "(i8* " zone ", i8* "
+                           (xtc:codegen:get-ir-type (car functiontype)) " "
+                           (car (xtc:codegen:ssa-temp "f")) "(ptr " zone ", ptr "
                            (car (xtc:codegen:ssa-temp "e"))
                            (apply string-append (map (lambda (var)
-                                                       (string-append ", " (cadr var) " " (car var)))
+                                                       (string-append ", " (xtc:codegen:ir-type (cadr var)) " " (car var)))
                                                      vars))
                            ")\n") os)
       ;;(println 'os: os)
@@ -2270,15 +2377,15 @@
           (xtc:diagnostics:print-type-mismatch-error iterator-type (cadr num) (car ast)))
 
       (if start-value?
-          (emit (string-append "store " (cadr start) " " (car start) ", "
-                               iterator-type "* " iterator "Ptr\n") os)
+          (emit (string-append "store " (xtc:codegen:ir-type (cadr start)) " " (car start) ", "
+                               "ptr " iterator "Ptr\n") os)
           (emit (string-append "store " iterator-type (if (xtc:codegen:fixed-point? (cadr num))
                                                           " 0, "
                                                           " 0.0, ")
-                               iterator-type "* " iterator "Ptr\n") os))
+                               "ptr " iterator "Ptr\n") os))
 
       (emit (xtc:codegen:ssa-temp "val" iterator-type)
-            " = load " iterator-type ", " iterator-type "* " iterator "Ptr\n" os)
+            " = load " iterator-type ", ptr " iterator "Ptr\n" os)
 
       (emit (xtc:codegen:ssa-temp "num" (cadr num))
             (if (xtc:codegen:fixed-point? (cadr num))
@@ -2291,7 +2398,7 @@
             (if (xtc:codegen:fixed-point? (cadr num))
                 "icmp ult "
                 "fcmp ult ")
-            (cadr num) " " (car num) ", "
+            (xtc:codegen:ir-type (cadr num)) " " (car num) ", "
             (if (xtc:codegen:fixed-point? (cadr num))
                 "1\n"
                 "1.0\n") os)
@@ -2305,7 +2412,7 @@
       (emit  "\n" loop-label "\n" os)
       (emit bodystr os)
       (emit (string-append "%loop_cnt" (number->string loop-num)
-                           " = load " iterator-type ", " iterator-type "* " iterator "Ptr\n") os)
+                           " = load " iterator-type ", ptr " iterator "Ptr\n") os)
       (emit (string-append "%next" (number->string loop-num)
                            (if (xtc:codegen:fixed-point? (cadr num))
                                " = add "
@@ -2316,7 +2423,7 @@
                                ", 1.0\n"))
             os)
       (emit (string-append "store " iterator-type " %next" (number->string loop-num)
-                           ", " iterator-type "* " iterator "Ptr\n") os)
+                           ", ptr " iterator "Ptr\n") os)
       (emit (string-append cmp " = "
                            (if (xtc:codegen:fixed-point? (cadr num))
                                "icmp ult "
@@ -2376,10 +2483,10 @@
       (emit "; do set!\n" os)
       (emit s2 os)
       (if global? ;; (xtc:cache:globalvar-exists? (symbol->string (ast:set!-var ast))) ;; are we are setting a global variable?
-          (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+          (emit (string-append "store " (xtc:codegen:ir-type (cadr vv)) " " (car vv) ", ptr @"
                                (symbol->string (ast:set!-var ast)) "\n") os)
           (if (member (ast:set!-var ast) *xtc:codegen:sym-name-stack*)
-              (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+              (emit (string-append "store " (xtc:codegen:ir-type (cadr vv)) " " (car vv) ", ptr %"
                                    (symbol->string (ast:set!-var ast)) "Ptr\n") os)
               (xtc:diagnostics:print-missing-identifier-error (ast:set!-var ast) 'variable)))
       ;; ir:gname should be vv
@@ -2409,14 +2516,14 @@
              (fullt (string-append "[" (number->string num-elts) " x " (cadr (cdar elts)) "]")))
         (emit "; stack alloc array literal")
         (emit (caar elts) os)
-        (emit (xtc:codegen:ssa-temp "arrayl" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
+        (emit (xtc:codegen:ssa-temp "arrayl" fullt) " = insertvalue " (xtc:codegen:ir-type fullt) " undef, " (xtc:codegen:ir-type (cadr (cdar elts))) " " (car (cdar elts)) ", 0\n" os)
         (emit "; set array literal elts")
         (for-each (lambda (x idx)
                     (emit (car x) os)
                     (let ((last (xtc:codegen:ssa-temp "arrayl")))
                       (emit (xtc:codegen:ssa-temp "arrayl" fullt)
-                            " = insertvalue " fullt " " (car last)
-                            ", " (caddr x) " " (cadr x) ", " (number->string idx) "\n" os)))
+                            " = insertvalue " (xtc:codegen:ir-type fullt) " " (car last)
+                            ", " (xtc:codegen:ir-type (caddr x)) " " (cadr x) ", " (number->string idx) "\n" os)))
                   (cdr elts)
                   (range 1 (+ 1 num-elts)))
         (xtc:codegen:strip-space os)))))
@@ -2447,12 +2554,12 @@
       (if (not (xtc:codegen:pointer? ttype)) ;; must be an array if we're not a pointer
           ;; (log-error 'Compiler 'Error: 'array-ref 'must 'take 'a 'pointer 'to 'an 'array 'not (cadr var))
           (emit (string-append (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (caddr ttype))) " = extractvalue "
-                               (cadr var) " " (car var) ", " (car idx) "\n") os)
+                               (xtc:codegen:ir-type (cadr var)) " " (car var) ", " (car idx) "\n") os)
           (begin (emit (string-append (xtc:codegen:ssa-temp "_val" (string-append (xtc:codegen:get-type-str (caddr ttype)) "*"))
-                                      " = getelementptr " (xtc:codegen:strip-ptr-depth (cadr var)) ", " (cadr var) " " (car var)
-                                      ", i32 0, " (cadr idx) " " (car idx) "\n") os)
+                                      " = getelementptr " (xtc:codegen:ir-pointee (cadr var)) ", " (xtc:codegen:ir-type (cadr var)) " " (car var)
+                                      ", i32 0, " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n") os)
                  (set! tt (xtc:codegen:get-type-str (caddr ttype)))
-                 (emit (xtc:codegen:ssa-temp "val" tt) " = load " tt ", " tt "* " (car (xtc:codegen:ssa-temp "_val")) "\n" os)))
+                 (emit (xtc:codegen:ssa-temp "val" tt) " = load " (xtc:codegen:ir-type tt) ", ptr " (car (xtc:codegen:ssa-temp "_val")) "\n" os)))
       (xtc:codegen:strip-space os))))
 
 
@@ -2479,8 +2586,8 @@
       (if (not (xtc:codegen:pointer? ttype)) ;; must be an array if we're not a pointer
           (xtc:diagnostics:print-bad-type-error-with-ast (cadr ttype) "array-ref-ptr must take a pointer to an array" ast)
           (emit (string-append (xtc:codegen:ssa-temp "val" (string-append (xtc:codegen:get-type-str (caddr ttype)) "*"))
-                               " = getelementptr " (xtc:codegen:strip-ptr-depth (cadr var)) ", " (cadr var) " " (car var)
-                               ", i32 0, " (cadr idx) " " (car idx) "\n") os))
+                               " = getelementptr " (xtc:codegen:ir-pointee (cadr var)) ", " (xtc:codegen:ir-type (cadr var)) " " (car var)
+                               ", i32 0, " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n") os))
       (xtc:codegen:strip-space os))))
 
 
@@ -2521,10 +2628,10 @@
           ;(begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (caddr ttype))) " = insertvalue "
           ;     (cadr var) " " (car var) ", " (cadr val) " " (car val) ", " (car idx) "\n" os))
           (begin (emit (xtc:codegen:ssa-temp "val" (string-append (xtc:codegen:get-type-str (caddr ttype)) "*"))
-                       " = getelementptr " (xtc:codegen:strip-ptr-depth (cadr var)) ", " (cadr var) " " (car var)
-                       ", i32 0, " (cadr idx) " " (car idx) "\n" os)
-                 (emit "store " (cadr val) " " (car val) ", "
-                       (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp)) "\n" os)))
+                       " = getelementptr " (xtc:codegen:ir-pointee (cadr var)) ", " (xtc:codegen:ir-type (cadr var)) " " (car var)
+                       ", i32 0, " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n" os)
+                 (emit "store " (xtc:codegen:ir-type (cadr val)) " " (car val) ", "
+                       (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp))) " " (car (xtc:codegen:ssa-temp)) "\n" os)))
       (xtc:codegen:ssa-temp "val" (car val) (cadr val))
       (xtc:codegen:strip-space os))))
 
@@ -2548,12 +2655,12 @@
       (emit "; pointer ref\n" os)
       (if (not (xtc:codegen:pointer? ttype)) ;; must be an array if we're not a pointer
           (emit (string-append (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (caddr ttype))) " = extractvalue "
-                               (cadr var) " " (car var) ", " (car idx) "\n") os)
+                               (xtc:codegen:ir-type (cadr var)) " " (car var) ", " (car idx) "\n") os)
           (begin (emit (string-append (xtc:codegen:ssa-temp "val" (cadr var)) " = getelementptr "
-                                      (xtc:codegen:strip-ptr-depth (cadr var)) ", " (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os)
+                                      (xtc:codegen:ir-pointee (cadr var)) ", " (xtc:codegen:ir-type (cadr var)) " " (car var) ", " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n") os)
                  (set! tt (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str (cadr var)))))))
       (if (xtc:codegen:pointer? ttype)
-          (emit (string-append (xtc:codegen:ssa-temp "val" tt) " = load " tt ", " tt "* "
+          (emit (string-append (xtc:codegen:ssa-temp "val" tt) " = load " (xtc:codegen:ir-type tt) ", ptr "
                                (car (xtc:codegen:ssa-temp 1)) "\n") os))
       (xtc:codegen:strip-space os))))
 
@@ -2578,9 +2685,9 @@
       (emit var-str os)
       (emit "; pointer ref\n" os)
       (emit (string-append (xtc:codegen:ssa-temp "val" (cadr var)) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr var))
-                           ", " (cadr var) " " (car var) ", "
-                           (cadr idx) " " (car idx) "\n") os)
+                           (xtc:codegen:ir-pointee (cadr var))
+                           ", " (xtc:codegen:ir-type (cadr var)) " " (car var) ", "
+                           (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n") os)
       (xtc:codegen:strip-space os))))
 
 
@@ -2621,10 +2728,10 @@
       (emit val-str os)
       (emit "; set pointer\n" os)
       (emit (string-append (xtc:codegen:ssa-temp "val" (cadr var)) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr var)) ", " (cadr var) " "
-                           (car var) ", " (cadr idx) " " (car idx) "\n") os)
-      (emit (string-append "store " (cadr val) " " (car val) ", "
-                           (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp)) "\n") os)
+                           (xtc:codegen:ir-pointee (cadr var)) ", ptr "
+                           (car var) ", " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n") os)
+      (emit (string-append "store " (xtc:codegen:ir-type (cadr val)) " " (car val) ", "
+                           (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp))) " " (car (xtc:codegen:ssa-temp)) "\n") os)
       (xtc:codegen:ssa-temp "val" (car val) (cadr val))
       (xtc:codegen:strip-space os))))
 
@@ -2651,14 +2758,14 @@
              (fullt (string-append "<" (number->string num-elts) " x " (cadr (cdar elts)) ">")))
         (emit "; stack alloc vector literal")
         (emit (caar elts) os)
-        (emit (xtc:codegen:ssa-temp "vecl" fullt) " = insertelement " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", i32 0\n" os)
+        (emit (xtc:codegen:ssa-temp "vecl" fullt) " = insertelement " (xtc:codegen:ir-type fullt) " undef, " (xtc:codegen:ir-type (cadr (cdar elts))) " " (car (cdar elts)) ", i32 0\n" os)
         (emit "; set array literal elts")
         (for-each (lambda (x idx)
                     (emit (car x) os)
                     (let ((last (xtc:codegen:ssa-temp "vecl")))
                       (emit (xtc:codegen:ssa-temp "vecl" fullt)
-                            " = insertelement " fullt " " (car last)
-                            ", " (caddr x) " " (cadr x) ", i32 " (number->string idx) "\n" os)))
+                            " = insertelement " (xtc:codegen:ir-type fullt) " " (car last)
+                            ", " (xtc:codegen:ir-type (caddr x)) " " (cadr x) ", i32 " (number->string idx) "\n" os)))
                   (cdr elts)
                   (range 1 (+ 1 num-elts)))
         (xtc:codegen:strip-space os)))))
@@ -2688,12 +2795,12 @@
       ;; (println 'ret: (caddr ttype))
       ;; (println 'pointer: (xtc:codegen:pointer? ttype))
       (if (xtc:codegen:pointer? ttype) ;; a pointer?
-          (emit (string-append (xtc:codegen:ssa-temp "vect" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr var)))) " = load " (xtc:codegen:strip-ptr-depth (cadr var)) ", "
-                               (cadr var) " " (car var) "\n"
+          (emit (string-append (xtc:codegen:ssa-temp "vect" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr var)))) " = load " (xtc:codegen:ir-pointee (cadr var)) ", "
+                               (xtc:codegen:ir-type (cadr var)) " " (car var) "\n"
                                (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (caddr ttype))) " = extractelement "
-                               (cadr (xtc:codegen:ssa-temp "vect")) " " (car (xtc:codegen:ssa-temp "vect")) ", " (cadr idx) " " (car idx) "\n") os)
+                               (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "vect"))) " " (car (xtc:codegen:ssa-temp "vect")) ", " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n") os)
           (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (caddr ttype))) " = extractelement "
-                (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n" os))
+                (xtc:codegen:ir-type (cadr var)) " " (car var) ", " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n" os))
       (xtc:codegen:strip-space os))))
 
 
@@ -2718,10 +2825,10 @@
       (emit val-str os)
       (emit "; set vector\n" os)
       (if (xtc:codegen:pointer? ttype) ;; must be an array if we're not a pointer
-          (emit (xtc:codegen:ssa-temp "vect" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth ttype))) " = load " (xtc:codegen:strip-ptr-depth (cadr var)) ", " (cadr var) " " (car var) "\n"
-                (xtc:codegen:ssa-temp "vect2" (cadr (xtc:codegen:ssa-temp "vect"))) " = insertelement " (cadr (xtc:codegen:ssa-temp "vect")) " " (car (xtc:codegen:ssa-temp "vect"))
-                ", " (cadr val) " " (car val) ", " (cadr idx) " " (car idx) "\n"
-                "store " (cadr (xtc:codegen:ssa-temp "vect2")) " " (car (xtc:codegen:ssa-temp "vect2")) ", " (cadr var) " " (car var) "\n" os)
+          (emit (xtc:codegen:ssa-temp "vect" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth ttype))) " = load " (xtc:codegen:ir-pointee (cadr var)) ", " (xtc:codegen:ir-type (cadr var)) " " (car var) "\n"
+                (xtc:codegen:ssa-temp "vect2" (cadr (xtc:codegen:ssa-temp "vect"))) " = insertelement " (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "vect"))) " " (car (xtc:codegen:ssa-temp "vect"))
+                ", " (xtc:codegen:ir-type (cadr val)) " " (car val) ", " (xtc:codegen:ir-type (cadr idx)) " " (car idx) "\n"
+                "store " (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "vect2"))) " " (car (xtc:codegen:ssa-temp "vect2")) ", " (xtc:codegen:ir-type (cadr var)) " " (car var) "\n" os)
           (xtc:diagnostics:print-bad-type-error-with-ast ttype "vset! needs to be a pointer to a vector" ast))
       (xtc:codegen:ssa-temp "voidmark" (xtc:codegen:get-type-str *xtc:codegen:void*))
       (xtc:codegen:strip-space os))))
@@ -2771,15 +2878,15 @@
       (emit b-str os)
       ;; dereference any vector pointers
       (if (xtc:codegen:pointer? (cadr aval))
-          (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr aval)))) " = load " (xtc:codegen:strip-ptr-depth (cadr aval)) ", " (cadr aval) " " (car aval) "\n" os)
+          (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr aval)))) " = load " (xtc:codegen:ir-pointee (cadr aval)) ", " (xtc:codegen:ir-type (cadr aval)) " " (car aval) "\n" os)
                  (set! aval (xtc:codegen:ssa-temp))))
       (if (and (list? _bt)
                (xtc:codegen:pointer? (cadr bval)))
-          (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr bval)))) " = load " (xtc:codegen:strip-ptr-depth (cadr bval)) ", " (cadr bval) " " (car bval) "\n" os)
+          (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr bval)))) " = load " (xtc:codegen:ir-pointee (cadr bval)) ", " (xtc:codegen:ir-type (cadr bval)) " " (car bval) "\n" os)
                  (set! bval (xtc:codegen:ssa-temp))))
       (emit (xtc:codegen:ssa-temp "vect" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth _at)))
             " = shufflevector "
-            (cadr aval) " " (car aval) ", "
+            (xtc:codegen:ir-type (cadr aval)) " " (car aval) ", "
             (cadr aval) " " (if (number? _bt) "undef" (car bval)) ", "
             (string-append "<" (number->string (cadr _at)) " x i32> <i32 " (number->string (car args))
                            (apply string-append (map (lambda (a) (string-append ", i32 " (number->string a)))
@@ -2829,16 +2936,16 @@
     (let* ((os (xtc:emit:new-buffer)))
       (let*      ;((t (xtc:codegen:convert-from-pretty-types (cadr ast))))
           ((t (xtc:codegen:strip-ptr-depth (car hint?))))
-        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-              (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+              (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
               os)
-        (emit (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
+        (emit (xtc:codegen:ssa-temp "dat" "i8*") " = call ptr @llvm_zone_malloc(ptr " (car (xtc:codegen:ssa-temp "zone")) ", "
               *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size t)) ")\n" os)
-        (emit "call i8* @memset(i8* " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, "
+        (emit "call ptr @memset(ptr " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, "
               *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size t)) ")\n" os)
         (emit (xtc:codegen:ssa-temp "val" (string-append (xtc:codegen:get-type-str t) "*"))
-              " = bitcast i8* " (car (xtc:codegen:ssa-temp "dat"))
-              " to " (xtc:codegen:get-type-str t) "*\n" os)
+              " = bitcast ptr " (car (xtc:codegen:ssa-temp "dat"))
+              " to ptr\n" os)
         (xtc:codegen:strip-space os)))))
 
 
@@ -2861,7 +2968,7 @@
             (begin (emit (string-append (xtc:codegen:ssa-temp "tmp" "i64") " = zext " (xtc:codegen:get-type-str t) " "
                                         (car idx) " to i64\n") os)
                    (set! idx (xtc:codegen:ssa-temp))))
-        (emit (xtc:codegen:ssa-temp "val" "i8*") " = getelementptr " (xtc:codegen:get-type-str t) ", " (xtc:codegen:get-type-str t) "* null, i32 1\n" os)
+        (emit (xtc:codegen:ssa-temp "val" "i8*") " = getelementptr " (xtc:codegen:get-ir-type t) ", ptr null, i32 1\n" os)
         ;; (emit (xtc:codegen:ssa-temp "typesize" *xtc:codegen:size_t_str*) " = ptrtoint " (xtc:codegen:get-type-str t) "* "
         ;;       (car (xtc:codegen:ssa-temp 1)) " to " *xtc:codegen:size_t_str* "\n" os)
         ;;
@@ -2870,17 +2977,17 @@
         ;;       (car idx) "\n" os)
         (emit (xtc:codegen:ssa-temp "zonesize" "i64") " = mul " (cadr idx) " " typesize ", " (car idx) "\n" os)
 
-        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
-              (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
+        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load ptr, ptr %_zonei8Ptr\n"
+              (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "tzone")) " to ptr\n"
               os)
         (emit
-         (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
+         (xtc:codegen:ssa-temp "dat" "i8*") " = call ptr @llvm_zone_malloc(ptr " (car (xtc:codegen:ssa-temp "zone")) ", i64 "
          (car (xtc:codegen:ssa-temp "zonesize"))
          ")\n" os)
-        (emit "call i8* @memset(i8* " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, i64 " (car (xtc:codegen:ssa-temp "zonesize")) ")\n" os)
+        (emit "call ptr @memset(ptr " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, i64 " (car (xtc:codegen:ssa-temp "zonesize")) ")\n" os)
         (emit (xtc:codegen:ssa-temp "val" (string-append (xtc:codegen:get-type-str tt) "*"))
-              " = bitcast i8* " (car (xtc:codegen:ssa-temp "dat"))
-              " to " (xtc:codegen:get-type-str tt) "*\n" os)
+              " = bitcast ptr " (car (xtc:codegen:ssa-temp "dat"))
+              " to ptr\n" os)
         (xtc:codegen:strip-space os)))))
 
 
@@ -2896,11 +3003,11 @@
     (let* ((os (xtc:emit:new-buffer)))
       (let* ;;((t (xtc:codegen:convert-from-pretty-types (cadr ast))))
           ((t (xtc:codegen:strip-ptr-depth (car hint?))))
-        (emit  (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @malloc(" *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size t)) ")\n" os)
-        (emit "call i8* @memset(i8* " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, " *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size t)) ")\n" os)
+        (emit  (xtc:codegen:ssa-temp "dat" "i8*") " = call ptr @malloc(" *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size t)) ")\n" os)
+        (emit "call ptr @memset(ptr " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, " *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size t)) ")\n" os)
         (emit (xtc:codegen:ssa-temp "val" (string-append (xtc:codegen:get-type-str t) "*"))
-              " = bitcast i8* " (car (xtc:codegen:ssa-temp "dat"))
-              " to " (xtc:codegen:get-type-str t) "*\n" os)
+              " = bitcast ptr " (car (xtc:codegen:ssa-temp "dat"))
+              " to ptr\n" os)
         (xtc:codegen:strip-space os)))))
 
 
@@ -2923,7 +3030,7 @@
                                         (car idx) " to i64\n") os)
                    (set! idx (xtc:codegen:ssa-temp))))
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (emit (xtc:codegen:ssa-temp "val" "i8*") " = getelementptr " (xtc:codegen:get-type-str t) ", " (xtc:codegen:get-type-str t) "* null, i32 1\n" os)
+        (emit (xtc:codegen:ssa-temp "val" "i8*") " = getelementptr " (xtc:codegen:get-ir-type t) ", ptr null, i32 1\n" os)
         ;; (emit (xtc:codegen:ssa-temp "typesize" *xtc:codegen:size_t_str*) " = ptrtoint " (xtc:codegen:get-type-str t) "* "
         ;;       (car (xtc:codegen:ssa-temp 1)) " to " *xtc:codegen:size_t_str* "\n" os)
         ;;
@@ -2935,16 +3042,16 @@
         (if (string=? *xtc:codegen:size_t_str* "i32")
             (begin
               (emit (xtc:codegen:ssa-temp "sizeb" "i32") " = trunc i64 " (car (xtc:codegen:ssa-temp "zonesize")) " to i32\n" os)
-              (emit (string-append (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @malloc(" *xtc:codegen:size_t_str* " "
+              (emit (string-append (xtc:codegen:ssa-temp "dat" "i8*") " = call ptr @malloc(" *xtc:codegen:size_t_str* " "
                                    (car (xtc:codegen:ssa-temp "sizeb"))
                                    ")\n") os))
-            (emit (string-append (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @malloc(" *xtc:codegen:size_t_str* " "
+            (emit (string-append (xtc:codegen:ssa-temp "dat" "i8*") " = call ptr @malloc(" *xtc:codegen:size_t_str* " "
                                  (car (xtc:codegen:ssa-temp "zonesize"))
                                  ")\n") os))
-        (emit "call i8* @memset(i8* " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, i64 " (car (xtc:codegen:ssa-temp "zonesize")) ")\n" os)
+        (emit "call ptr @memset(ptr " (car (xtc:codegen:ssa-temp "dat")) ", i32 0, i64 " (car (xtc:codegen:ssa-temp "zonesize")) ")\n" os)
         (emit (string-append (xtc:codegen:ssa-temp "val" (string-append (xtc:codegen:get-type-str tt) "*"))
-                             " = bitcast i8* " (car (xtc:codegen:ssa-temp "dat"))
-                             " to " (xtc:codegen:get-type-str tt) "*\n") os)
+                             " = bitcast ptr " (car (xtc:codegen:ssa-temp "dat"))
+                             " to ptr\n") os)
         (xtc:codegen:strip-space os)))))
 
 
@@ -2962,7 +3069,7 @@
              (idx (xtc:codegen:ssa-temp))
              (t (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (car hint?)))))
         (emit idx-str os)
-        (emit (string-append (xtc:codegen:ssa-temp "dat" (string-append t "*")) " = alloca " t ", " (cadr idx) " " (car idx) ", align 16\n") os)
+        (emit (string-append (xtc:codegen:ssa-temp "dat" (string-append t "*")) " = alloca " (xtc:codegen:ir-type t) ", " (xtc:codegen:ir-type (cadr idx)) " " (car idx) ", align 16\n") os)
         (xtc:codegen:strip-space os)))))
 
 (define xtc:codegen:compiler:stack-alloc-without-size
@@ -2970,7 +3077,7 @@
     (let* ((os (xtc:emit:new-buffer)))
       (let* ;((t (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (cadr ast)))))
           ((t (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (car hint?)))))
-        (emit (string-append (xtc:codegen:ssa-temp "dat" (string-append t "*")) " = alloca " t ", align 16\n") os)
+        (emit (string-append (xtc:codegen:ssa-temp "dat" (string-append t "*")) " = alloca " (xtc:codegen:ir-type t) ", align 16\n") os)
         (xtc:codegen:strip-space os)))))
 
 
@@ -3003,14 +3110,14 @@
                                    "}")))
         (emit "; stack alloc tuple literal")
         (emit (caar elts) os)
-        (emit (xtc:codegen:ssa-temp "tuplel" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
+        (emit (xtc:codegen:ssa-temp "tuplel" fullt) " = insertvalue " (xtc:codegen:ir-type fullt) " undef, " (xtc:codegen:ir-type (cadr (cdar elts))) " " (car (cdar elts)) ", 0\n" os)
         (emit "; set tuple literal elts")
         (for-each (lambda (x idx)
                     (emit (car x) os)
                     (let ((last (xtc:codegen:ssa-temp "tuplel")))
                       (emit (xtc:codegen:ssa-temp "tuplel" fullt)
-                            " = insertvalue " fullt " " (car last)
-                            ", " (caddr x) " " (cadr x) ", " (number->string idx) "\n" os)))
+                            " = insertvalue " (xtc:codegen:ir-type fullt) " " (car last)
+                            ", " (xtc:codegen:ir-type (caddr x)) " " (cadr x) ", " (number->string idx) "\n" os)))
                   (cdr elts)
                   (range 1 (+ 1 num-elts)))
         (xtc:codegen:strip-space os)))))
@@ -3069,11 +3176,11 @@
           (xtc:diagnostics:print-bad-type-error tuple-type "trying to ref from a tuple pointer" ast)
           (if (< (xtc:codegen:get-ptr-depth tuple-type) 1)
               (emit (string-append (xtc:codegen:ssa-temp "val" ttstr) " = extractvalue "
-                                   (cadr var) " " (car var) ", " (car idx) "\n") os)
+                                   (xtc:codegen:ir-type (cadr var)) " " (car var) ", " (car idx) "\n") os)
               (begin (emit (string-append (xtc:codegen:ssa-temp "val" (string-append ttstr "*")) " = getelementptr "
-                                          (xtc:codegen:strip-ptr-depth (cadr var)) ", "
-                                          (cadr var) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
-                     (emit (string-append (xtc:codegen:ssa-temp "val" ttstr) " = load " ttstr ", " ttstr "* "
+                                          (xtc:codegen:ir-pointee (cadr var)) ", "
+                                          (xtc:codegen:ir-type (cadr var)) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
+                     (emit (string-append (xtc:codegen:ssa-temp "val" ttstr) " = load " (xtc:codegen:ir-type ttstr) ", ptr "
                                           (car (xtc:codegen:ssa-temp 1)) "\n") os))))
       (xtc:codegen:strip-space os))))
 
@@ -3131,8 +3238,8 @@
       (if (<> (xtc:codegen:get-ptr-depth tuple-type) 1)
           (xtc:diagnostics:print-bad-type-error-with-ast tuple-type "bad tuple type" ast))
       (emit (string-append (xtc:codegen:ssa-temp "val" (string-append ttstr "*")) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr var)) ", "
-                           (cadr var) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
+                           (xtc:codegen:ir-pointee (cadr var)) ", "
+                           (xtc:codegen:ir-type (cadr var)) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
       (xtc:codegen:strip-space os))))
 
 
@@ -3178,10 +3285,10 @@
       (if (<> (xtc:codegen:get-ptr-depth tuple-type) 1)
           (xtc:diagnostics:print-bad-type-error-with-ast tuple-type "cannot set element into tuple type" ast))
       (emit (string-append (xtc:codegen:ssa-temp "val" (string-append ttstr "*")) " = getelementptr "
-                           (xtc:codegen:strip-ptr-depth (cadr var)) ", "
-                           (cadr var) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
-      (emit (string-append "store " (cadr val) " " (car val) ", "
-                           (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp)) "\n") os)
+                           (xtc:codegen:ir-pointee (cadr var)) ", "
+                           (xtc:codegen:ir-type (cadr var)) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
+      (emit (string-append "store " (xtc:codegen:ir-type (cadr val)) " " (car val) ", "
+                           (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp))) " " (car (xtc:codegen:ssa-temp)) "\n") os)
       (xtc:codegen:ssa-temp "val" (car val) (cadr val))
       (xtc:codegen:strip-space os))))
 
@@ -3215,8 +3322,8 @@
             ;(println 'type: type)
             (if (and (not (equal? (xtc:codegen:get-type-from-str (cadr (xtc:codegen:ssa-temp))) type))
                      (not (equal? (ast:ret-name ast) (ast:ret-expr ast)))) ;; this line is a weird catch for outer let??
-                (emit (xtc:codegen:ssa-temp "retval" (xtc:codegen:get-type-str type)) " = bitcast " (cadr val) " " (car val) " to " (xtc:codegen:get-type-str type) "\n" os))
-            (emit "ret " (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp)) "\n" os)))
+                (emit (xtc:codegen:ssa-temp "retval" (xtc:codegen:get-type-str type)) " = bitcast " (xtc:codegen:ir-type (cadr val)) " " (car val) " to " (xtc:codegen:get-ir-type type) "\n" os))
+            (emit "ret " (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp))) " " (car (xtc:codegen:ssa-temp)) "\n" os)))
       ;;(println 'os2: os)
       (xtc:codegen:strip-space os))))
 
@@ -3261,22 +3368,22 @@
             (else (xtc:diagnostics:print-bad-type-error "" "Bad VARARGS func!")))
       (if (equal? (car ast) 'printf)
           (string-append (apply string-append (map (lambda (a) (car a)) args))
-                         "\n" va " = call i32 (i8*, ...) @printf("
-                         (caddr (car args)) " " (cadr (car args))
+                         "\n" va " = call i32 (ptr, ...) @printf("
+                         (xtc:codegen:ir-type (caddr (car args))) " " (cadr (car args))
                          (apply string-append (map (lambda (a)
                                                      (string-append ", "
-                                                                    (caddr a)
+                                                                    (xtc:codegen:ir-type (caddr a))
                                                                     " " (cadr a)))
                                                    (cdr args)))
                          ")\n")
           (string-append (apply string-append (map (lambda (a) (car a)) args))
-                         "\n" va " = call i32 (i8*,i8*, ...) @"
+                         "\n" va " = call i32 (ptr,ptr, ...) @"
                          (symbol->string (car ast)) "("
-                         (caddr (car args)) " " (cadr (car args)) ", "
-                         (caddr (cadr args)) " " (cadr (cadr args))
+                         (xtc:codegen:ir-type (caddr (car args))) " " (cadr (car args)) ", "
+                         (xtc:codegen:ir-type (caddr (cadr args))) " " (cadr (cadr args))
                          (apply string-append (map (lambda (a)
                                                      (string-append ", "
-                                                                    (caddr a)
+                                                                    (xtc:codegen:ir-type (caddr a))
                                                                     " " (cadr a)))
                                                    (cddr args)))
                          ")\n")))))
@@ -3337,11 +3444,11 @@
         ;; dereference any vector pointers
         (if (and (xtc:codegen:pointer? (cadr aval))
                  (xtc:codegen:vector? (cadr aval)))
-            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr aval)))) " = load " (xtc:codegen:strip-ptr-depth (cadr aval)) ", " (cadr aval) " " (car aval) "\n" os)
+            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr aval)))) " = load " (xtc:codegen:ir-pointee (cadr aval)) ", " (xtc:codegen:ir-type (cadr aval)) " " (car aval) "\n" os)
                    (set! aval (xtc:codegen:ssa-temp))))
         (if (and (xtc:codegen:pointer? (cadr bval))
                  (xtc:codegen:vector? (cadr bval)))
-            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr bval)))) " = load " (xtc:codegen:strip-ptr-depth (cadr bval)) ", " (cadr bval) " " (car bval) "\n" os)
+            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr bval)))) " = load " (xtc:codegen:ir-pointee (cadr bval)) ", " (xtc:codegen:ir-type (cadr bval)) " " (car bval) "\n" os)
                    (set! bval (xtc:codegen:ssa-temp))))
         (if (and (xtc:codegen:vector? (cadr bval))
                  (xtc:codegen:pointer? type))
@@ -3360,10 +3467,10 @@
           (if (or (xtc:codegen:fixed-point? typetest)
                   (xtc:codegen:pointer? typetest))
               (emit (string-append (xtc:codegen:ssa-temp "cmp" (xtc:codegen:get-type-str typet)) " = icmp " (list-ref icmps v)
-                                   " " type " " (car aval)
+                                   " " (xtc:codegen:ir-type type) " " (car aval)
                                    ", " (car bval) "\n") os)
               (emit (string-append (xtc:codegen:ssa-temp "cmp" (xtc:codegen:get-type-str typet)) " = fcmp " (list-ref fcmps v)
-                                   " " type " " (car aval)
+                                   " " (xtc:codegen:ir-type type) " " (car aval)
                                    ", " (car bval) "\n") os)))
         ;(println 'os: os)
         (xtc:codegen:strip-space os)))))
@@ -3473,9 +3580,9 @@
         (emit cstr os)
         (emit (string-append (xtc:codegen:ssa-temp "val" (cadr aval)) " = call "
                              (cadr aval) " @llvm." (symbol->string (car ast)) "." (cdr (assoc (cadr aval) mls))
-                             "(" (cadr aval) " " (car aval)
-                             (if bval (string-append ", " (cadr bval) " " (car bval)) "")
-                             (if cval (string-append ", " (cadr cval) " " (car cval)) "")
+                             "(" (xtc:codegen:ir-type (cadr aval)) " " (car aval)
+                             (if bval (string-append ", " (xtc:codegen:ir-type (cadr bval)) " " (car bval)) "")
+                             (if cval (string-append ", " (xtc:codegen:ir-type (cadr cval)) " " (car cval)) "")
                              ")\n")
               os)
         (xtc:codegen:strip-space os)))))
@@ -3540,11 +3647,11 @@
         ;; dereference any vector pointers
         (if (and (xtc:codegen:pointer? (cadr aval))
                  (xtc:codegen:vector? (cadr aval)))
-            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr aval)))) " = load " (xtc:codegen:strip-ptr-depth (cadr aval)) ", " (cadr aval) " " (car aval) "\n" os)
+            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr aval)))) " = load " (xtc:codegen:ir-pointee (cadr aval)) ", " (xtc:codegen:ir-type (cadr aval)) " " (car aval) "\n" os)
                    (set! aval (xtc:codegen:ssa-temp))))
         (if (and (xtc:codegen:pointer? (cadr bval))
                  (xtc:codegen:vector? (cadr bval)))
-            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr bval)))) " = load " (xtc:codegen:strip-ptr-depth (cadr bval)) ", " (cadr bval) " " (car bval) "\n" os)
+            (begin (emit (xtc:codegen:ssa-temp "val" (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (cadr bval)))) " = load " (xtc:codegen:ir-pointee (cadr bval)) ", " (xtc:codegen:ir-type (cadr bval)) " " (car bval) "\n" os)
                    (set! bval (xtc:codegen:ssa-temp))))
         (if (and (xtc:codegen:vector? (cadr bval))
                  (xtc:codegen:pointer? type))
@@ -3616,7 +3723,7 @@
                          (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (caddr ast))))))
       (emit a os)
       (emit (string-append (xtc:codegen:ssa-temp "val" type-str)
-                           " = bitcast " (cadr at) " " (car at) " to " type-str "\n") os)
+                           " = bitcast " (xtc:codegen:ir-type (cadr at)) " " (car at) " to " (xtc:codegen:ir-type type-str) "\n") os)
       (xtc:codegen:strip-space os))))
 
 ;; currently only supports 64bit!
@@ -3640,13 +3747,13 @@
               ((and (xtc:codegen:pointer? from) ;; must be pointer -> pointer
                     (xtc:codegen:pointer? to))  ;; do standard bitcast
                (emit (string-append (xtc:codegen:ssa-temp "val" type-str)
-                                    " = bitcast " (cadr at) " " (car at) " to " type-str "\n") os))
+                                    " = bitcast " (xtc:codegen:ir-type (cadr at)) " " (car at) " to " (xtc:codegen:ir-type type-str) "\n") os))
               ((equal? from to) ;; if to and from are same type do standard bitcast
                (emit (string-append (xtc:codegen:ssa-temp "val" type-str)
-                                    " = bitcast " (cadr at) " " (car at) " to " type-str "\n") os))
+                                    " = bitcast " (xtc:codegen:ir-type (cadr at)) " " (car at) " to " (xtc:codegen:ir-type type-str) "\n") os))
               ((xtc:codegen:pointer? from) ;; to must be value
                ;; first convert pointer to int
-               (emit (xtc:codegen:ssa-temp "val1" "i64") " = ptrtoint " (xtc:codegen:get-type-str from) " " (car at) " to i64\n" os)
+               (emit (xtc:codegen:ssa-temp "val1" "i64") " = ptrtoint " (xtc:codegen:get-ir-type from) " " (car at) " to i64\n" os)
                ;; now convert i64 into correct final type
                (cond ((= to *xtc:codegen:fp64*) (emit (xtc:codegen:ssa-temp "val" type-str) " = sitofp i64 " (car (xtc:codegen:ssa-temp "val1")) " to double\n" os))
                      ((= to *xtc:codegen:fp32*) (emit (xtc:codegen:ssa-temp "val" type-str) " = sitofp i64 " (car (xtc:codegen:ssa-temp "val1")) " to float\n" os))
@@ -3666,7 +3773,7 @@
                      ((= from *xtc:codegen:si8*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = sext i8 " (car at) " to i64\n" os))
                      ((= from *xtc:codegen:i1*) (emit (xtc:codegen:ssa-temp "val1" "i64") " = zext i1 " (car at) " to i64\n" os))
                      (else (xtc:diagnostics:print-unsupported-conversion-error from to)))
-               (emit (xtc:codegen:ssa-temp "val" type-str) " = inttoptr i64 " (car (xtc:codegen:ssa-temp "val1")) " to " type-str "\n" os))
+               (emit (xtc:codegen:ssa-temp "val" type-str) " = inttoptr i64 " (car (xtc:codegen:ssa-temp "val1")) " to " (xtc:codegen:ir-type type-str) "\n" os))
               ((= to *xtc:codegen:fp64*)
                (cond ((= from *xtc:codegen:fp32*) (emit (xtc:codegen:ssa-temp "val" "double") " = fpext float " (car at) " to double\n" os))
                      ((= from *xtc:codegen:si64*) (emit (xtc:codegen:ssa-temp "val" "double") " = sitofp i64 " (car at) " to double\n" os))
@@ -3732,7 +3839,7 @@
            (a (xtc:codegen:compiler (cadr ast) types))
            (at (xtc:codegen:ssa-temp)))
       (emit a os)
-      (emit  (xtc:codegen:ssa-temp "val" "i1") " = icmp eq " (cadr at) " " (car at) ", null\n" os)
+      (emit  (xtc:codegen:ssa-temp "val" "i1") " = icmp eq " (xtc:codegen:ir-type (cadr at)) " " (car at) ", null\n" os)
       (xtc:codegen:strip-space os))))
 
 
@@ -3786,8 +3893,8 @@
           (emit (xtc:codegen:compiler (ast:if-then ast) types (car hint?)) os)
           (emit (xtc:codegen:compiler (ast:if-then ast) types) os))
       (if (not (xtc:codegen:void? (cadr (xtc:codegen:ssa-temp))))
-          (emit (string-append "store " (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp))
-                               ", " (cadr (xtc:codegen:ssa-temp)) "* %ifptr" num "\n") os))
+          (emit (string-append "store " (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp))) " " (car (xtc:codegen:ssa-temp))
+                               ", ptr %ifptr" num "\n") os))
       (emit  "br label %ifcont" num "\n" os)
       (define a (xtc:codegen:ssa-temp))
       ;; do else if requried
@@ -3797,8 +3904,8 @@
                      (emit (xtc:codegen:compiler (ast:if-else ast) types (car hint?)) os)
                      (emit (xtc:codegen:compiler (ast:if-else ast) types) os))
                  (if (not (xtc:codegen:void? (cadr (xtc:codegen:ssa-temp))))
-                     (emit (string-append "store " (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp))
-                                          ", " (cadr (xtc:codegen:ssa-temp)) "* %ifptr" num "\n") os))
+                     (emit (string-append "store " (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp))) " " (car (xtc:codegen:ssa-temp))
+                                          ", ptr %ifptr" num "\n") os))
                  (emit  "br label %ifcont" num "\n" os))
           (begin (emit  "\nelse" num ":\n" os)
                  (emit  "br label %ifcont" num "\n" os)))
@@ -3813,7 +3920,7 @@
 
       (emit  "\nifcont" num ":\n" os)
       (if (not (xtc:codegen:void? (cadr a)))
-          (begin (emit  (xtc:codegen:ssa-temp "ifres" (cadr a)) " = load " (cadr a) ", " (cadr a) "* %ifptr" num "\n\n" os)
+          (begin (emit  (xtc:codegen:ssa-temp "ifres" (cadr a)) " = load " (xtc:codegen:ir-type (cadr a)) ", ptr %ifptr" num "\n\n" os)
                  ;; make sure ifptr gets stack allocated at the TOP
                  ;; of the closure by adding it to *xtc:codegen:ls_var*
                  (set! *xtc:codegen:ls_var* (cons (cons (cons (string-append "%ifptr" num)
@@ -3872,52 +3979,52 @@
           (xtc:diagnostics:print-bad-arity-error ast))
 
       (emit timestr os)
-      (emit (xtc:codegen:ssa-temp "dat1_" "i8*") " = call ccc i8* @malloc(" *xtc:codegen:size_t_str* " " (number->string total_size1) ")\n"
-            (xtc:codegen:ssa-temp "struct1_" struct_type1) " = bitcast i8* " (car (xtc:codegen:ssa-temp "dat1_")) " to " struct_type1 "\n"
+      (emit (xtc:codegen:ssa-temp "dat1_" "i8*") " = call ccc ptr @malloc(" *xtc:codegen:size_t_str* " " (number->string total_size1) ")\n"
+            (xtc:codegen:ssa-temp "struct1_" struct_type1) " = bitcast ptr " (car (xtc:codegen:ssa-temp "dat1_")) " to ptr\n"
             os)
       (if (null? args)
-          (emit (xtc:codegen:ssa-temp "dat2_" "i8*") " = select i1 true, i8* null, i8* null\n" os)
-          (emit (xtc:codegen:ssa-temp "dat2_" "i8*") " = call ccc i8* @malloc(" *xtc:codegen:size_t_str* " " (number->string total_size2) ")\n"
-                (xtc:codegen:ssa-temp "struct2_" struct_type2) " = bitcast i8* " (car (xtc:codegen:ssa-temp "dat2_")) " to " struct_type2 "\n"
+          (emit (xtc:codegen:ssa-temp "dat2_" "i8*") " = select i1 true, ptr null, ptr null\n" os)
+          (emit (xtc:codegen:ssa-temp "dat2_" "i8*") " = call ccc ptr @malloc(" *xtc:codegen:size_t_str* " " (number->string total_size2) ")\n"
+                (xtc:codegen:ssa-temp "struct2_" struct_type2) " = bitcast ptr " (car (xtc:codegen:ssa-temp "dat2_")) " to ptr\n"
                 os))
 
       (emit callback_func_name_str os)
 
-      (emit (xtc:codegen:ssa-temp "funcptr_ptr" "i8*") " = call ccc i8* @llvm_get_function_ptr(i8* " (car callback_func_name) ")\n" os)
-      (emit (xtc:codegen:ssa-temp "funcptr" "void(i8*, %mzone*)*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "funcptr_ptr")) " to void(i8*, %mzone*)*\n" os)
+      (emit (xtc:codegen:ssa-temp "funcptr_ptr" "i8*") " = call ccc ptr @llvm_get_function_ptr(ptr " (car callback_func_name) ")\n" os)
+      (emit (xtc:codegen:ssa-temp "funcptr" "void(i8*, %mzone*)*") " = bitcast ptr " (car (xtc:codegen:ssa-temp "funcptr_ptr")) " to ptr\n" os)
 
       (emit cbzonestr os)
 
       (emit (apply string-append (map (lambda (a n)
                                         (string-append (car a)
                                                        (xtc:codegen:ssa-temp "ptr" (string-append (cadr (cdr a)) "*")) " = getelementptr "
-                                                       (xtc:codegen:strip-ptr-depth struct_type2) ", " struct_type2 " "
+                                                       (xtc:codegen:ir-pointee struct_type2) ", ptr "
                                                        (car (xtc:codegen:ssa-temp "struct2_")) ", i32 0, i32 " (number->string n) "\n"
-                                                       "store " (cadr (cdr a)) " " (car (cdr a)) ", "
-                                                       (cadr (xtc:codegen:ssa-temp "ptr")) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"))
+                                                       "store " (xtc:codegen:ir-type (cadr (cdr a))) " " (car (cdr a)) ", "
+                                                       (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "ptr"))) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"))
                                       args
                                       (make-list-with-proc (length args) (lambda (i) i))))
             os)
 
       ;; now add both {fptr, struct2 and the mzone} to struct1
-      (emit (xtc:codegen:ssa-temp "ptr" "void(i8*, %mzone*)**") " = getelementptr " (xtc:codegen:strip-ptr-depth struct_type1) ", " struct_type1 " "
+      (emit (xtc:codegen:ssa-temp "ptr" "void(i8*, %mzone*)**") " = getelementptr " (xtc:codegen:ir-pointee struct_type1) ", ptr "
             (car (xtc:codegen:ssa-temp "struct1_")) ", i32 0, i32 0\n"
-            "store " (cadr (xtc:codegen:ssa-temp "funcptr")) " " (car (xtc:codegen:ssa-temp "funcptr")) ", "
-            (cadr (xtc:codegen:ssa-temp "ptr")) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"
+            "store " (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "funcptr"))) " " (car (xtc:codegen:ssa-temp "funcptr")) ", "
+            (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "ptr"))) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"
             os)
-      (emit (xtc:codegen:ssa-temp "ptr" "i8**") " = getelementptr " (xtc:codegen:strip-ptr-depth struct_type1) ", "  struct_type1 " "
+      (emit (xtc:codegen:ssa-temp "ptr" "i8**") " = getelementptr " (xtc:codegen:ir-pointee struct_type1) ", ptr "
             (car (xtc:codegen:ssa-temp "struct1_")) ", i32 0, i32 1\n"
-            "store " (cadr (xtc:codegen:ssa-temp "dat2_")) " " (car (xtc:codegen:ssa-temp "dat2_")) ", "
-            (cadr (xtc:codegen:ssa-temp "ptr")) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"
+            "store " (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "dat2_"))) " " (car (xtc:codegen:ssa-temp "dat2_")) ", "
+            (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "ptr"))) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"
             os)
-      (emit (xtc:codegen:ssa-temp "ptr" "%mzone**") " = getelementptr " (xtc:codegen:strip-ptr-depth struct_type1) ", "  struct_type1 " "
+      (emit (xtc:codegen:ssa-temp "ptr" "%mzone**") " = getelementptr " (xtc:codegen:ir-pointee struct_type1) ", ptr "
             (car (xtc:codegen:ssa-temp "struct1_")) ", i32 0, i32 2\n"
-            "store " (cadr cbzone) " " (car cbzone) ", "
-            (cadr (xtc:codegen:ssa-temp "ptr")) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"
+            "store " (xtc:codegen:ir-type (cadr cbzone)) " " (car cbzone) ", "
+            (xtc:codegen:ir-type (cadr (xtc:codegen:ssa-temp "ptr"))) " " (car (xtc:codegen:ssa-temp "ptr")) "\n"
             os)
 
-      (emit "call ccc void @llvm_schedule_callback(" (cadr time) " " (car time) ", "
-            "i8* " (car (xtc:codegen:ssa-temp "dat1_")) ")\n" os)
+      (emit "call ccc void @llvm_schedule_callback(" (xtc:codegen:ir-type (cadr time)) " " (car time) ", "
+            "ptr " (car (xtc:codegen:ssa-temp "dat1_")) ")\n" os)
       (xtc:codegen:ssa-temp "voidmark" (xtc:codegen:get-type-str *xtc:codegen:void*))
       (xtc:codegen:strip-space os))))
 
@@ -3980,7 +4087,7 @@
                              (cons (string-append
                                     (car p)
                                     (xtc:codegen:ssa-temp "val" ft)
-                                    " = bitcast " atype " " aname " to " ft "\n")
+                                    " = bitcast " (xtc:codegen:ir-type atype) " " aname " to " (xtc:codegen:ir-type ft) "\n")
                                    (xtc:codegen:ssa-temp))
                              p)))
                      args (cdr ftypes))))
@@ -3998,7 +4105,7 @@
                                (string-append (xtc:codegen:ssa-temp "res" (car ftypes)) " = "))
                            ;; "tail "
                            "call " (xtc:codegen:function-calling-convention fname)
-                           " " (car ftypes)
+                           " " (xtc:codegen:ir-type (car ftypes))
                            " @" (xtc:codegen:intrinsic-substitution fname) "("
                            (apply string-append
                                   (map (lambda (p ft i)
@@ -4010,7 +4117,7 @@
                                                             (xtc:codegen:get-type-from-str ft)))
                                                (xtc:diagnostics:print-type-mismatch-error atype (xtc:codegen:pretty-print-type ft) ast))
                                            (string-append (if (> i 0) ", " "")
-                                                          atype " " aname)))
+                                                          (xtc:codegen:ir-type atype) " " aname)))
                                        args (cdr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
                            (xtc:codegen:function-fixup-args fname)
                            ")\n") os)
@@ -4038,7 +4145,7 @@
           (xtc:diagnostics:print-bad-arity-error ast))
       (emit fptrstr os)
       (emit (apply string-append (map (lambda (p) (car p)) args)) os)
-      (emit (xtc:codegen:ssa-temp "fptr" ftypestr) " = bitcast " (cadr fptr) " " (car fptr) " to " ftypestr "\n" os)
+      (emit (xtc:codegen:ssa-temp "fptr" ftypestr) " = bitcast " (xtc:codegen:ir-type (cadr fptr)) " " (car fptr) " to ptr\n" os)
       ;; (if (= (xtc:codegen:get-ptr-depth ftypes) 2)
       ;;     (begin (emit (xtc:codegen:ssa-temp "fptr_" (string-append ftypestr "*")) " = bitcast " (cadr fptr) " " (car fptr) " to " ftypestr "*\n" os)
       ;;            (emit (xtc:codegen:ssa-temp "fptr" ftypestr) " = load " (xtc:codegen:strip-ptr-depth (cadr (xtc:codegen:ssa-temp "fptr_"))) ", " (cadr (xtc:codegen:ssa-temp "fptr_")) " " (car (xtc:codegen:ssa-temp "fptr_")) "\n" os))
@@ -4049,7 +4156,7 @@
                                (begin (xtc:codegen:ssa-temp "res" "void") "")
                                (string-append (xtc:codegen:ssa-temp "res" (xtc:codegen:get-type-str (cadr ftypes))) " = "))
                            "call ccc "
-                           (xtc:codegen:get-type-str (cadr ftypes)) " " (car (xtc:codegen:ssa-temp "fptr")) "("
+                           (xtc:codegen:get-ir-type (cadr ftypes)) " " (car (xtc:codegen:ssa-temp "fptr")) "("
                            (apply string-append
                                   (map (lambda (p ft i)
                                          (let ((atype (cadr (cdr p)))
@@ -4058,7 +4165,7 @@
                                                             ft)) ;(xtc:codegen:get-type-from-str ft)))
                                                (xtc:diagnostics:print-type-mismatch-error ft atype ast))
                                            (string-append (if (> i 0) ", " "")
-                                                          atype " " aname)))
+                                                          (xtc:codegen:ir-type atype) " " aname)))
                                        args (cddr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
                            ")\n") os)
       (xtc:codegen:strip-space os))))
@@ -4094,20 +4201,14 @@
                                 (let ((name (symbol->string ast))
                                       (ftypes (xtc:cache:get-nativefunc-arg-types (symbol->string ast))))
                                   (string-append (xtc:codegen:ssa-temp "__fptr" "i8*")
-                                                 " = bitcast " (car ftypes)
-                                                 " (" (string-join (cdr ftypes) ",")
-                                                 ")* @" name " to i8*\n"))
+                                                 " = bitcast ptr @" name " to ptr\n"))
                                 (xtc:codegen:compiler:closure-from-getter (symbol->string ast)))
                             (if (xtc:cache:nativefunc-exists? (symbol->string ast))
                                 (let ((name (symbol->string ast))
                                       (ftypes (xtc:cache:get-nativefunc-arg-types (symbol->string ast))))
                                   (string-append (xtc:codegen:ssa-temp "__fptr"
                                                                        (string-append (car ftypes) " (" (string-join (cdr ftypes) ",") ")*"))
-                                                 " = bitcast " (car ftypes)
-                                                 " (" (string-join (cdr ftypes) ",")
-                                                 ")* @" name " to " (car ftypes)
-                                                 " (" (string-join (cdr ftypes) ",")
-                                                 ")*\n"))
+                                                 " = bitcast ptr @" name " to ptr\n"))
                                 (xtc:diagnostics:print-missing-identifier-error ast 'variable)))))
                    ((number? ast)
                     ;; (println 'number: 'ast: ast 'hint: hint?)
@@ -4146,7 +4247,7 @@
                    ((equal? (car ast) 'pop_zone) (xtc:codegen:compile:pop_zone ast types))
                    ((member (car ast) '(impc_null))
                     (string-append (xtc:codegen:ssa-temp "null" (if (null? hint?) "i8*" (xtc:codegen:get-type-str (car hint?))))
-                                   " = bitcast i8* null to " (if (null? hint?) "i8*" (xtc:codegen:get-type-str (car hint?)))
+                                   " = bitcast ptr null to " (xtc:codegen:ir-type (if (null? hint?) "i8*" (xtc:codegen:get-type-str (car hint?))))
                                    "\n"))
                    ((member (car ast) '(__make-static))
                     (let* ((fstr (xtc:codegen:compile:make-static ast types)))
