@@ -287,6 +287,23 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
     return status;
 }
 
+// A session's greeting, above the startup messages: for a person at a
+// terminal only, so it goes straight to stderr rather than into the log, and
+// never into a pipe, a log file or a -q run. Plain ASCII, which every console
+// draws.
+void print_greeting() {
+    using namespace extemp;
+    if (!UNIV::is_terminal(stderr) || !log::enabled(log::Level::Info)) {
+        return;
+    }
+    const std::string text = log::dim("   .-.     .-.     .-.\n"
+                                      "  /   \\   /   \\   /   \\     ") +
+                             log::bold("e x t e m p o r e") + "\n" +
+                             log::dim("-'     '-'     '-'     '-   ex tempore: out of time") +
+                             "\n\n";
+    std::fputs(text.c_str(), stderr);
+}
+
 // Which messages show (include/Log.h): a session says what it is doing, the
 // subcommands only what goes wrong; then EXTEMPORE_LOG, then -q and -v.
 void configure_logging(const extemp::cli::Invocation& Inv) {
@@ -621,6 +638,9 @@ EXPORT int extempore_init(int argc, char** argv) {
     // an offline render runs the scheduler itself, from its render thread
     if (extemp::UNIV::MODE != extemp::UNIV::Mode::Render) {
         extemp::TaskScheduler::I()->start();
+    }
+    if (session) {
+        print_greeting();
     }
     extemp::EXTLLVM::initLLVM();
 #ifdef __APPLE__
