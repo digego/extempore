@@ -50,7 +50,6 @@ if(EXTEMPORE_SANITIZE AND NOT EXTEMPORE_SANITIZE MATCHES "^(asan|ubsan|tsan|asan
 endif()
 option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native)" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
-option(EXTEMPORE_SYSTEM_LLVM "use an installed LLVM of the pinned minor version instead of building it" OFF)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -224,51 +223,44 @@ endif()
 
 message(STATUS "LLVM target architecture: ${LLVM_TARGET_ARCH}")
 
-if(EXTEMPORE_SYSTEM_LLVM)
-    # LLVM's package config accepts any patch release of the same minor.
-    string(REGEX MATCH "^[0-9]+\\.[0-9]+" _llvm_minor ${DEP_LLVM_VERSION})
-    find_package(LLVM ${_llvm_minor} CONFIG REQUIRED)
-    message(STATUS "Using LLVM ${LLVM_PACKAGE_VERSION} from ${LLVM_DIR}")
-else()
-    set(LLVM_TARGETS_TO_BUILD ${LLVM_TARGET_ARCH} CACHE STRING "" FORCE)
-    set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "" FORCE)
-    set(LLVM_ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
-    set(LLVM_ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
-    set(LLVM_INCLUDE_TOOLS OFF CACHE BOOL "" FORCE)
-    set(LLVM_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-    set(LLVM_INCLUDE_UTILS OFF CACHE BOOL "" FORCE)
-    set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "" FORCE)
-    set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
-    set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
-    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
-    set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
-    set(LLVM_ENABLE_OCAMLDOC OFF CACHE BOOL "" FORCE)
-    # A Debug build would otherwise run a Debug tablegen, which is very slow.
-    set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "" FORCE)
+set(LLVM_TARGETS_TO_BUILD ${LLVM_TARGET_ARCH} CACHE STRING "" FORCE)
+set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "" FORCE)
+set(LLVM_ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
+set(LLVM_ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_TOOLS OFF CACHE BOOL "" FORCE)
+set(LLVM_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_UTILS OFF CACHE BOOL "" FORCE)
+set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
+set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
+set(LLVM_ENABLE_OCAMLDOC OFF CACHE BOOL "" FORCE)
+# A Debug build would otherwise run a Debug tablegen, which is very slow.
+set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "" FORCE)
 
-    # DOWNLOAD_EXTRACT_TIMESTAMP keeps the archive's mtimes on the extracted
-    # sources. CI restores a cached LLVM build into a fresh checkout, where
-    # configure extracts the sources again; stamped with the extraction time they
-    # would be newer than every cached object and Ninja would rebuild all of LLVM.
-    FetchContent_Declare(LLVM
-        URL https://github.com/llvm/llvm-project/releases/download/llvmorg-${DEP_LLVM_VERSION}/llvm-project-${DEP_LLVM_VERSION}.src.tar.xz
-        URL_HASH SHA256=${DEP_LLVM_SHA256}
-        SOURCE_SUBDIR llvm
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-        EXCLUDE_FROM_ALL)
+# DOWNLOAD_EXTRACT_TIMESTAMP keeps the archive's mtimes on the extracted
+# sources. CI restores a cached LLVM build into a fresh checkout, where
+# configure extracts the sources again; stamped with the extraction time they
+# would be newer than every cached object and Ninja would rebuild all of LLVM.
+FetchContent_Declare(LLVM
+    URL https://github.com/llvm/llvm-project/releases/download/llvmorg-${DEP_LLVM_VERSION}/llvm-project-${DEP_LLVM_VERSION}.src.tar.xz
+    URL_HASH SHA256=${DEP_LLVM_SHA256}
+    SOURCE_SUBDIR llvm
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    EXCLUDE_FROM_ALL)
 
-    # LLVM's cmake_minimum_required predates CMP0219 (CMake 4.4), which warns
-    # about its backslash-carrying macro calls. Keep the old behaviour it was
-    # written for, without the warning.
-    set(CMAKE_POLICY_DEFAULT_CMP0219 OLD)
-    FetchContent_MakeAvailable(LLVM)
-    unset(CMAKE_POLICY_DEFAULT_CMP0219)
+# LLVM's cmake_minimum_required predates CMP0219 (CMake 4.4), which warns
+# about its backslash-carrying macro calls. Keep the old behaviour it was
+# written for, without the warning.
+set(CMAKE_POLICY_DEFAULT_CMP0219 OLD)
+FetchContent_MakeAvailable(LLVM)
+unset(CMAKE_POLICY_DEFAULT_CMP0219)
 
-    set(LLVM_INCLUDE_DIRS
-        ${llvm_SOURCE_DIR}/llvm/include
-        ${llvm_BINARY_DIR}/include)
-endif()
+set(LLVM_INCLUDE_DIRS
+    ${llvm_SOURCE_DIR}/llvm/include
+    ${llvm_BINARY_DIR}/include)
 
 # GoogleTest for C++ unit tests.
 if(BUILD_TESTS)
@@ -325,9 +317,7 @@ llvm_map_components_to_libnames(LLVM_LIBRARIES ${EXTEMPORE_LLVM_COMPONENTS})
 message(STATUS "LLVM libraries: ${LLVM_LIBRARIES}")
 
 # Target for building just LLVM (useful for CI caching)
-if(NOT EXTEMPORE_SYSTEM_LLVM)
-    add_custom_target(llvm-libs DEPENDS ${LLVM_LIBRARIES})
-endif()
+add_custom_target(llvm-libs DEPENDS ${LLVM_LIBRARIES})
 
 #############
 # extempore #

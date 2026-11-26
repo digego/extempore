@@ -63,8 +63,7 @@ pinned CMake, Ninja and Python. Generated files (the AOT cache and the platform
 shared libraries) now go in `build/libs/` beside the binary instead of the
 source tree, and `(sys:build-dir)` names that directory. When upgrading a source
 checkout, delete its `libs/aot-cache/` and `libs/platform-shlibs/`. On Windows,
-`extempore.exe` is built into `build\` too. `-DEXTEMPORE_SYSTEM_LLVM=ON` builds
-against an installed LLVM 22.1.
+`extempore.exe` is built into `build\` too.
 
 LLVM goes to 22.1.8 and PCRE2 to 10.49, and rtmidi is no longer built, since
 nothing used it. Release archives are packaged with CPack and carry

@@ -69,9 +69,7 @@ users will care about:
 
 Extempore links against a specific version of LLVM (currently 22.1.8, pinned in
 `CMakeLists.txt`). LLVM is fetched and built in-tree via CMake's
-`FetchContent` --- no system LLVM required. To use an installed LLVM of the same
-minor version instead, configure with `-DEXTEMPORE_SYSTEM_LLVM=ON` (and
-`-DLLVM_DIR=<prefix>/lib/cmake/llvm` if CMake doesn't find it).
+`FetchContent` --- no system LLVM required.
 
 The first build takes ~10-30 min because LLVM is compiled from source.
 Subsequent builds reuse the cached artifacts under `build/_deps/llvm-*`. Only
