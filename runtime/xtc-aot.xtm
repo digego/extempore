@@ -382,6 +382,8 @@
     (if (and (output-port? *xtc:aot:current-output-port*)
              (not *xtc:aot:dll*))
         (begin
+          (write `(xtc:aot:report-unbound-declarations ,libname) *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)
           (write `(llvm:compile-ir (sys:slurp-file (sys:build-path ,(string-append "libs/aot-cache/" libname ".ll"))))
                  *xtc:aot:current-output-port*)
           (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
@@ -502,18 +504,53 @@
             (begin (log:emit 'error 'compiler "cannot write AOT-compilation file at" aot-compilation-file)
                    (quit 2)))))))
 
-;;
-;; any 'declare' (external declarations) found in an llvm ll 'lib file'
-;; must belong to a single DLL specified BEFORE the aot header in main library file
-;;
+;; The functions an AOT library's IR declares and leaves to a shared library:
+;; its own bind-lib functions, and those of any library it was compiled on top
+;; of whose declarations came along. Kept from the first bind-dylib which names
+;; the .ll file until its IR is compiled, so that the file is read once.
+(define *xtc:aot:external-declarations* (make-hashtable 64))
+
+(define xtc:aot:external-declarations
+  (lambda (ll-name)
+    (or (hashtable-ref *xtc:aot:external-declarations* ll-name)
+        (let* ((pattern "declare cc 0.*@([^(]*).*nounwind")
+               (ll (sys:slurp-file (sys:build-path (string-append "libs/aot-cache/" ll-name ".ll"))))
+               (names (map (lambda (m) (cadr (regex:matched m pattern)))
+                           (regex:match-all ll pattern))))
+          (hashtable-set! *xtc:aot:external-declarations* ll-name names)
+          names))))
+
+;; the symbols a shared library has provided so far, by name
+(define *xtc:aot:bound-symbols* (make-hashtable 1024))
+
+;; Bind the functions LL-NAME's IR declares which the library LIBNAME has. A
+;; library file can name several shared libraries for the one .ll (webgpu
+;; does), and each has only some of the functions, so one this library lacks
+;; is no error here: xtc:aot:report-unbound-declarations says which were found
+;; in none.
 (define bind-external-dylib-declarations
-  (lambda (libname ll-file-path)
-    (for-each (lambda (m)
-                (let* ((res (regex:matched m "declare cc 0.*@([^(]*).*nounwind"))
-                       (result (eval `(llvm:bind-symbol ,(string->symbol libname) ,(cadr res)))))
-                  (if (not result) (log:emit 'error 'compiler "could not bind" res "to" libname "in declaration from" ll-file-path))))
-              (regex:match-all (sys:slurp-file (sys:build-path (string-append "libs/aot-cache/" ll-file-path ".ll"))) "declare cc 0.*@([^(]*).*nounwind"))
+  (lambda (libname ll-name)
+    (for-each (lambda (name)
+                (if (eval `(llvm:bind-symbol ,(string->symbol libname) ,name))
+                    (hashtable-set! *xtc:aot:bound-symbols* name libname)))
+              (xtc:aot:external-declarations ll-name))
     #t))
+
+;; Run before LL-NAME's IR is compiled: an error for each function it declares
+;; which no shared library has provided. A library whose bind-dylibs don't name
+;; its .ll file binds each function later, with its bind-lib, and is not
+;; checked here.
+(define xtc:aot:report-unbound-declarations
+  (lambda (ll-name)
+    (let ((names (hashtable-ref *xtc:aot:external-declarations* ll-name)))
+      (if names
+          (begin
+            (for-each (lambda (name)
+                        (if (not (hashtable-ref *xtc:aot:bound-symbols* name))
+                            (log:emit 'error 'compiler "could not bind" name
+                                      "which" ll-name "declares: none of the shared libraries loaded for it has the symbol")))
+                      names)
+            (hashtable-set! *xtc:aot:external-declarations* ll-name #f))))))
 
 ;; aot compile llvm bitcode (bc)
 ;; cache-name, if given, names the cache in place of the library file's own
