@@ -233,14 +233,14 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
     if (Inv.files.empty()) {
         const std::string text{std::istreambuf_iterator<char>(std::cin), {}};
         const auto result = extemp::format::format(text);
-        if (!result.error.empty()) {
-            std::cerr << "extempore: " << result.error << std::endl;
+        if (!result) {
+            std::cerr << "extempore: " << result.error() << std::endl;
             return 1;
         }
         if (check) {
-            return result.text == text ? 0 : 1;
+            return *result == text ? 0 : 1;
         }
-        std::cout << result.text;
+        std::cout << *result;
         return 0;
     }
     std::vector<fs::path> files;
@@ -271,14 +271,14 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
         }
         const std::string text{std::istreambuf_iterator<char>(in), {}};
         const auto result = extemp::format::format(text);
-        if (!result.error.empty()) {
-            std::cerr << "extempore: " << file.string() << ": " << result.error << std::endl;
+        if (!result) {
+            std::cerr << "extempore: " << file.string() << ": " << result.error() << std::endl;
             status = 1;
-        } else if (result.text != text) {
+        } else if (*result != text) {
             if (check) {
                 std::cout << file.string() << std::endl;
                 status = 1;
-            } else if (!(std::ofstream(file, std::ios::binary) << result.text)) {
+            } else if (!(std::ofstream(file, std::ios::binary) << *result)) {
                 std::cerr << "extempore: can't write " << file.string() << std::endl;
                 status = 1;
             }

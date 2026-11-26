@@ -204,10 +204,10 @@ std::string where(std::string_view Text, std::size_t Offset) {
 
 }  // namespace
 
-Result format(std::string_view Text) {
+std::expected<std::string, std::string> format(std::string_view Text) {
     if (const auto problems = forms::problems(Text); !problems.empty()) {
-        return {"", where(Text, problems.front().offset) + ": " +
-                        std::string(problems.front().message)};
+        return std::unexpected(where(Text, problems.front().offset) + ": " +
+                               std::string(problems.front().message));
     }
 
     std::vector<std::string_view> lines;
@@ -357,7 +357,7 @@ Result format(std::string_view Text) {
         result += line;
         result += newline;
     }
-    return {std::move(result), ""};
+    return result;
 }
 
 }  // namespace extemp::format

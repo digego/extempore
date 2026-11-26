@@ -30,9 +30,9 @@ std::string flatten(std::string_view Text) {
 // changes nothing.
 void expectFormatted(std::string_view Text) {
     const auto once = format(flatten(Text));
-    ASSERT_EQ(once.error, "");
-    EXPECT_EQ(once.text, Text);
-    EXPECT_EQ(format(once.text).text, once.text);
+    ASSERT_TRUE(once.has_value()) << once.error();
+    EXPECT_EQ(*once, Text);
+    EXPECT_EQ(format(*once).value(), *once);
 }
 
 }  // namespace
@@ -135,7 +135,7 @@ TEST(Formatter, CommentsIndentLikeCode) {
                     "  ;; a comment\n"
                     "  ; and another\n"
                     "  x)\n");
-    EXPECT_EQ(format("                ; at the top level\n(f)\n").text,
+    EXPECT_EQ(format("                ; at the top level\n(f)\n").value(),
               "; at the top level\n(f)\n");
 }
 
@@ -144,11 +144,11 @@ TEST(Formatter, StringsAndBlockCommentsKeepTheirLines) {
                                   "  \"a docstring which runs on   \n"
                                   "     with its own indentation\"\n"
                                   "  (lambda () 1))\n";
-    EXPECT_EQ(format(docstring).text, docstring);
+    EXPECT_EQ(format(docstring).value(), docstring);
     const std::string block = "#| a block comment\n"
                               "      keeps its layout |#\n"
                               "(f)\n";
-    EXPECT_EQ(format(block).text, block);
+    EXPECT_EQ(format(block).value(), block);
 }
 
 TEST(Formatter, DelimitersInStringsCommentsAndCharactersDontCount) {
@@ -157,23 +157,23 @@ TEST(Formatter, DelimitersInStringsCommentsAndCharactersDontCount) {
 }
 
 TEST(Formatter, WhitespaceAtTheEnds) {
-    EXPECT_EQ(format("(f)   \n\n\n(g)\t\n\n\n").text, "(f)\n\n\n(g)\n");
-    EXPECT_EQ(format("(f)").text, "(f)\n");
-    EXPECT_EQ(format("").text, "");
-    EXPECT_EQ(format("(f\r\n\tx)\r\n").text, "(f\r\n x)\r\n");
+    EXPECT_EQ(format("(f)   \n\n\n(g)\t\n\n\n").value(), "(f)\n\n\n(g)\n");
+    EXPECT_EQ(format("(f)").value(), "(f)\n");
+    EXPECT_EQ(format("").value(), "");
+    EXPECT_EQ(format("(f\r\n\tx)\r\n").value(), "(f\r\n x)\r\n");
 }
 
 TEST(Formatter, OnlyWhitespaceChanges) {
     // each line's content (stripped) is unchanged and in place
     const std::string text = "(bind-func osc:[double,double]*\n"
                              "        (lambda (freq) (* 0.1 (sin freq))))\n";
-    EXPECT_EQ(format(text).text, "(bind-func osc:[double,double]*\n"
+    EXPECT_EQ(format(text).value(), "(bind-func osc:[double,double]*\n"
                                  "  (lambda (freq) (* 0.1 (sin freq))))\n");
 }
 
 TEST(Formatter, TextWhichDoesntReadIsNotFormatted) {
     const auto unclosed = format("(define x 1)\n(define (f y)\n  (+ y 1\n");
-    EXPECT_EQ(unclosed.text, "");
-    EXPECT_EQ(unclosed.error, "line 2, column 1: this form never ends: a closing parenthesis is missing");
-    EXPECT_NE(format("(f))\n").error, "");
+    ASSERT_FALSE(unclosed.has_value());
+    EXPECT_EQ(unclosed.error(), "line 2, column 1: this form never ends: a closing parenthesis is missing");
+    EXPECT_FALSE(format("(f))\n").has_value());
 }

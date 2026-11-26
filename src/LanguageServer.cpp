@@ -484,13 +484,13 @@ class Server {
         }
         const Document& doc = found->second;
         const auto result = format::format(doc.text);
-        if (!result.error.empty() || result.text == doc.text) {
+        if (!result || *result == doc.text) {
             return edits;
         }
         const json::Object* where = InRange ? Params.getObject("range") : nullptr;
         if (!where) {
             edits.push_back(json::Object{{"range", range(doc, 0, doc.text.size())},
-                                         {"newText", result.text}});
+                                         {"newText", *result}});
             return edits;
         }
         const std::size_t first = positionAt(doc.text, offsetIn(doc, where->getObject("start")), m_utf8).line;
@@ -511,15 +511,15 @@ class Server {
             return std::pair{begin, end};
         };
         const auto docStarts = lineStarts(doc.text);
-        const auto newStarts = lineStarts(result.text);
+        const auto newStarts = lineStarts(*result);
         for (std::size_t line = first; line <= last && line < docStarts.size() &&
                                        line < newStarts.size();
              ++line) {
             const auto [begin, end] = lineOf(doc.text, docStarts, line);
-            const auto [newBegin, newEnd] = lineOf(result.text, newStarts, line);
+            const auto [newBegin, newEnd] = lineOf(*result, newStarts, line);
             const std::string_view now = std::string_view(doc.text).substr(begin, end - begin);
             const std::string_view then =
-                std::string_view(result.text).substr(newBegin, newEnd - newBegin);
+                std::string_view(*result).substr(newBegin, newEnd - newBegin);
             if (now != then) {
                 edits.push_back(json::Object{{"range", range(doc, begin, end)},
                                              {"newText", std::string(then)}});

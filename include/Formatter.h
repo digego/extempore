@@ -12,16 +12,13 @@
 // forms is the table in Formatter.cpp; extempore-emacs-mode and
 // tree-sitter-extempore's indents.scm keep copies of it.
 
+#include <expected>
 #include <string>
 #include <string_view>
 
 namespace extemp::format {
 
-struct Result {
-    std::string text;   // the formatted text, when error is empty
-    std::string error;  // why the text can't be formatted (it doesn't read)
-};
-
-Result format(std::string_view Text);
+// The formatted text, or why the text can't be formatted (it doesn't read).
+std::expected<std::string, std::string> format(std::string_view Text);
 
 }  // namespace extemp::format
