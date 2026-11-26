@@ -212,7 +212,7 @@ EXPORT void llvm_schedule_callback(long long time, void* dat) {
     const uint64_t current_time = time;    // task->getStartTime();
     const uint64_t duration = 1000000000;  // task->getDuration();
     extemp::TaskScheduler::I()->addTask(current_time, duration, proc->getExtemporeCallback(), dat,
-                                        0, true);
+                                        0);
     return;
 }
 

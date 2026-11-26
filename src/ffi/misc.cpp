@@ -221,16 +221,14 @@ static pointer callCPPAtTime(scheme* Scheme, pointer Args) {
     if (task_type == 1) {
         log::error("no render thread available for callbacks");
     } else {
-        const bool is_callback = (task_type == 2);
         auto obj(new SchemeObj(Scheme, argAt(Scheme, Args, 4), argAt(Scheme, Args, 5)));
         auto cm(reinterpret_cast<extemp::CM*>(argCptr(Scheme, Args, 3)));
         pointer when = argAt(Scheme, Args, 1);
         if (is_pair(when)) {
             extemp::TaskScheduler::I()->addTask(ivalue(pair_car(when)), ivalue(pair_cdr(when)), cm,
-                                                obj, 0, is_callback);
+                                                obj, 0);
         } else {
-            extemp::TaskScheduler::I()->addTask(ivalue(when), Scheme->call_default_time, cm, obj, 0,
-                                                is_callback);
+            extemp::TaskScheduler::I()->addTask(ivalue(when), Scheme->call_default_time, cm, obj, 0);
         }
     }
     return Scheme->T;

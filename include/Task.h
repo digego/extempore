@@ -72,9 +72,7 @@ class TaskI {
     bool m_housekeeping = false;
 
   protected:
-    // Callback is accepted for the callers that pass it and otherwise unused.
-    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag,
-          bool /*Callback*/ = false)
+    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag)
         : m_startTime(StartTime), m_duration(Duration), m_classMember(ClassMember), m_tag(Tag) {}
 
   public:
@@ -108,9 +106,8 @@ template <typename T = int> class Task : public TaskI {
     T m_arg;
 
   public:
-    Task(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg, int Tag = 0,
-         bool Callback = false)
-        : TaskI(StartTime, Duration, ClassMember, Tag, Callback), m_arg(Arg) {}
+    Task(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg, int Tag = 0)
+        : TaskI(StartTime, Duration, ClassMember, Tag), m_arg(Arg) {}
 
     const T& getArg() const {
         return m_arg;

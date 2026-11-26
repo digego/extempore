@@ -120,8 +120,8 @@ class TaskScheduler {
     }
     template <typename T>
     static void addTask(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg,
-                        int Tag, bool Callback) {
-        sm_instance.add(new Task<T>(StartTime, Duration, ClassMember, Arg, Tag, Callback));
+                        int Tag) {
+        sm_instance.add(new Task<T>(StartTime, Duration, ClassMember, Arg, Tag));
     };
 
 #ifndef _WIN32
