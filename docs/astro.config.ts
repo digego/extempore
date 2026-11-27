@@ -39,15 +39,64 @@ export default defineConfig({
   },
   site: "https://extemporelang.github.io",
   base: "/",
-  // type-inference was folded into the types reference page; keep the old URL working.
   redirects: {
+    // type-inference was folded into the types reference page
     "/reference/type-inference/": "/reference/types/#type-inferencing",
+    // the Jekyll site's pages were under /docs/
+    ...Object.fromEntries(
+      [
+        "api/audio_dsp",
+        "api/core",
+        "guides",
+        "guides/analogue-synth",
+        "guides/audio-file-io",
+        "guides/audio-signal-processing",
+        "guides/editor-support",
+        "guides/making-an-instrument",
+        "guides/note-level-music",
+        "guides/pattern-language",
+        "guides/sampler",
+        "overview/contributing",
+        "overview/philosophy",
+        "overview/quickstart",
+        "overview/time",
+        "overview/using-extempore",
+        "reference",
+        "reference/c-xtlang-interop",
+        "reference/concurrency",
+        "reference/docstrings",
+        "reference/memory-management",
+        "reference/scheme-xtlang-interop",
+        "reference/testing",
+        "reference/types",
+      ].map((page) => [`/docs/${page}/`, `/${page}/`]),
+    ),
+    "/docs/": "/",
+    "/docs/guides/common-lisp-music/": "/guides/",
+    "/docs/guides/impromptu-users/": "/guides/",
+    "/docs/overview/bits-and-pieces/": "/overview/using-extempore/",
+    "/docs/reference/type-inference/": "/reference/types/#type-inferencing",
+    ...Object.fromEntries(
+      [
+        "advanced-functions",
+        "advanced-types",
+        "basics",
+        "closures",
+        "control-logic",
+        "generics",
+        "intro-types",
+        "memory-management",
+        "memory-techiques",
+        "strings",
+      ].map((page) => [`/docs/reference/new/${page}/`, "/reference/tutorial/"]),
+    ),
   },
   integrations: [
     starlight({
       // /404 is owned by src/pages/404.astro --- see the note there.
       disable404Route: true,
       title: "Extempore",
+      favicon: "/favicon.ico",
       description: "Livecoding environment for music and audio",
       social: [
         {
