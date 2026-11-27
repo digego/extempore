@@ -3,7 +3,7 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## Unreleased
+## v0.12.0
 
 The studio is new: a second audio path in `libs/studio`, with fifteen
 synthesised instruments (among them a 303-style acid bass and ports of Mutable
