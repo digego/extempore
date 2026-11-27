@@ -5,6 +5,37 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
 
 ## Unreleased
 
+Extempore installs with one command, and runs from a conventional layout. On
+macOS or Linux, `curl -fsSL https://extemporelang.github.io/install.sh | sh`
+installs the latest release in `~/.local/share/extempore` and puts `extempore`
+on your `PATH`; on Windows,
+`irm https://extemporelang.github.io/install.ps1 | iex` does the same in
+`%LOCALAPPDATA%\Programs\Extempore`. Neither needs administrator rights, both
+check the download against the release's new `SHA256SUMS`, and running either
+again upgrades. The VS Code extension's _Extempore: Install Extempore_ command
+installs to the same place, and macOS doesn't quarantine what any of the three
+download.
+
+The release archives, and `cmake --install`, now lay out `bin/extempore`,
+`share/extempore/` (`runtime/`, `libs/`, `examples/`, `assets/`) and
+`lib/extempore/` (the AOT cache and platform shared libraries), so
+`cmake --install build --prefix ~/.local` (or `/usr/local`) works as it does for
+other software. The tree can still be moved anywhere. Anything which ran
+`./extempore` from an unzipped folder needs `bin/extempore` instead, and a VS
+Code `extempore.executable` setting which points into an old folder keeps
+running that old version.
+
+An installed tree needn't be writable: AOT compilation writes to a per-user
+cache (`~/.cache/extempore/<version>` on Linux, `~/Library/Caches/...` on macOS,
+`%LOCALAPPDATA%\extempore\<version>` on Windows, or `$EXTEMPORE_CACHE_DIR`),
+which shadows the installed cache. In xtlang, `(sys:lib-dir)` and
+`(sys:cache-dir)` replace `(sys:build-dir)`, `(sys:lib-path path)` replaces
+`(sys:build-path path)`, and `(sys:aot-cache-path name)` finds a file in either
+cache.
+
+The Windows archive carries the Visual C++ runtime DLLs beside `extempore.exe`,
+so it no longer needs the Visual C++ Redistributable installed.
+
 `(sys:extempore-version)` gives the version as a string, such as `"v0.12.1"`,
 and `extempore --version` prints it as `extempore version` does.
 
