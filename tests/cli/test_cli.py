@@ -22,7 +22,12 @@ def run(
     *args: str, timeout: float = 120, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(BIN), *args], cwd=REPO, capture_output=True, text=True, timeout=timeout, env=env
+        [str(BIN), *args],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
     )
 
 
@@ -86,7 +91,13 @@ class Exec(Scratch):
         code = '(log:warn "careful")'
         self.assertNotIn("\x1b[", run("exec", "-e", code).stderr)
         self.assertIn("\x1b[", run("exec", "--color", "always", "-e", code).stderr)
-        p = run("exec", "--color", "always", "-e", '(print-with-colors (quote red) (quote default) #t (print "red"))')
+        p = run(
+            "exec",
+            "--color",
+            "always",
+            "-e",
+            '(print-with-colors (quote red) (quote default) #t (print "red"))',
+        )
         self.assertIn("\x1b[", p.stdout)
 
     def test_a_missing_file_is_status_1(self) -> None:
@@ -405,7 +416,6 @@ class Test(Scratch):
         self.assertEqual(len(list(junit.glob("*.xml"))), 4)
 
 
-
 class Fmt(Scratch):
     """extempore fmt: whitespace only, files in place or stdin to stdout."""
 
@@ -413,7 +423,9 @@ class Fmt(Scratch):
     TIDY = "(define (f x)\n  (+ x 1))\n"
 
     def test_stdin_to_stdout(self) -> None:
-        p = subprocess.run([str(BIN), "fmt"], input=self.MESSY, capture_output=True, text=True)
+        p = subprocess.run(
+            [str(BIN), "fmt"], input=self.MESSY, capture_output=True, text=True
+        )
         self.assertEqual((p.returncode, p.stdout, p.stderr), (0, self.TIDY, ""))
 
     def test_files_and_directories_in_place(self) -> None:
