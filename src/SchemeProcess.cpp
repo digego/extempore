@@ -208,13 +208,13 @@ bool SchemeProcess::start(bool subsume) {
         address.sin_addr.s_addr = htonl(INADDR_ANY);  // set server's IP
         if (bind(m_serverSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
             log::error(log::server, "could not bind server socket on port {}: {}", m_serverPort,
-                       strerror(errno));
+                       net::errorText(net::lastError()));
             m_running = false;
             return false;
         }
         if (listen(m_serverSocket, 5) < 0) {
             log::error(log::server, "could not listen on port {}: {}", m_serverPort,
-                       strerror(errno));
+                       net::errorText(net::lastError()));
             m_running = false;
             return false;
         }
@@ -630,7 +630,7 @@ void* SchemeProcess::serverImpl() {
             if (poll_interrupted()) {
                 continue;
             }
-            log::error(log::server, "{} server: {}", m_name, strerror(errno));
+            log::error(log::server, "{} server: {}", m_name, net::errorText(net::lastError()));
             // don't spin on a persistent failure
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
@@ -642,7 +642,7 @@ void* SchemeProcess::serverImpl() {
                                    &clientAddressSize));
             if (sock == INVALID_SOCKET) [[unlikely]] {
                 log::error(log::server, "could not accept a connection to the {} process: {}",
-                           m_name, strerror(errno));
+                           m_name, net::errorText(net::lastError()));
             } else {
                 log::info(log::server, "Accepted a connection to the {} process", m_name);
                 clients.push_back({sock, std::string()});
@@ -720,7 +720,7 @@ void* SchemeProcess::serverImpl() {
     }
     if (closesocket(m_serverSocket)) {
         log::error(log::server, "could not close the {} server socket: {}", m_name,
-                   strerror(errno));
+                   net::errorText(net::lastError()));
     }
     m_serverSocket = INVALID_SOCKET;
     log::debug(log::server, "{} server thread exiting", m_name);
