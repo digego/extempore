@@ -29,9 +29,16 @@ jobs:
           curl -fsSL https://extemporelang.github.io/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Install (Windows)
+      # Windows PowerShell 5.1, which every Windows has, then PowerShell 7
+      # installing over it
+      - name: Install (Windows PowerShell)
         if: runner.os == 'Windows'
         shell: powershell
+        run: irm https://extemporelang.github.io/install.ps1 | iex
+
+      - name: Install again (PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           irm https://extemporelang.github.io/install.ps1 | iex
           "$env:LOCALAPPDATA\Programs\Extempore\current\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
