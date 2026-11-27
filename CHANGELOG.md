@@ -3,7 +3,7 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## Unreleased
+## v0.13.0
 
 Extempore installs with one command, and runs from a conventional layout. On
 macOS or Linux, `curl -fsSL https://extemporelang.github.io/install.sh | sh`
