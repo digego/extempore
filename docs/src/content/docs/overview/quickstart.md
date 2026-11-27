@@ -56,8 +56,10 @@ through the _Command Palette_, which you can open up with
 Grab the latest release from the
 [GitHub releases page](https://github.com/digego/extempore/releases), unzip it
 and put it wherever you like (e.g. in your _Documents_ folder). Then set the
-_Extempore: Sharedir_ VSCode config setting to point at that folder---this lets
-VSCode start Extempore for you (we'll do that in the next step).
+_Extempore: Executable_ VSCode config setting to the `extempore` program in that
+folder (`extempore.exe` on Windows)---this lets VSCode start Extempore for you
+(we'll do that in the next step). Set _Extempore: Sharedir_ to the folder as
+well, so the `(sys:load "libs/...")` lines in the examples link to their files.
 
 :::tip
 
@@ -83,7 +85,7 @@ running. If you see something like this, everything's working---nice one.
   /   \   /   \   /   \     e x t e m p o r e
 -'     '-'     '-'     '-   cyberphysical programming
 
-Extempore 0.11.2, LLVM 22.1.8, arm64-apple-darwin23.6.0 (apple-m1)
+Extempore 0.12.1, LLVM 23.1.6, arm64-apple-darwin23.6.0 (apple-m1)
 Audio: MacBook Pro Speakers, 2 out, 44100 Hz, 1024 frames, 23 ms latency
 nREPL server started on port 7888 on host 127.0.0.1 - nrepl://127.0.0.1:7888
 Loaded xtmbase in 1.63 s
@@ -106,125 +108,6 @@ supports a bunch of command line options---try
 
 Open (or create) a file ending in `.xtm`. VSCode finds the running Extempore by
 itself, through its nREPL server on port 7888, so there's nothing to connect.
-
-<details>
-<summary>Non-VSCode editors</summary>
-
-This quickstart guide is based on VSCode. If you'd prefer to use another editor
-(e.g. Emacs, Atom, ST, Vim) then that's fine as well---these boxes will explain
-how your setup process will be different.
-
-</details>
-
-:::note
-
-With everything on this page, if you run in to problems make sure you check the
-[Troubleshooting](#troubleshooting) section at the end.
-
-:::
-
-## Setup
-
-Here's the stuff you only need to do once.
-
-### Download & set up VSCode {#editor-setup}
-
-**VSCode** (a.k.a. Visual Studio Code) is freely available on all the operating
-systems that Extempore runs on (macOS, Windows & Linux). To install VSCode, go
-to the [homepage](https://code.visualstudio.com/) and hit the big "Download"
-button (you can't miss it). Once you've installed VSCode, you need to install
-the
-[VSCode Extempore extension](https://github.com/extemporelang/vscode-extempore)---this
-tells VSCode how to deal with Extempore code.
-
-Open the _Command Palette_, type in a few characters of the command _Extensions:
-Install Extensions_ until it shows up, then hit <kbd>return</kbd>. Then, search
-for "Extempore" and install the extension.
-
-:::note
-
-The main way to run commands (in other words, to "do things") in VSCode is
-through the _Command Palette_, which you can open up with
-<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>P</kbd> (or through the menu
-`View > Command Palette...`).
-
-:::
-
-### Download Extempore
-
-Grab the latest release from the
-[GitHub releases page](https://github.com/digego/extempore/releases), unzip it
-and put it wherever you like (e.g. in your _Documents_ folder). Then set the
-_Extempore: Sharedir_ VSCode config setting to point at that folder---this lets
-VSCode start Extempore for you (we'll do that in the next step).
-
-:::tip
-
-The _Extempore: Download binary_ command does all this for you: it downloads
-the latest release for your computer, unzips it where you say, and sets
-_Extempore: Sharedir_ and _Extempore: Executable_ to point at it.
-
-:::
-
-## Using Extempore {#using-extempore}
-
-Here's the stuff you need to do every time you want to work with Extempore.
-
-### Step 1: start Extempore {#step-1}
-
-You can start Extempore using the _Extempore: Start_ command (again, you can
-find this command using the [command palette](#vscode-command-palette)). It'll
-open up a terminal, `cd` into your extempore folder, and start the Extempore
-running. If you see something like this, everything's working---nice one.
-
-```
-   .-.     .-.     .-.
-  /   \   /   \   /   \     e x t e m p o r e
--'     '-'     '-'     '-   cyberphysical programming
-
-Extempore 0.11.2, LLVM 22.1.8, arm64-apple-darwin23.6.0 (apple-m1)
-Audio: MacBook Pro Speakers, 2 out, 44100 Hz, 1024 frames, 23 ms latency
-nREPL server started on port 7888 on host 127.0.0.1 - nrepl://127.0.0.1:7888
-Loaded xtmbase in 1.63 s
-Ready: connect your editor to nREPL port 7888 (or the legacy server on 7099)
-```
-
-:::note
-
-If you can't (or don't want to) start Extempore using the _Extempore: Start_
-VSCode command, then open a terminal in your Extempore directory (VSCode has a
-built-in terminal which you can bring up with <kbd>CTRL</kbd>+<kbd>&#96;</kbd>)
-and type `./extempore` (or `.\extempore.exe` if you're on Windows---note the
-backslash instead of the forward slash) and hit <kbd>return</kbd>. Extempore
-supports a bunch of command line options---try
-`./extempore --help`/`.\extempore.exe --help` to see the full list.
-
-:::
-
-### Step 2: connect your text editor
-
-Extempore is now just sitting waiting for you to tell it what code to execute.
-Before you can do this, you first need to connect your text editor to the
-running Extempore session. In VSCode, you do this with the _Extempore Connect_
-command.
-
-```
-Starting primary process
-Trying to connect to 'localhost' on port 7099
-New Client Connection
-Successfully connected to remote process
-Loading xtmbase library... done in 1.505913 seconds
-New Client Connection
-```
-
-If everything's gone to plan, you'll see one more message at the very bottom of
-the terminal:
-
-```
-Accepted a connection to the primary process
-```
-
-Congrats, you're connected... and almost there.
 
 <details>
 <summary>Non-VSCode editors</summary>
