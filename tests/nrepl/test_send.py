@@ -198,7 +198,7 @@ class SessionRepl(unittest.TestCase):
     """--repl is that REPL in the session's own terminal, on its own server."""
 
     def test_no_legacy_server_and_a_piped_repl(self) -> None:
-        xtm = Extempore("--no-legacy-server", wait_for_banner=False, nrepl_port=0)
+        xtm = Extempore("--no-legacy-server", ready=None, nrepl_port=0)
         try:
             port = int(xtm.wait_for(r"nREPL server started on port (\d+)", 120).group(1))
             xtm.wait_for(r"Ready: connect your editor to nREPL port \d+\n", 120)

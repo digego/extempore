@@ -456,8 +456,14 @@ class Protocol(unittest.TestCase):
 
     # --- the wire -------------------------------------------------------
 
-    def raw(self) -> socket.socket:
-        return socket.create_connection(("127.0.0.1", self.xtm.port), timeout=30)
+    def raw(self, rcvbuf: int | None = None) -> socket.socket:
+        s = socket.socket()
+        if rcvbuf is not None:
+            # before connecting, or the window it advertises is already set
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, rcvbuf)
+        s.settimeout(30)
+        s.connect(("127.0.0.1", self.xtm.port))
+        return s
 
     def test_frames_split_across_reads_and_joined_in_one(self) -> None:
         with self.xtm.client() as c:
@@ -494,8 +500,7 @@ class Protocol(unittest.TestCase):
         self.assertEqual(values(self.eval("(+ 2 3)")), ["5"])
 
     def test_a_client_that_never_reads_is_dropped(self) -> None:
-        s = self.raw()
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+        s = self.raw(rcvbuf=4096)
         s.sendall(
             bencode(
                 {
@@ -547,7 +552,7 @@ class Startup(unittest.TestCase):
             blocker.bind(("127.0.0.1", 0))
             blocker.listen()
             port = blocker.getsockname()[1]
-            with Extempore(nrepl_port=port, wait_for_banner=False) as xtm:
+            with Extempore(nrepl_port=port, ready=None) as xtm:
                 self.assertNotEqual(xtm.proc.wait(timeout=60), 0)
                 self.assertIn("could not listen", xtm.console_text())
 
@@ -558,9 +563,10 @@ class Startup(unittest.TestCase):
             except OSError:
                 self.skipTest("the default nREPL port is already in use")
             blocker.listen()
-            with Extempore(nrepl_port=None, wait_for_banner=False) as xtm:
-                xtm.wait_for("could not listen")
-                xtm.wait_for("Ready: connect your editor to port")
+            with Extempore(
+                nrepl_port=None, ready="Ready: connect your editor to port"
+            ) as xtm:
+                self.assertIn("could not listen", xtm.console_text())
                 with socket.create_connection(
                     ("127.0.0.1", xtm.eval_port), timeout=60
                 ) as s:
@@ -569,12 +575,13 @@ class Startup(unittest.TestCase):
                     self.assertEqual(s.recv(4096), b"3\0")
 
     def test_no_nrepl(self) -> None:
-        with Extempore("--no-nrepl", nrepl_port=None, wait_for_banner=False) as xtm:
-            xtm.wait_for("Ready: connect your editor to port")
+        with Extempore(
+            "--no-nrepl", nrepl_port=None, ready="Ready: connect your editor to port"
+        ) as xtm:
             self.assertNotIn("nREPL", xtm.console_text())
 
     def test_a_request_before_startup_finishes_is_answered_after_it(self) -> None:
-        with Extempore(wait_for_banner=True) as xtm:
+        with Extempore() as xtm:
             with xtm.client() as c:
                 # base is still loading, or just has: either way the eval sees it
                 rs = c.request(op="eval", code="(defined? '*xtmlib-base-loaded*)")

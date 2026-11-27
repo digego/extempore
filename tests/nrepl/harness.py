@@ -34,9 +34,12 @@ def _free(port: int) -> bool:
 def free_port_pair() -> int:
     """A port P with P - 1 free too, for extempore's primary and utility eval
     servers. Random rather than the OS's pick: macOS hands out ports in
-    sequence, so tests starting together would choose overlapping pairs."""
+    sequence, so tests starting together would choose overlapping pairs. Below
+    32768, where no OS hands out ephemeral ports (Linux from 32768, macOS and
+    Windows from 49152), so another test's connection or port-0 listener can't
+    take one between this check and extempore's bind."""
     for _ in range(100):
-        p = random.randrange(20000, 60000)
+        p = random.randrange(20000, 32768)
         if _free(p) and _free(p - 1):
             return p
     raise RuntimeError("no free port pair")
@@ -49,26 +52,30 @@ class Extempore:
     """An extempore process with its nREPL server on a free port. The console
     output is collected in `console` (a list of lines).
 
-    Another process can take the eval ports between choosing them and
-    extempore binding them, so a start that dies before it is listening is
-    retried with fresh ports."""
+    The constructor waits for `ready` in the console (the nREPL banner by
+    default) and for the primary eval server to listen; `ready=None` returns
+    at once. Another process can take the eval ports between choosing them and
+    extempore binding them, so a start that dies before it is ready is retried
+    with fresh ports."""
 
     def __init__(
         self,
         *args: str,
         nrepl_port: int | None = 0,
         cwd: Path | None = None,
-        wait_for_banner: bool = True,
+        ready: re.Pattern | str | None = BANNER,
         timeout: float = 120,
     ):
         self.cwd = cwd or Path(tempfile.mkdtemp(prefix="xtm-nrepl-"))
         self.port = 0
         for attempt in range(3):
             self._launch(args, nrepl_port)
-            if not wait_for_banner:
+            if ready is None:
                 return
             try:
-                self.port = int(self.wait_for(BANNER, timeout).group(1))
+                m = self.wait_for(ready, timeout)
+                if ready is BANNER:
+                    self.port = int(m.group(1))
                 self._wait_until_listening(timeout)
                 return
             except RuntimeError:
