@@ -5,39 +5,60 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
 
 ## v0.13.0
 
-Extempore installs with one command, and runs from a conventional layout. On
-macOS or Linux, `curl -fsSL https://extemporelang.github.io/install.sh | sh`
-installs the latest release in `~/.local/share/extempore` and puts `extempore`
-on your `PATH`; on Windows,
-`irm https://extemporelang.github.io/install.ps1 | iex` does the same in
-`%LOCALAPPDATA%\Programs\Extempore`. Neither needs administrator rights, both
-check the download against the release's new `SHA256SUMS`, and running either
-again upgrades. The VS Code extension's _Extempore: Install Extempore_ command
-installs to the same place, and macOS doesn't quarantine what any of the three
-download.
+Extempore installs with one command, into a conventional layout. On macOS or
+Linux:
 
-The release archives, and `cmake --install`, now lay out `bin/extempore`,
+```sh
+curl -fsSL https://extemporelang.github.io/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://extemporelang.github.io/install.ps1 | iex
+```
+
+These install the latest release in `~/.local/share/extempore` (macOS, Linux) or
+`%LOCALAPPDATA%\Programs\Extempore` (Windows), and put `extempore` on your
+`PATH`. Neither needs administrator rights, both check the download against the
+release's new `SHA256SUMS`, and running either again upgrades. The VS Code
+extension's _Extempore: Install Extempore_ command (extension v0.4.0) installs
+to the same place. macOS doesn't quarantine what these three download; a zip
+downloaded in a browser still needs the `xattr` command in the README.
+
+The release archives, and `cmake --install`, lay out `bin/extempore`,
 `share/extempore/` (`runtime/`, `libs/`, `examples/`, `assets/`) and
 `lib/extempore/` (the AOT cache and platform shared libraries), so
 `cmake --install build --prefix ~/.local` (or `/usr/local`) works as it does for
-other software. The tree can still be moved anywhere. Anything which ran
-`./extempore` from an unzipped folder needs `bin/extempore` instead, and a VS
-Code `extempore.executable` setting which points into an old folder keeps
-running that old version.
+other software. The tree can still be moved anywhere.
 
 An installed tree needn't be writable: AOT compilation writes to a per-user
-cache (`~/.cache/extempore/<version>` on Linux, `~/Library/Caches/...` on macOS,
-`%LOCALAPPDATA%\extempore\<version>` on Windows, or `$EXTEMPORE_CACHE_DIR`),
-which shadows the installed cache. In xtlang, `(sys:lib-dir)` and
-`(sys:cache-dir)` replace `(sys:build-dir)`, `(sys:lib-path path)` replaces
-`(sys:build-path path)`, and `(sys:aot-cache-path name)` finds a file in either
-cache.
+cache, `~/.cache/extempore/<version>` on Linux,
+`~/Library/Caches/extempore/<version>` on macOS,
+`%LOCALAPPDATA%\extempore\<version>` on Windows, or `$EXTEMPORE_CACHE_DIR` if
+it's set. A library compiled there is loaded in place of the installed copy.
 
 The Windows archive carries the Visual C++ runtime DLLs beside `extempore.exe`,
 so it no longer needs the Visual C++ Redistributable installed.
 
-`(sys:extempore-version)` gives the version as a string, such as `"v0.12.1"`,
+`(sys:extempore-version)` gives the version as a string, such as `"v0.13.0"`,
 and `extempore --version` prints it as `extempore version` does.
+
+### Upgrading
+
+- An unzipped release runs `bin/extempore`, where it used to run `./extempore`
+  at the top of the folder. Update any script or shortcut which runs it.
+- A VS Code `extempore.executable` setting which points into an old unzipped
+  folder keeps running that old version. Clear it to run the installed
+  Extempore; _Extempore: Install Extempore_ offers to.
+- `sys:build-dir` and `sys:build-path` are gone, with no alias, so code which
+  calls them fails with an unbound variable. Use `(sys:lib-dir)` or
+  `(sys:cache-dir)`, and `(sys:lib-path path)`. To find an AOT-compiled file,
+  `(sys:aot-cache-path name)` looks in the per-user cache, then the installed
+  one.
+- Libraries you AOT-compiled into an old release's `libs/aot-cache` don't carry
+  over: compile them again, and they go to the per-user cache. That cache is per
+  version, so the same goes for each upgrade.
 
 ## v0.12.1
 
