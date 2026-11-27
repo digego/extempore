@@ -13,7 +13,9 @@ permissions:
 
 jobs:
   # One job creates the release, so the build jobs only upload to it. Its notes
-  # are the tag's CHANGELOG.md section, which release.sh checks exists.
+  # are the tag's CHANGELOG.md section, which release.sh checks exists. It's a
+  # draft until the publish job has uploaded SHA256SUMS: the installers and the
+  # VS Code extension download releases/latest, which skips drafts.
   create-release:
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
@@ -35,7 +37,7 @@ jobs:
           awk -v h="## $TAG" '$0 == h {on=1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
           prerelease=()
           [[ "$TAG" == *-* ]] && prerelease=(--prerelease)
-          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md "${prerelease[@]}"
+          gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes-file notes.md "${prerelease[@]}"
 
   build:
     name: ${{ matrix.name }}
@@ -71,10 +73,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The released binary finds runtime/ and libs/ beside itself. The
-      # `release` preset's EXT_SHARE_DIR=. makes its fallback, for a binary
-      # moved out of its folder, the working directory rather than the CI
-      # worker's long-gone source path.
+      # The released binary finds its files from its own path (../share,
+      # ../lib). The `release` preset's EXT_SHARE_DIR=. makes its fallback, for
+      # a binary moved out of its tree, the working directory rather than the
+      # CI worker's long-gone source path.
       - uses: ./.github/actions/setup-build
         with:
           preset: release
@@ -97,6 +99,20 @@ jobs:
           "$(dirname "$(command -v cmake)")/cpack" --config build/CPackConfig.cmake \
             -B dist -D CPACK_PACKAGE_FILE_NAME="$PACKAGE"
 
+      # Install the archive with the installer script, from a local server, as
+      # a user would (extras/release/smoke-test.*). On Windows this also runs
+      # it in a clean container, without the Visual C++ runtime.
+      - name: Smoke test
+        shell: bash
+        run: |
+          (cd dist && if command -v sha256sum >/dev/null; then sha256sum *.zip; else shasum -a 256 *.zip; fi > SHA256SUMS)
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            pwsh -NoProfile -File extras/release/smoke-test.ps1 dist
+          else
+            extras/release/smoke-test.sh dist
+          fi
+          rm dist/SHA256SUMS
+
       - uses: actions/attest-build-provenance@v4
         if: github.ref_type == 'tag'
         with:
@@ -118,3 +134,50 @@ jobs:
           path: dist/*.zip
           retention-days: 7
           compression-level: 0
+
+  # SHA256SUMS lists every archive. The installers read it to find the archive
+  # for their platform (its name is the one file name a release always has),
+  # so it goes up last, and then the release is published.
+  publish:
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download the archives (release)
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p '*.zip' -D dist
+
+      - name: Download the archives (dry run)
+        if: github.ref_type != 'tag'
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write SHA256SUMS
+        run: |
+          cd dist
+          sha256sum *.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload SHA256SUMS and publish the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" dist/SHA256SUMS --clobber
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false
+
+      - name: Attach SHA256SUMS to the run (dry run)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: SHA256SUMS
+          path: dist/SHA256SUMS
+          retention-days: 7
