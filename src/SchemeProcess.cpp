@@ -369,6 +369,7 @@ void* SchemeProcess::taskImpl() {
     loadFile("runtime/xtc-bind.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-codegen.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/nrepl.xtm", UNIV::SHARE_DIR);
+    scheme_enable_stops(m_scheme);  // after the compiler: see scheme_enable_stops
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
         const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);

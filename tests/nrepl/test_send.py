@@ -172,9 +172,8 @@ class Repl(Clients):
 
         try:
             wait_for(b"xtm> ")
-            # (s7 looks for an interrupt between the forms of a body)
-            os.write(master, b"(let loop ((i 0)) (set! i (+ i 1)) (loop i))\r")
-            wait_for(b"(loop i))")
+            os.write(master, b"(let loop ((i 0)) (loop (+ i 1)))\r")
+            wait_for(b"(loop (+ i 1)))")
             wait_for(b"\n")  # the line is entered: the eval is on its way
             time.sleep(1.0)
             os.write(master, b"\x03")

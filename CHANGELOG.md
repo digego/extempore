@@ -3,6 +3,19 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## Unreleased
+
+An interrupt (nREPL's `interrupt`, an editor's interrupt command, <kbd>C-c</kbd>
+in `extempore repl`) and the time limit now stop any Scheme evaluation. Before,
+s7 looked for them only between the forms of a body, so a loop such as
+`(let loop ((i 0)) (loop (+ i 1)))` couldn't be stopped, and nor could most
+loops in a function: they ran until Extempore was killed. The price is speed in
+Scheme loops and recursion defined after startup, which s7 no longer compiles to
+the fast paths that loop in C: a tight `do` loop is many times slower, and a
+recursive function such as `fib` about six times. The xtlang compiler keeps
+those fast paths, so compiling is no slower, and code which needs the speed
+belongs in xtlang. Compiled xtlang code still runs to completion once called.
+
 ## v0.12.0
 
 The studio is new: a second audio path in `libs/studio`, with fifteen

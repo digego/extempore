@@ -149,6 +149,16 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
     }
 }
 
+// An interrupt and the time limit stop an evaluation through begin_hook, which
+// s7 calls every few thousand steps.  With it set, s7 also compiles closures and
+// do loops without its fast paths that loop in C, where the hook can't be
+// called (see Begin_Hook_Interval in s7.c).  So it is set once the runtime has
+// loaded: the xtlang compiler keeps those fast paths, and what is defined after
+// it can always be stopped.
+void scheme_enable_stops(scheme* sc) {
+    s7_set_begin_hook(sc->sc, begin_hook);
+}
+
 scheme* scheme_init_new() {
     scheme* sc = new scheme{};
 
@@ -191,8 +201,6 @@ scheme* scheme_init_new() {
         s7_set_default_random_state(sc->sc, s7_int(extemp::UNIV::SEED + made.fetch_add(1)),
                                     1675393560);
     }
-
-    s7_set_begin_hook(sc->sc, begin_hook);
 
     sc->output_port = s7_open_output_string(sc->sc);
     s7_gc_protect(sc->sc, sc->output_port);

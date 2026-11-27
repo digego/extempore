@@ -400,6 +400,48 @@ class Protocol(unittest.TestCase):
             c.request(op="interrupt", session=session, **{"interrupt-id": eval_id})
             self.assertIn("interrupted", statuses(list(c.responses(eval_id))))
 
+    # Loops with no begin in them, which s7 runs in C when it's let to (its tc,
+    # recur and optimised do ops): see Begin_Hook_Interval in src/s7.c.
+    TIGHT_LOOPS = {
+        "named let": "(let loop ((i 0)) (loop (+ i 1)))",
+        "tail call": "(begin (define (nrepl-tc n) (nrepl-tc (+ n 1))) (nrepl-tc 0))",
+        "mutual recursion": "(begin (define (nrepl-ping n) (nrepl-pong n))"
+        " (define (nrepl-pong n) (nrepl-ping (+ n 1))) (nrepl-ping 0))",
+        "do, no body": "(do ((i 0 (+ i 1))) (#f))",
+        "do in a function": "(begin (define (nrepl-sum n) (let ((x 0))"
+        " (do ((i 0 (+ i 1))) ((= i n) x) (set! x (+ x i))))) (nrepl-sum (expt 10 12)))",
+        "recursion": "(begin (define (nrepl-fib n)"
+        " (if (< n 2) n (+ (nrepl-fib (- n 1)) (nrepl-fib (- n 2))))) (nrepl-fib 60))",
+    }
+
+    def test_interrupt_a_tight_loop(self) -> None:
+        with self.xtm.client() as c:
+            session = c.request(op="clone")[0]["new-session"]
+            for name, code in self.TIGHT_LOOPS.items():
+                with self.subTest(name):
+                    eval_id = c.send(op="eval", code=code, session=session)
+                    time.sleep(0.3)
+                    c.request(
+                        op="interrupt", session=session, **{"interrupt-id": eval_id}
+                    )
+                    self.assertEqual(
+                        statuses(list(c.responses(eval_id))), ["interrupted", "done"]
+                    )
+                    self.assertEqual(
+                        values(c.request(op="eval", code="(+ 1 1)", session=session)),
+                        ["2"],
+                    )
+
+    def test_time_limit_stops_a_tight_loop(self) -> None:
+        with self.xtm.client() as c:
+            c.request(op="eval", code="(sys:set-default-timeout 44100)")
+            try:
+                rs = c.request(op="eval", code=self.TIGHT_LOOPS["named let"])
+            finally:
+                c.request(op="eval", code="(sys:set-default-timeout (* 44100 60))")
+        self.assertEqual(statuses(rs), ["eval-error", "done"])
+        self.assertIn("time limit", "".join(r.get("err", "") for r in rs))
+
     def test_time_limit(self) -> None:
         with self.xtm.client() as c:
             c.request(

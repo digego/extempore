@@ -1324,6 +1324,7 @@ struct s7_scheme {
 
   void (*begin_hook)(s7_scheme *sc, bool *val);
   opcode_t begin_op;
+  int32_t begin_hook_countdown; /* extempore: see Begin_Hook_Interval */
 
   bool debug_or_profile, profiling_gensyms;
   s7_int current_line, s7_call_line, debug, profile, profile_position;
@@ -55749,6 +55750,15 @@ static s7_pointer g_hook_set_functions(s7_scheme *sc, s7_pointer args)
 
 
 /* -------------------------------- begin_hook -------------------------------- */
+/* With a begin_hook set, eval calls it every Begin_Hook_Interval ops as well as
+   at each begin, so that an interrupt or time limit can stop any evaluation
+   (most loops have no begin in them).  Closures aren't compiled to the tc or
+   recur ops, nor do loops to the optimised do ops: their loops and recursions
+   run in C without coming back to eval.
+   [extempore-local change vs upstream s7; re-apply on s7 upgrade -- see
+   test_interrupt_a_tight_loop in tests/nrepl/test_server.py] */
+#define Begin_Hook_Interval 1024
+
 void (*s7_begin_hook(s7_scheme *sc))(s7_scheme *sc, bool *val) {return(sc->begin_hook);}
 
 void s7_set_begin_hook(s7_scheme *sc, void (*hook)(s7_scheme *sc, bool *val))
@@ -79367,13 +79377,13 @@ static void optimize_lambda(s7_scheme *sc, bool unstarred_lambda, s7_pointer fun
 	    if (((unstarred_lambda) || ((is_null(p)) && (npars == sc->rec_tc_args))) &&
 		(is_null(cdr(body))))
 	      { /* (if <a> #t|#f...) happens only rarely */
-		if (sc->got_tc)
+		if ((sc->got_tc) && (!sc->begin_hook)) /* extempore: see Begin_Hook_Interval */
 		  {
 		    if (check_tc(sc, func, npars, cleared_pars, car(body)))
 		      set_safe_closure_body(body);	      /* (very_)safe_closure set above if > Recur_Body */
 		    /* if not check_tc, car(body) is either not a tc op or it is not optimized so that is_fxable will return false */
 		  }
-		if ((sc->got_rec) &&
+		if ((sc->got_rec) && (!sc->begin_hook) && /* extempore: see Begin_Hook_Interval */
 		    (!is_tc_op(optimize_op(car(body)))) &&
 		    (check_recur(sc, func, npars, cleared_pars, car(body))))
 		  set_safe_closure_body(body);
@@ -85756,6 +85766,8 @@ static s7_pointer check_do(s7_scheme *sc)
   check_do_for_obvious_errors(sc, form);
   pair_set_syntax_op(form, OP_DO_UNCHECKED);
   code = cdr(form); /* ok here, since check_do_for_obvious_errors will call error_nr otherwise */
+  if (sc->begin_hook) /* extempore: see Begin_Hook_Interval */
+    return(code);
   end = cadr(code);
 
   if ((!is_pair(end)) || (!is_fxable(sc, car(end))))
@@ -95970,6 +95982,12 @@ static s7_pointer eval(s7_scheme *sc, opcode_t first_op)
       sc->cur_op = optimize_op(sc->code); /* sc->code can be anything, optimize_op examines a type field (opt_bits) */
 
     Top_No_Pop:
+      if ((sc->begin_hook) && (--sc->begin_hook_countdown <= 0)) /* extempore: see Begin_Hook_Interval */
+	{
+	  sc->begin_hook_countdown = Begin_Hook_Interval;
+	  if (call_begin_hook(sc))
+	    return(sc->F);
+	}
 #if Show_Eval_Ops && s7_Debugging
       safe_print(fprintf(stderr, "  %s%s%s (%d), code: %s\n",
 			 Bold_Text, op_names[sc->cur_op], Unbold_Text, (int)(sc->cur_op), display_truncated(sc->code)));
@@ -102359,6 +102377,7 @@ s7_scheme *s7_init(void)
   sc->read_dims = Int_Zero;
 
   sc->begin_hook = NULL;
+  sc->begin_hook_countdown = Begin_Hook_Interval;
   sc->autoload_table = sc->nil;
   sc->autoload_names = NULL;
   sc->autoload_names_sizes = NULL;

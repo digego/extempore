@@ -19,6 +19,7 @@ typedef pointer (*foreign_func)(struct scheme*, pointer);
 struct scheme;
 
 scheme* scheme_init_new();
+void scheme_enable_stops(scheme* sc);
 void scheme_deinit(scheme* sc);
 void scheme_set_input_port_file(scheme* sc, FILE* fin);
 void scheme_set_input_port_string(scheme* sc, char* start, char* past_the_end);
