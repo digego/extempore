@@ -53,8 +53,8 @@ users will care about:
 - `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead of
   ALSA.
 - `EXTEMPORE_CCACHE` (default `ON`) --- route compilation through `ccache` when
-  it's installed. The sub-builds (LLVM, portaudio, ...) inherit it, so
-  a second build directory costs minutes rather than half an hour.
+  it's installed. The sub-builds (LLVM, portaudio, ...) inherit it, so a second
+  build directory costs minutes rather than half an hour.
 - `EXTEMPORE_SANITIZE` (default empty) --- build Extempore's own objects with a
   sanitizer: `asan`, `ubsan`, `tsan` or `asan+ubsan`. Anything else is a
   configure error. Unix only.

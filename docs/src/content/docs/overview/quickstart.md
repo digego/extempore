@@ -63,9 +63,9 @@ well, so the `(sys:load "libs/...")` lines in the examples link to their files.
 
 :::tip
 
-The _Extempore: Download binary_ command does all this for you: it downloads
-the latest release for your computer, unzips it where you say, and sets
-_Extempore: Sharedir_ and _Extempore: Executable_ to point at it.
+The _Extempore: Download binary_ command does all this for you: it downloads the
+latest release for your computer, unzips it where you say, and sets _Extempore:
+Sharedir_ and _Extempore: Executable_ to point at it.
 
 :::
 
@@ -155,8 +155,8 @@ represented as `#t` in Extempore).
 This is just a quickstart, so we won't go down the rabbit hole, but the rule of
 thumb is that when you call a print function (e.g. `println`)
 
-- the printed output will show up in the terminal (and in VSCode's
-  "Extempore" output panel)
+- the printed output will show up in the terminal (and in VSCode's "Extempore"
+  output panel)
 - the _return value_ of the function will be shown at the end of the line you
   evaluated (`=> #t`), until you next edit the file
 
@@ -242,10 +242,9 @@ always. So if you're not getting any sound, it could be because Extempore is
 sending sound output to the wrong audio device.
 
 To print the list of audio devices that Extempore can "see", open a terminal and
-type the command `./extempore devices` (or
-`./extempore.exe devices` if you're on Windows) and hit
-<kbd>return</kbd>. On my machine right now it says this, but yours will (almost
-certainly) be different.
+type the command `./extempore devices` (or `./extempore.exe devices` if you're
+on Windows) and hit <kbd>return</kbd>. On my machine right now it says this, but
+yours will (almost certainly) be different.
 
 ```
 0: DisplayPort (Core Audio, 0 in, 2 out)

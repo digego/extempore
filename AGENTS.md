@@ -25,9 +25,9 @@ Key options: `-DASSETS=ON` (download multimedia assets), `-DBUILD_TESTS=ON`
 ### LLVM dependency
 
 LLVM is fetched and built automatically via CMake's `FetchContent`. The version
-is pinned in `CMakeLists.txt`. On first build, CMake downloads
-the LLVM source tarball and builds only the required components (OrcJIT, target
-codegen, AsmParser, Passes, MCDisassembler, IRPrinter).
+is pinned in `CMakeLists.txt`. On first build, CMake downloads the LLVM source
+tarball and builds only the required components (OrcJIT, target codegen,
+AsmParser, Passes, MCDisassembler, IRPrinter).
 
 After configuration, LLVM sources and build artifacts are in:
 
@@ -132,12 +132,13 @@ forever (a temporal recursion) runs until it calls `(quit)`, so give untested
 code a `timeout`.
 
 `build/extempore render FILE -o OUT.wav --duration SECONDS` renders a file's
-audio offline, and renders the same samples every time.
-`build/extempore --help` lists the subcommands.
+audio offline, and renders the same samples every time. `build/extempore --help`
+lists the subcommands.
 
-To iterate against a running instance instead, start `build/extempore --no-audio
---nrepl-port 0` from a scratch directory and send code from there with
-`build/extempore send '...'` (or `--file F`, or `--file F --line N` for one
-form): it prints values and output, exits 1 on an error, and libraries stay
-loaded between evals. `build/extempore status` says whether it is reachable.
-`docs/src/content/docs/guides/nrepl.md` describes the server.
+To iterate against a running instance instead, start
+`build/extempore --no-audio --nrepl-port 0` from a scratch directory and send
+code from there with `build/extempore send '...'` (or `--file F`, or
+`--file F --line N` for one form): it prints values and output, exits 1 on an
+error, and libraries stay loaded between evals. `build/extempore status` says
+whether it is reachable. `docs/src/content/docs/guides/nrepl.md` describes the
+server.

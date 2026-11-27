@@ -112,8 +112,8 @@ _Note on running_: an in-tree build keeps its runtime files (`runtime/`,
 `libs/`, `examples/`) in the source tree, so run it in place
 (`build/extempore`). If you'd rather have a self-contained tree somewhere else,
 `cmake --install build --prefix <dir>` copies the binary and its runtime files
-into `<dir>`; that tree can be moved anywhere and run from any working directory
---- see [BUILDING.md](./BUILDING.md).
+into `<dir>`; that tree can be moved anywhere and run from any working
+directory --- see [BUILDING.md](./BUILDING.md).
 
 ### Hear your first sine wave
 
@@ -150,10 +150,9 @@ its BDFL; Ben is the current maintainer. For issues and questions the
 [mailing list](http://groups.google.com/group/extemporelang) is the best place
 to start, but you can also email Ben directly. Many others have contributed to
 Extempore's development
-([see the full list](https://github.com/digego/extempore/graphs/contributors))
---- including [Jim Kuhn](https://github.com/JimKuhn), whose significant
-performance improvements don't show up in the commit logs but for which we're
-very grateful.
+([see the full list](https://github.com/digego/extempore/graphs/contributors)) ---
+including [Jim Kuhn](https://github.com/JimKuhn), whose significant performance
+improvements don't show up in the commit logs but for which we're very grateful.
 
 ## Docs & Community
 
