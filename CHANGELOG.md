@@ -72,8 +72,8 @@ build-provenance attestations, and clang-tidy runs on every push.
 xtlang's optimiser now knows the host CPU, so it vectorises loops: one which
 scales and adds two `float` buffers runs about six times faster on an AVX-512
 machine. A sum carried from one iteration to the next (a dot product) is still
-scalar, since vectorising it would change the rounding. A true `i1` handed to
-a C function is now always 1, where it could arrive as any non-zero byte.
+scalar, since vectorising it would change the rounding. A true `i1` handed to a
+C function is now always 1, where it could arrive as any non-zero byte.
 
 The IR the compiler emits spells every pointer `ptr`, as LLVM itself has since
 17, where it wrote the typed pointers (`i8*`, `%String**`) that LLVM's parser
@@ -182,11 +182,11 @@ the interpreter read from stdin on the way: harmless when stdin was closed, and
 a hang when it was open with nothing to read.
 
 `extempore fmt` formats `.xtm` files, changing only whitespace: indentation, and
-whitespace at the ends of lines. The language server
-formats too (`textDocument/formatting`), so an editor with a language client can
-format on save, and extempore-mode has `extempore-format-buffer`. The source
-tree has been formatted with it, and CI checks it stays formatted; the commit
-which reformatted it is in `.git-blame-ignore-revs`.
+whitespace at the ends of lines. The language server formats too
+(`textDocument/formatting`), so an editor with a language client can format on
+save, and extempore-mode has `extempore-format-buffer`. The source tree has been
+formatted with it, and CI checks it stays formatted; the commit which
+reformatted it is in `.git-blame-ignore-revs`.
 
 `sys:mcjit-enabled` is gone. It has returned `#t` for as long as MCJIT, and then
 ORC, was the only JIT.
