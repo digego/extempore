@@ -90,7 +90,7 @@ class Protocol(unittest.TestCase):
 
     def test_out_arrives_before_done_without_colour_codes(self) -> None:
         rs = self.eval(
-            '(println \'hello) (print-with-colors \'red \'default #t (print "in red")) 42'
+            "(println 'hello) (print-with-colors 'red 'default #t (print \"in red\")) 42"
         )
         text = out(rs)
         self.assertIn("hello\n", text)
@@ -121,7 +121,9 @@ class Protocol(unittest.TestCase):
         self.assertEqual(error["status"], ["eval-error"])
         err = "".join(r["err"] for r in rs if "err" in r)
         self.assertIn("no overload matches the argument types [i64,double]", err)
-        self.assertTrue(err.startswith("error: couldn't resolve the type of nrepl_bad_fn\n"), err)
+        self.assertTrue(
+            err.startswith("error: couldn't resolve the type of nrepl_bad_fn\n"), err
+        )
         self.assertEqual(err.count("couldn't resolve"), 1)
         self.assertNotIn("\x1b", err)
         # the report reaches the client once, as err, not as out too
@@ -208,10 +210,14 @@ class Protocol(unittest.TestCase):
             self.assertEqual(values(c.request(op="eval", code="nrepl-kept")), ["99"])
 
     def test_utility_session_runs_while_primary_is_busy(self) -> None:
-        busy_loop = "(let loop ((i 0)) (if (< i 10000000) (begin (set! i (+ i 1)) (loop i)) i))"
+        busy_loop = (
+            "(let loop ((i 0)) (if (< i 10000000) (begin (set! i (+ i 1)) (loop i)) i))"
+        )
         with self.xtm.client() as busy, self.xtm.client() as c:
             busy_id = busy.send(op="eval", code=busy_loop)
-            session = c.request(op="clone", **{"extempore/process": "utility"})[0]["new-session"]
+            session = c.request(op="clone", **{"extempore/process": "utility"})[0][
+                "new-session"
+            ]
             rs = c.request(op="eval", code="(ipc:get-process-name)", session=session)
             utility_done = time.monotonic()
             self.assertEqual(values(rs), ['"utility"'])
@@ -256,21 +262,32 @@ class Protocol(unittest.TestCase):
 
     def test_completions_of_scheme_and_xtlang_names(self) -> None:
         with self.xtm.client() as c:
-            c.request(op="eval", code="""
+            c.request(
+                op="eval",
+                code="""
                 (define nrepl-complete-var 1)
                 (define (nrepl-complete-fn x) x)
                 (define-macro (nrepl-complete-macro x) x)
                 (bind-func nrepl_complete_xt (lambda (x:i64) (* x 2)))
-                (bind-type NreplCompleteType <i64,double>)""")
+                (bind-type NreplCompleteType <i64,double>)""",
+            )
             found = self.candidates(c, "nrepl-complete-")
-            self.assertEqual(found, {"nrepl-complete-fn": "function",
-                                     "nrepl-complete-macro": "macro",
-                                     "nrepl-complete-var": "var"})
+            self.assertEqual(
+                found,
+                {
+                    "nrepl-complete-fn": "function",
+                    "nrepl-complete-macro": "macro",
+                    "nrepl-complete-var": "var",
+                },
+            )
             self.assertEqual(list(found), sorted(found))
-            self.assertEqual(self.candidates(c, "nrepl_complete_"),
-                             {"nrepl_complete_xt": "function"})
+            self.assertEqual(
+                self.candidates(c, "nrepl_complete_"), {"nrepl_complete_xt": "function"}
+            )
             # a type has no Scheme binding: the compiler's caches know it
-            self.assertEqual(self.candidates(c, "NreplComplete")["NreplCompleteType"], "class")
+            self.assertEqual(
+                self.candidates(c, "NreplComplete")["NreplCompleteType"], "class"
+            )
             self.assertEqual(self.candidates(c, "bind-fu")["bind-func"], "special-form")
             self.assertEqual(self.candidates(c, "no-such-prefix-anywhere"), {})
             self.assertEqual(self.candidates(c, ""), {})
@@ -281,9 +298,12 @@ class Protocol(unittest.TestCase):
 
     def test_lookup(self) -> None:
         with self.xtm.client() as c:
-            c.request(op="eval", code="""
+            c.request(
+                op="eval",
+                code="""
                 (bind-func nrepl_lookup_xt "doubles its argument" (lambda (x:i64) (* x 2)))
-                (define (nrepl-lookup-fn a b) a)""")
+                (define (nrepl-lookup-fn a b) a)""",
+            )
             (reply,) = c.request(op="lookup", sym="nrepl_lookup_xt")
             self.assertEqual(reply["status"], ["done"])
             info = reply["info"]
@@ -339,17 +359,24 @@ class Protocol(unittest.TestCase):
     def test_interrupt_an_eval_which_is_still_waiting_its_turn(self) -> None:
         with self.xtm.client() as c:
             session = c.request(op="clone")[0]["new-session"]
-            c.request(op="eval", code="(define nrepl-spin 0) (define nrepl-ran #f)",
-                      session=session)
+            c.request(
+                op="eval",
+                code="(define nrepl-spin 0) (define nrepl-ran #f)",
+                session=session,
+            )
             running = c.send(op="eval", code=self.LONG_LOOP, session=session)
             waiting = c.send(op="eval", code="(set! nrepl-ran #t)", session=session)
             time.sleep(0.5)
-            (ack,) = c.request(op="interrupt", session=session, **{"interrupt-id": waiting})
+            (ack,) = c.request(
+                op="interrupt", session=session, **{"interrupt-id": waiting}
+            )
             self.assertEqual(ack["status"], ["done"])
             c.request(op="interrupt", session=session, **{"interrupt-id": running})
             self.assertIn("interrupted", statuses(list(c.responses(running))))
             # its turn comes, and it says it was interrupted without running
-            self.assertEqual(statuses(list(c.responses(waiting))), ["interrupted", "done"])
+            self.assertEqual(
+                statuses(list(c.responses(waiting))), ["interrupted", "done"]
+            )
             self.assertEqual(
                 values(c.request(op="eval", code="nrepl-ran", session=session)), ["#f"]
             )
