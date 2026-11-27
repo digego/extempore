@@ -63,9 +63,8 @@ Then,
 [set up your text editor of choice](https://extemporelang.github.io/guides/editor-support/)
 and away you go.
 
-_Note_: the VSCode extension used to offer an _Extempore: Download binary_
-command for one-click setup. It hasn't been updated for the current releases and
-may not work --- downloading the release manually is the safest option for now.
+In VSCode, the extension's _Extempore: Download binary_ command does the
+download and unzip for you, and points the extension at the result.
 
 _Note on macOS first launch_: the binaries aren't signed with an Apple Developer
 ID, so on first launch macOS will refuse to run them ("apple could not verify
