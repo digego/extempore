@@ -171,11 +171,14 @@ add_test(NAME tests/core/aot-compilation.xtm
         -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_aot_test.cmake)
 set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
     TIMEOUT 200
-    LABELS compiler-unit)
+    LABELS compiler-unit
+    RESOURCE_LOCK build-aot-cache)
 
 # Installed-tree test: install to a temporary prefix, make it read-only, and
 # check the installed binary finds its files and AOT-compiles into the per-user
-# cache dir (extras/cmake/run_install_test.cmake).
+# cache dir (extras/cmake/run_install_test.cmake). The install copies
+# build/libs/aot-cache, which the AOT round-trip test above writes to, hence
+# the lock.
 add_test(NAME install/installed-tree
     COMMAND ${CMAKE_COMMAND}
         -DBUILD_DIR=${CMAKE_BINARY_DIR}
@@ -184,7 +187,8 @@ add_test(NAME install/installed-tree
         -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_install_test.cmake)
 set_tests_properties(install/installed-tree PROPERTIES
     TIMEOUT 600
-    LABELS install)
+    LABELS install
+    RESOURCE_LOCK build-aot-cache)
 
 # Documentation example verifier: run every xtlang snippet in the docs through
 # extempore exec and check its claimed output, so doc code that drifts from
