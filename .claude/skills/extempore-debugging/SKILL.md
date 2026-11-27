@@ -253,7 +253,7 @@ Key runtime functions to instrument:
 ./extempore exec --no-base -e "(begin (llvm:jit-compile-ir-string \"define i64 @test() { ret i64 42 }\") (println (llvm:get-function \"test\")))"
 
 # Test AOT cache loading
-./extempore exec --no-base -e "(llvm:compile-ir (sys:slurp-file \"libs/aot-cache/xtmbase.ll\"))"
+./extempore exec --no-base -e "(llvm:compile-ir (sys:slurp-file (sys:aot-cache-path \"xtmbase.ll\")))"
 ```
 
 ## C++ debug output

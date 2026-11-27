@@ -7,7 +7,7 @@
 
 ;; The studio's five xtlang libraries (engine, dsp, fx, hall and mixer) are
 ;; compiled ahead of time when Extempore is built, like the core libraries,
-;; into libs/aot-cache in the build directory. Loading one from its cache is
+;; into the AOT cache (sys:aot-cache-path). Loading one from its cache is
 ;; several times quicker than compiling it.
 ;;
 ;; A core library's cache is loaded whatever has happened to its source since,
@@ -56,14 +56,14 @@
             (set! *studio:aot:checksums* (cons (cons path sum) *studio:aot:checksums*))
             sum)))))
 
-(define studio:aot:note-path
+(define studio:aot:note-file
   (lambda (name)
-    (sys:build-path (string-append "libs/aot-cache/" name ".sources"))))
+    (string-append name ".sources")))
 
 ;; the cache's note: a list of (path . checksum), or #f if there isn't one
 (define studio:aot:read-note
   (lambda (name)
-    (let ((text (sys:slurp-file (studio:aot:note-path name))))
+    (let ((text (sys:slurp-file (sys:aot-cache-path (studio:aot:note-file name)))))
       (and text
            (> (string-length text) 0)
            (let ((note (read (open-input-string text))))
@@ -88,7 +88,8 @@
 (define studio:aot-load
   (lambda (name sources)
     (cond ((output-port? *xtc:aot:current-output-port*)
-           (let ((port (open-output-file (studio:aot:note-path name))))
+           (let ((port (open-output-file (string-append (sys:aot-cache-output-dir) "/"
+                                                        (studio:aot:note-file name)))))
              (write (map (lambda (path) (cons path (studio:aot:checksum path))) sources) port)
              (newline port)
              (close-port port)
@@ -99,7 +100,7 @@
            (let ((note (and *xtc:globals:with-cache* (studio:aot:read-note name))))
              (cond ((not note) #f)
                    ((studio:aot:fresh? note sources)
-                    (sys:load (sys:build-path (string-append "libs/aot-cache/" name ".xtm")) 'quiet))
+                    (sys:load (sys:aot-cache-path (string-append name ".xtm")) 'quiet))
                    (else
                     (log:emit 'info 'compiler "The compiled cache of" (log:styled 'blue #t name)
                               "is older than its source: compiling it afresh")

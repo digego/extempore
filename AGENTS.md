@@ -54,6 +54,7 @@ ctest --test-dir build -L audio-offline -j4  # render audio offline, check the W
 ctest --test-dir build -L cli               # the command line: output, exit statuses
 ctest --test-dir build -L nrepl -j2         # the nREPL server and its clients
 ctest --test-dir build -L lsp               # the language server (extempore lsp)
+ctest --test-dir build -L install           # an installed tree, run from outside the source
 ```
 
 Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
@@ -72,7 +73,11 @@ NOTE: this project uses GitHub Actions (in particular the
 
 The build writes its AOT cache and the shared libraries xtlang binds into
 `build/libs/` (`aot-cache/`, `platform-shlibs/`), never the source tree; the
-runtime finds them beside the binary (`sys:build-dir`). Don't edit them.
+runtime finds them beside the binary (`sys:lib-dir`). Don't edit them. An
+installed tree (`cmake --install`, the release archives) has another layout and
+writes AOT output to a per-user cache: `include/ext/ShareDir.h` describes both,
+and `ctest -L install` tests it. Code that reads the AOT cache goes through
+`sys:aot-cache-path`.
 
 ```bash
 cmake --build build --target aot_core            # AOT compile the core stdlib

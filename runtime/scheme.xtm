@@ -1606,12 +1606,29 @@
 
 ;; sys:load and friends
 
-;; path, relative to the build dir: the directory holding what a build
-;; generates (libs/aot-cache/, libs/platform-shlibs/, libs/builds/). That is
-;; build/ for a source build, and the share dir for an installed tree.
-(define sys:build-path
+;; What a build generates is in the lib dir (sys:lib-dir): aot-cache/ and
+;; platform-shlibs/, build/libs/ for a source build and lib/extempore/ in an
+;; installed tree, where it is read-only. AOT compilation writes to the cache
+;; dir (sys:cache-dir) instead: a per-user directory for an installed tree, and
+;; the lib dir again for a source build.
+
+;; path, relative to the lib dir
+(define sys:lib-path
   (lambda (path)
-    (string-append (sys:build-dir) "/" path)))
+    (string-append (sys:lib-dir) "/" path)))
+
+;; where AOT compilation writes: aot-cache/ in the cache dir
+(define sys:aot-cache-output-dir
+  (lambda ()
+    (string-append (sys:cache-dir) "/aot-cache")))
+
+;; a file in the AOT cache: the cache dir's, which shadows the lib dir's
+(define sys:aot-cache-path
+  (lambda (name)
+    (let ((own (string-append (sys:aot-cache-output-dir) "/" name)))
+      (if (file-exists? own)
+          own
+          (string-append (sys:lib-dir) "/aot-cache/" name)))))
 
 (define *global-sysload-evals* (make-list-with-proc 10 (lambda (i) #f)))
 

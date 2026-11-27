@@ -58,10 +58,10 @@ users will care about:
 - `EXTEMPORE_SANITIZE` (default empty) --- build Extempore's own objects with a
   sanitizer: `asan`, `ubsan`, `tsan` or `asan+ubsan`. Anything else is a
   configure error. Unix only.
-- `EXT_SHARE_DIR` (default: the source tree) --- the fallback location for
-  `runtime/`, `libs/` and `examples/`, baked in at compile time. It is only
-  consulted when the directory holding the binary has no `runtime/` beside it
-  (see [Running Extempore](#running-extempore)); the release builds set `.`.
+- `EXT_SHARE_DIR` (default: the source tree) --- the location of `runtime/`,
+  `libs/` and `examples/`, baked in at compile time. It is consulted only when
+  the binary isn't in an installed tree (see [Installing](#installing)); the
+  release builds set `.`.
 - `EXTEMPORE_VERSION` (default: `git describe`) --- the version the binary
   reports. CI passes the tag explicitly because its checkout is shallow.
 
@@ -102,38 +102,46 @@ standard library (for faster startup). Other targets worth knowing about:
 
 ## Installing
 
-`cmake --install build --prefix <dir>` lays out a self-contained tree in
-`<dir>`: the `extempore` binary with `runtime/`, `libs/` (AOT cache and platform
-shared libraries included), `examples/` and, if they were downloaded, `assets/`
-beside it. That's the layout of the binary release archives, and an installed
-tree runs from any working directory --- and can be moved anywhere --- because
-the binary finds those directories beside itself.
+`cmake --install build --prefix <dir>` lays out an installed tree, the same as
+the release archives hold:
+
+    <dir>/bin/extempore
+    <dir>/share/extempore/      runtime/, libs/, examples/ and (if downloaded) assets/
+    <dir>/lib/extempore/        the AOT cache and the shared libraries xtlang binds
+    <dir>/share/doc/extempore/  README.md, CHANGELOG.md
+
+So `--prefix ~/.local` puts `extempore` on the usual per-user `PATH`, and
+`--prefix /usr/local` installs it for everyone. The tree can be moved anywhere:
+the binary finds the rest from its own path, after resolving symlinks, so a link
+to `bin/extempore` from anywhere on your `PATH` works too.
+
+An installed tree needn't be writable. AOT compilation writes to a per-user
+cache directory instead, versioned so each release keeps its own:
+`$XDG_CACHE_HOME/extempore/<version>` (or `~/.cache/...`) on Linux,
+`~/Library/Caches/extempore/<version>` on macOS and
+`%LOCALAPPDATA%\extempore\<version>` on Windows. Set `EXTEMPORE_CACHE_DIR` to
+use another. What's compiled there shadows the installed AOT cache.
 
 ## Running Extempore
 
-The `extempore` binary looks for its share directory (`runtime/`, `libs/`,
-`examples/`) beside itself, resolving symlinks first, so an unzipped release or
-an installed tree works from any working directory and keeps working if you move
-it or put a link to it on your `PATH`. An in-tree build --- where the binary
-sits in `build/` with no `runtime/` next to it --- falls back to the source tree
-it was built from, so run it from the build directory:
+An in-tree build runs against the source tree it was built from, so run it in
+place:
 
-    ./extempore                 # audio + Scheme interpreter, listens on port 7099
-    ./extempore --no-audio      # same, without audio
-    ./extempore --repl          # interactive linenoise REPL (Linux/macOS only)
-    ./extempore exec -e "(println 'hello)"   # run code and exit
+    build/extempore                 # audio + Scheme interpreter, listens on port 7099
+    build/extempore --no-audio      # same, without audio
+    build/extempore --repl          # interactive linenoise REPL (Linux/macOS only)
+    build/extempore exec -e "(println 'hello)"   # run code and exit
 
-What the build generates --- the AOT cache (`libs/aot-cache/`) and the shared
-libraries xtlang binds (`libs/platform-shlibs/`) --- goes in `libs/` beside the
-binary: `build/libs/` for an in-tree build, the same `libs/` as the sources in
-an installed tree. In xtlang, `(sys:build-dir)` names that directory, as
-`(sys:share-dir)` names the share directory.
+What the build generates --- the AOT cache (`aot-cache/`) and the shared
+libraries xtlang binds (`platform-shlibs/`) --- goes in `build/libs/`, which is
+both the lib directory and the cache directory of an in-tree build. In xtlang,
+`(sys:share-dir)`, `(sys:lib-dir)` and `(sys:cache-dir)` name the three, and
+`(sys:aot-cache-path name)` finds a file in the AOT cache.
 
-To use a share directory that isn't beside the binary --- an in-tree build run
-against an installed tree, say, or a binary you copied out of a release archive
-on its own --- name it explicitly:
+To use a share directory other than the one the binary finds --- a build run
+against an installed tree's sources, say --- name it explicitly:
 
-    ./extempore --share-dir /path/to/extempore
+    build/extempore --share-dir /path/to/share/extempore
 
 ## Platform-specific notes
 
@@ -143,11 +151,12 @@ Extempore's macOS builds target arm64 (Apple Silicon) with a minimum deployment
 target of macOS 13.3 Ventura. CI builds and tests on macOS 15 and macOS 26.
 
 Apple requires distributed binaries to be signed & notarised, and the Extempore
-core team haven't got an Apple Developer account set up for that. If Gatekeeper
-refuses to run the `extempore` binary from a downloaded release, strip the
-quarantine attribute and try again:
+core team haven't got an Apple Developer account set up for that. The install
+script and the VS Code extension download releases without the quarantine flag
+that browsers set, so Gatekeeper doesn't stop them. If it refuses to run an
+archive you downloaded with a browser, strip the flag and try again:
 
-    xattr -dr com.apple.quarantine /path/to/extempore
+    xattr -dr com.apple.quarantine /path/to/the/unzipped/folder
 
 If that doesn't help, reach out on the
 [mailing list](mailto:extemporelang@googlegroups.com).
@@ -174,9 +183,3 @@ don't already have VS installed, download the free
 CI builds Windows with Ninja from a Visual Studio developer prompt, which is
 what the presets assume. To use the VS generator instead, skip the presets and
 configure with `-G "Visual Studio 17 2022" -A x64`.
-
-#### Missing `VCRUNTIME140_1.dll`
-
-If you see _VCRUNTIME140_1.dll was not found_, install the x64
-`vc_redist.x64.exe` from the
-[official Microsoft page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).

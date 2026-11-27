@@ -48,6 +48,7 @@
 #include "SchemeS7Private.h"
 #include "ext/FileUtil.h"
 #include "ext/ShareDir.h"
+#include "ExtemporeVersion.h"
 
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
@@ -340,14 +341,17 @@ std::string executable_file() {
     return executable_path().string();
 }
 
-std::string resolve_share_dir(std::string_view explicit_dir) {
+void resolve_dirs(std::string_view explicit_share_dir) {
     const auto exe = executable_path();
-    return share_dir::pick(explicit_dir, exe.empty() ? exe : exe.parent_path(), EXT_SHARE_DIR);
-}
-
-std::string resolve_build_dir(std::string_view share_dir) {
-    const auto exe = executable_path();
-    return share_dir::pick_build_dir(exe.empty() ? exe : exe.parent_path(), share_dir);
+    const auto getenv = [](const char* name) {
+        const char* value = std::getenv(name);
+        return std::string(value ? value : "");
+    };
+    const auto dirs = share_dir::pick(explicit_share_dir, exe.empty() ? exe : exe.parent_path(),
+                                      EXT_SHARE_DIR, EXTEMPORE_VERSION, getenv);
+    SHARE_DIR = dirs.share;
+    LIB_DIR = dirs.lib;
+    CACHE_DIR = dirs.cache;
 }
 
 std::string find_file(const std::string& path) {
@@ -356,17 +360,16 @@ std::string find_file(const std::string& path) {
     if (p.is_absolute() || std::filesystem::exists(p, ec)) {
         return path;
     }
-    for (const std::string* root : {&BUILD_DIR, &SHARE_DIR}) {
-        const auto candidate = std::filesystem::path(*root) / p;
-        if (std::filesystem::exists(candidate, ec)) {
-            return candidate.string();
-        }
+    const auto candidate = std::filesystem::path(SHARE_DIR) / p;
+    if (std::filesystem::exists(candidate, ec)) {
+        return candidate.string();
     }
     return path;
 }
 
 std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
-std::string BUILD_DIR = std::string(EXT_SHARE_DIR);
+std::string LIB_DIR = std::string(EXT_SHARE_DIR) + "/libs";
+std::string CACHE_DIR = LIB_DIR;
 uint32_t NUM_FRAMES = 1024;
 uint32_t CHANNELS = 2;
 uint32_t IN_CHANNELS = 0;

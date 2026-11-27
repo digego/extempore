@@ -173,6 +173,19 @@ set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
     TIMEOUT 200
     LABELS compiler-unit)
 
+# Installed-tree test: install to a temporary prefix, make it read-only, and
+# check the installed binary finds its files and AOT-compiles into the per-user
+# cache dir (extras/cmake/run_install_test.cmake).
+add_test(NAME install/installed-tree
+    COMMAND ${CMAKE_COMMAND}
+        -DBUILD_DIR=${CMAKE_BINARY_DIR}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DSCRATCH=${CMAKE_BINARY_DIR}/install-test
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_install_test.cmake)
+set_tests_properties(install/installed-tree PROPERTIES
+    TIMEOUT 600
+    LABELS install)
+
 # Documentation example verifier: run every xtlang snippet in the docs through
 # extempore exec and check its claimed output, so doc code that drifts from
 # the compiler can be caught. Labelled `docs` (kept out of the libs-core

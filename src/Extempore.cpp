@@ -606,8 +606,7 @@ EXPORT int extempore_init(int argc, char** argv) {
     if (apply_invocation(extemp::cli::parse(args), settings, status) == ParseResult::Exit) {
         return status;
     }
-    extemp::UNIV::SHARE_DIR = extemp::UNIV::resolve_share_dir(settings.sharedir);
-    extemp::UNIV::BUILD_DIR = extemp::UNIV::resolve_build_dir(extemp::UNIV::SHARE_DIR);
+    extemp::UNIV::resolve_dirs(settings.sharedir);
     if (!settings.file.empty()) {
         // sys:load looks in the working directory, then in the share dir
         std::error_code ec;

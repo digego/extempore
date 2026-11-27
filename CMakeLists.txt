@@ -55,7 +55,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # What the build generates for the runtime --- the AOT cache and the shared
 # libraries xtlang binds --- goes under libs/ beside the executable, where the
-# runtime looks for it (UNIV::BUILD_DIR). The source tree holds sources only.
+# runtime looks for it (UNIV::LIB_DIR). The source tree holds sources only.
 set(EXTEMPORE_AOT_CACHE_DIR ${CMAKE_BINARY_DIR}/libs/aot-cache)
 set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_BINARY_DIR}/libs/platform-shlibs)
 foreach(_stale libs/aot-cache libs/platform-shlibs)
@@ -515,31 +515,39 @@ endif()
 # install #
 ###########
 
-# `cmake --install build --prefix <dir>` lays out a binary release: the
-# executable at the top of the prefix with runtime/, libs/ and examples/ beside
-# it, the build's AOT cache and platform shlibs merged into libs/. There the
-# share dir and the build dir are one directory, which the binary finds beside
-# itself (UNIV::resolve_share_dir), so an installed tree is relocatable and runs
-# from any working directory. `cpack --config build/CPackConfig.cmake` zips it,
-# which is how the release workflow builds its archives.
-install(TARGETS extempore RUNTIME DESTINATION .)
+# `cmake --install build --prefix <dir>` lays out an installed tree, which is
+# also what the release archives hold (include/ext/ShareDir.h describes it):
+# bin/extempore, the sources in share/extempore/, and the build's AOT cache and
+# platform shlibs in lib/extempore/. The binary finds the rest from its own
+# path, so the tree runs from any working directory and can be moved anywhere.
+# `cpack --config build/CPackConfig.cmake` zips it, which is how the release
+# workflow builds its archives.
+install(TARGETS extempore RUNTIME DESTINATION bin)
 install(DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime
     ${CMAKE_CURRENT_SOURCE_DIR}/examples
-    DESTINATION .)
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libs DESTINATION .
+    DESTINATION share/extempore)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libs DESTINATION share/extempore
     PATTERN aot-cache EXCLUDE
     PATTERN platform-shlibs EXCLUDE)
 install(DIRECTORY ${EXTEMPORE_AOT_CACHE_DIR} ${EXT_PLATFORM_SHLIBS_DIR}
-    DESTINATION libs
+    DESTINATION lib/extempore
     OPTIONAL
     PATTERN "*.exp" EXCLUDE)  # MSVC export files, a by-product of linking
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION . OPTIONAL)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION share/extempore
+    COMPONENT assets
+    OPTIONAL)
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.md
-    ${CMAKE_CURRENT_SOURCE_DIR}/BUILDING.md
     ${CMAKE_CURRENT_SOURCE_DIR}/CHANGELOG.md
-    DESTINATION .)
+    DESTINATION share/doc/extempore)
+# The MSVC runtime DLLs, beside extempore.exe, so a machine without the Visual
+# C++ Redistributable runs it. AOT-compiled DLLs link the same runtime
+# (msvcrt.lib in runtime/xtc-aot.xtm) and use the copies the exe has loaded.
+if(MSVC)
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION bin)
+    include(InstallRequiredSystemLibraries)
+endif()
 
 set(CPACK_GENERATOR ZIP)
 set(CPACK_SOURCE_GENERATOR "")

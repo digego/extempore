@@ -76,17 +76,16 @@ namespace extemp {
 
 namespace UNIV {
 
-// Where the runtime files (runtime/, libs/, examples/) live.  Resolved once at
-// startup by resolve_share_dir(); pass the value of --sharedir, or an empty
-// view when it was not given.
+// The share dir (runtime/, libs/, examples/), the lib dir (the build's
+// aot-cache/ and platform-shlibs/) and the cache dir (where AOT compilation
+// writes); see share_dir::pick.  Resolved once at startup by resolve_dirs();
+// pass the value of --share-dir, or an empty view when it was not given.
 extern std::string SHARE_DIR;
-std::string resolve_share_dir(std::string_view explicit_dir);
-// Where the generated files (libs/aot-cache/, libs/platform-shlibs/) live; see
-// share_dir::pick_build_dir.  Resolved once at startup, after SHARE_DIR.
-extern std::string BUILD_DIR;
-std::string resolve_build_dir(std::string_view share_dir);
-// A relative path names a file in the working directory, the build dir or the
-// share dir, tried in that order; an absolute one is returned as it is.
+extern std::string LIB_DIR;
+extern std::string CACHE_DIR;
+void resolve_dirs(std::string_view explicit_share_dir);
+// A relative path names a file in the working directory or the share dir,
+// tried in that order; an absolute one is returned as it is.
 std::string find_file(const std::string& path);
 EXPORT uint32_t CHANNELS;
 EXPORT uint32_t IN_CHANNELS;

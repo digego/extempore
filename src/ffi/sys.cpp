@@ -78,8 +78,12 @@ static pointer getShareDir(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, UNIV::SHARE_DIR.c_str());
 }
 
-static pointer getBuildDir(scheme* Scheme, pointer Args) {
-    return mk_string(Scheme, UNIV::BUILD_DIR.c_str());
+static pointer getLibDir(scheme* Scheme, pointer Args) {
+    return mk_string(Scheme, UNIV::LIB_DIR.c_str());
+}
+
+static pointer getCacheDir(scheme* Scheme, pointer Args) {
+    return mk_string(Scheme, UNIV::CACHE_DIR.c_str());
 }
 
 // (sys:extempore-version): the version `extempore version` prints, such as
@@ -117,8 +121,8 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args) {
 #ifdef _WIN32
     // set up the DLL load path
     SetDllDirectory("");  // Plug "binary planting" security hole.
-    if (!SetDllDirectory((extemp::UNIV::BUILD_DIR + "/libs/aot-cache").c_str())) {
-        log::warn("couldn't add libs/aot-cache/ to the DLL search path");
+    if (!SetDllDirectory((extemp::UNIV::LIB_DIR + "/aot-cache").c_str())) {
+        log::warn("couldn't add the lib dir's aot-cache/ to the DLL search path");
     }
     void* lib_handle = LoadLibraryA(libname);
 #else
@@ -331,7 +335,8 @@ std::span<const FFIEntry> sysDefs() {
         FFI_DEF("sys:pointer-size", pointerSize, 0, 0, false),
         FFI_DEF("sys:platform", platform, 0, 0, false),
         FFI_DEF("sys:share-dir", getShareDir, 0, 0, false),
-        FFI_DEF("sys:build-dir", getBuildDir, 0, 0, false),
+        FFI_DEF("sys:lib-dir", getLibDir, 0, 0, false),
+        FFI_DEF("sys:cache-dir", getCacheDir, 0, 0, false),
         FFI_DEF("sys:extempore-version", extemporeVersion, 0, 0, false),
         FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false),
         FFI_DEF("sys:note-failure", noteFailure, 0, 0, false),
