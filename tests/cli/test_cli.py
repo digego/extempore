@@ -278,6 +278,10 @@ class Usage(Scratch):
         self.assertEqual(p.returncode, 0)
         # a tag and what follows it, or in a checkout without tags a bare hash
         self.assertRegex(p.stdout, r"^Extempore \S+\n$")
+        self.assertEqual(run("--version").stdout, p.stdout)
+        version = p.stdout.removeprefix("Extempore ").strip()
+        p = run("exec", "-e", "(println (sys:extempore-version))")
+        self.assertEqual(p.stdout, f'"{version}"\n')
         p = run("--help")
         self.assertEqual(p.returncode, 0)
         for subcommand in ("exec", "test", "render", "compile", "devices"):

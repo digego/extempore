@@ -183,7 +183,8 @@ const std::vector<Subcommand>& subcommands() {
              false),
          0, kAnyNumber},
         {Command::Devices, "devices", "devices", "list the audio devices", with({}, false), 0, 0},
-        {Command::Version, "version", "version", "print the version", with({}, false), 0, 0},
+        {Command::Version, "version", "version", "print the version (also --version)",
+         with({}, false), 0, 0},
     };
     return table;
 }
@@ -413,6 +414,11 @@ Invocation parseCurrent(std::span<const std::string_view> Args) {
                 i = 1;
                 break;
             }
+        }
+        // what most programs answer to
+        if (Args[0] == "--version") {
+            inv.command = Command::Version;
+            i = 1;
         }
     }
     const Subcommand& sub = subcommand(inv.command);

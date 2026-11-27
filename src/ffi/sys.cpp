@@ -33,6 +33,7 @@
  *
  */
 
+#include "ExtemporeVersion.h"
 #include "SchemeFFIRegistry.h"
 
 #include "SchemeProcess.h"
@@ -79,6 +80,12 @@ static pointer getShareDir(scheme* Scheme, pointer Args) {
 
 static pointer getBuildDir(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, UNIV::BUILD_DIR.c_str());
+}
+
+// (sys:extempore-version): the version `extempore version` prints, such as
+// "v0.12.1" (a release's tag) or "v0.12.1-3-gabc1234" (a build past it)
+static pointer extemporeVersion(scheme* Scheme, pointer Args) {
+    return mk_string(Scheme, EXTEMPORE_VERSION);
 }
 
 // (sys:note-failure): the run didn't do what it was asked, so extempore exec
@@ -325,6 +332,7 @@ std::span<const FFIEntry> sysDefs() {
         FFI_DEF("sys:platform", platform, 0, 0, false),
         FFI_DEF("sys:share-dir", getShareDir, 0, 0, false),
         FFI_DEF("sys:build-dir", getBuildDir, 0, 0, false),
+        FFI_DEF("sys:extempore-version", extemporeVersion, 0, 0, false),
         FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false),
         FFI_DEF("sys:note-failure", noteFailure, 0, 0, false),
         FFI_DEF("sys:log-uncaught-error", logUncaughtError, 1, 0, false),

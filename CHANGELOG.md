@@ -3,6 +3,11 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## Unreleased
+
+`(sys:extempore-version)` gives the version as a string, such as `"v0.12.1"`,
+and `extempore --version` prints it as `extempore version` does.
+
 ## v0.12.1
 
 An interrupt (nREPL's `interrupt`, an editor's interrupt command, <kbd>C-c</kbd>
