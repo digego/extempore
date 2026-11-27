@@ -51,23 +51,38 @@ through the _Command Palette_, which you can open up with
 
 :::
 
-### Download Extempore
+### Install Extempore
 
-Grab the latest release from the
-[GitHub releases page](https://github.com/digego/extempore/releases), unzip it
-and put it wherever you like (e.g. in your _Documents_ folder). Then set the
-_Extempore: Executable_ VSCode config setting to the `extempore` program in that
-folder (`extempore.exe` on Windows)---this lets VSCode start Extempore for you
-(we'll do that in the next step). Set _Extempore: Sharedir_ to the folder as
-well, so the `(sys:load "libs/...")` lines in the examples link to their files.
+Run the _Extempore: Install Extempore_ command (from the command palette, as
+always). It downloads the latest release for your computer---a few hundred
+megabytes, mostly audio samples for the examples---and installs it. That's all:
+VSCode finds it there, so there's nothing to set, and VSCode's terminals have
+the `extempore` command. Run the command again whenever you want to upgrade.
 
-:::tip
+<details>
+<summary>Installing without VSCode</summary>
 
-The _Extempore: Download binary_ command does all this for you: it downloads the
-latest release for your computer, unzips it where you say, and sets _Extempore:
-Sharedir_ and _Extempore: Executable_ to point at it.
+On macOS or Linux, run this in a terminal:
 
-:::
+```
+curl -fsSL https://extemporelang.github.io/install.sh | sh
+```
+
+On Windows, run this in PowerShell:
+
+```
+irm https://extemporelang.github.io/install.ps1 | iex
+```
+
+Either one installs the same thing as the VSCode command, and puts `extempore`
+on your `PATH` for every terminal. You can also download the archive for your
+computer from the
+[GitHub releases page](https://github.com/digego/extempore/releases) and unzip
+it anywhere: the program is `bin/extempore` in there (`bin\extempore.exe` on
+Windows). On macOS, clear the quarantine flag your browser put on it first
+(`xattr -dr com.apple.quarantine` and the folder), or macOS won't run it.
+
+</details>
 
 ## Using Extempore {#using-extempore}
 
@@ -77,8 +92,8 @@ Here's the stuff you need to do every time you want to work with Extempore.
 
 You can start Extempore using the _Extempore: Start_ command (again, you can
 find this command using the [command palette](#vscode-command-palette)). It'll
-open up a terminal, `cd` into your extempore folder, and start the Extempore
-running. If you see something like this, everything's working---nice one.
+open up a terminal and start Extempore running. If you see something like this,
+everything's working---nice one.
 
 ```
    .-.     .-.     .-.
@@ -95,12 +110,10 @@ Ready: connect your editor to nREPL port 7888 (or the legacy server on 7099)
 :::note
 
 If you can't (or don't want to) start Extempore using the _Extempore: Start_
-VSCode command, then open a terminal in your Extempore directory (VSCode has a
-built-in terminal which you can bring up with <kbd>CTRL</kbd>+<kbd>&#96;</kbd>)
-and type `./extempore` (or `.\extempore.exe` if you're on Windows---note the
-backslash instead of the forward slash) and hit <kbd>return</kbd>. Extempore
-supports a bunch of command line options---try
-`./extempore --help`/`.\extempore.exe --help` to see the full list.
+VSCode command, then open a terminal (VSCode has a built-in terminal which you
+can bring up with <kbd>CTRL</kbd>+<kbd>&#96;</kbd>), type `extempore` and hit
+<kbd>return</kbd>. Extempore supports a bunch of command line options---try
+`extempore --help` to see the full list.
 
 :::
 
@@ -241,10 +254,10 @@ _Most_ of the time Extempore will guess the correct audio device, but not
 always. So if you're not getting any sound, it could be because Extempore is
 sending sound output to the wrong audio device.
 
-To print the list of audio devices that Extempore can "see", open a terminal and
-type the command `./extempore devices` (or `./extempore.exe devices` if you're
-on Windows) and hit <kbd>return</kbd>. On my machine right now it says this, but
-yours will (almost certainly) be different.
+To print the list of audio devices that Extempore can "see", open a terminal
+(VSCode's terminal will do) and type the command `extempore devices` and hit
+<kbd>return</kbd>. On my machine right now it says this, but yours will (almost
+certainly) be different.
 
 ```
 0: DisplayPort (Core Audio, 0 in, 2 out)
@@ -256,11 +269,11 @@ yours will (almost certainly) be different.
 If you do want Extempore to use a particular audio device, you can pass either
 the device index or the device name through an additional option. For example,
 if you want Extempore to use the _MacBook Pro Speakers_, either of these would
-work (again, remember to use `./extempore.exe` if you're on Windows):
+work:
 
 ```plaintext
-./extempore --device 3
-./extempore --device "MacBook Pro Speakers"
+extempore --device 3
+extempore --device "MacBook Pro Speakers"
 ```
 
 :::note
@@ -296,7 +309,7 @@ in order of easiest fixes to most difficult:
    for the gig
 
 2. try starting Extempore with a larger frame size (e.g.
-   `./extempore --frames 8192`)
+   `extempore --frames 8192`)
 
 3. if you don't need MIDI I/O, just load
    `(sys:load "examples/sharedsystem/audiosetup.xtm")` instead of
@@ -314,14 +327,3 @@ If you go with option #4, remember that you can create a new copy of
 messing with the original `audiosetup.xtm` file directly, remember that you can
 get a "pristine" version at any time from
 [GitHub](https://github.com/digego/extempore/blob/master/examples/sharedsystem/audiosetup.xtm).
-
-### Windows
-
-#### VCRUNTIME140_1.dll was not found
-
-**Windows users**: if you ever see the error message _VCRUNTIME140_1.dll was not
-found_, then you'll need to download the x64 `vc_redist.x64.exe`---make sure you
-get it from the official
-[Windows website](https://support.microsoft.com/en-au/help/2977003/the-latest-supported-visual-c-downloads),
-because there are lots of sketchy places on the web which will try and get you
-to download theirs, and who knows what they've done with it?

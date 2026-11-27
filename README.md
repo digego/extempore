@@ -53,35 +53,40 @@ reproducible example where you can.
 
 ### The easy way
 
-Download the latest
-[binary release](https://github.com/digego/extempore/releases) for your platform
-and unzip it. The folder is self-contained --- keep it together, but put it
-wherever you like --- and `extempore` (`extempore.exe` on Windows) runs from any
-working directory.
+In VSCode, install the
+[Extempore extension](https://marketplace.visualstudio.com/items?itemName=extemporelang.vscode-extempore)
+and run its _Extempore: Install Extempore_ command. The
+[quickstart](https://extemporelang.github.io/overview/quickstart/) takes it from
+there.
 
-Then,
+From a terminal, on macOS or Linux:
+
+    curl -fsSL https://extemporelang.github.io/install.sh | sh
+
+or on Windows, in PowerShell:
+
+    irm https://extemporelang.github.io/install.ps1 | iex
+
+Each installs the latest release for your machine, for you alone (no
+administrator rights needed), and puts `extempore` on your `PATH`. Run it again
+to upgrade. Then
 [set up your text editor of choice](https://extemporelang.github.io/guides/editor-support/)
 and away you go.
 
-In VSCode, the extension's _Extempore: Download binary_ command does the
-download and unzip for you, and points the extension at the result.
+If you'd rather not run a script, download the archive for your platform from
+the [releases page](https://github.com/digego/extempore/releases) and unzip it
+anywhere: `bin/extempore` (`bin\extempore.exe` on Windows) runs from any working
+directory. On macOS, a browser marks the download as quarantined, and macOS
+won't run it ("Apple could not verify ... is free of malware") until you clear
+the flag:
 
-_Note on macOS first launch_: the binaries aren't signed with an Apple Developer
-ID, so on first launch macOS will refuse to run them ("apple could not verify
-... is free of malware"). Despite the wording, this means Apple hasn't _checked_
-the binary, not that anything malicious has been _detected_ --- the release is
-built in public from the source in this repository by the
+    xattr -dr com.apple.quarantine /path/to/the/unzipped/folder
+
+The installers and the extension download with tools which don't set that flag.
+The binaries aren't signed with an Apple Developer ID: they're built in public
+from this repository by the
 [Release workflow](https://github.com/digego/extempore/actions/workflows/release-binary.yml),
-and you can rebuild it yourself from source if you'd prefer (see below). Signing
-with a Developer ID requires a paid Apple Developer account, which Extempore (as
-a research project) doesn't currently maintain.
-
-To clear the quarantine flag on the whole unzipped folder in one go, run:
-
-    xattr -dr com.apple.quarantine /path/to/extempore
-
-(replace the path with wherever you unzipped it, e.g. `~/Downloads/extempore`).
-After that, `extempore` will launch normally.
+and you can build them yourself from source if you'd prefer (see below).
 
 ### Build from source
 
@@ -108,12 +113,11 @@ many of the examples, but adds a ~250MB download to the build process. If you'd
 rather not do that, and are happy with some of the examples not working, then
 set `-DASSETS=OFF` instead.
 
-_Note on running_: an in-tree build keeps its runtime files (`runtime/`,
-`libs/`, `examples/`) in the source tree, so run it in place
-(`build/extempore`). If you'd rather have a self-contained tree somewhere else,
-`cmake --install build --prefix <dir>` copies the binary and its runtime files
-into `<dir>`; that tree can be moved anywhere and run from any working
-directory --- see [BUILDING.md](./BUILDING.md).
+_Note on running_: an in-tree build runs against the source tree's `runtime/`,
+`libs/` and `examples/`, so run it in place (`build/extempore`). To install it
+instead, `cmake --install build --prefix ~/.local` puts `extempore` in
+`~/.local/bin` and its files in `~/.local/share/extempore` and
+`~/.local/lib/extempore` --- see [BUILDING.md](./BUILDING.md).
 
 ### Hear your first sine wave
 
