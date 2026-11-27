@@ -1,0 +1,45 @@
+name: Installers
+
+# The install commands the docs give, run as given: the scripts the docs site
+# serves, installing the latest release. Run it after a release and the docs
+# deploy which follows; the weekly run notices either breaking.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+    steps:
+      - name: Install (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            sudo apt-get update -q && sudo apt-get install -yq libasound2t64
+          fi
+          curl -fsSL https://extemporelang.github.io/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          irm https://extemporelang.github.io/install.ps1 | iex
+          "$env:LOCALAPPDATA\Programs\Extempore\current\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Run it
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          extempore --version
+          extempore exec -e '(sys:load "libs/core/math.xtm") (println (sqrt 2.0))' | tee out.txt
+          grep -q 1.414214 out.txt
