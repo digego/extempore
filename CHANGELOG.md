@@ -3,7 +3,7 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## Unreleased
+## v0.12.1
 
 An interrupt (nREPL's `interrupt`, an editor's interrupt command, <kbd>C-c</kbd>
 in `extempore repl`) and the time limit now stop any Scheme evaluation. Before,
